@@ -9,17 +9,17 @@ open Causa.Ui.Contracts
 open Causa.App.Views.Workspace
 
 module SaveIndicator =
-    /// Forma's lozenge state for each save state (components.css: ok, attention, unknown, blocked). Saving has none:
-    /// it is in progress, neither good nor bad.
+    /// Forma's lozenge state for each save state (components.css: ok, attention, unknown, blocked), so every state
+    /// carries the lozenge glyph as well as its word (PERSIST-030). Saving is "unknown": not yet confirmed.
     let lozengeState kind =
         match kind with
         | SavedKind -> "ok"
         | UnsavedKind
         | OfflineKind -> "attention"
+        | SavingKind
         | UnknownOutcomeKind -> "unknown"
         | ConflictKind
         | SaveFailedKind -> "blocked"
-        | SavingKind -> ""
 
     let private offered a =
         match a with

@@ -19,6 +19,28 @@ What to tap:
 - **Your own investigation:** **New investigation**, fill in the problem statement, **Start investigation**, **Save**.
   Then record an observation and a hypothesis, **Save** again and reload the page: the investigation is still there.
 
+## Known limitations
+
+- **Not governed-accepted.** `main` holds only the shell and the build (T10 and T11, merged under the owner's P18 rule).
+  The full app runs from `slice/SL-T20`. The ledger reports 0 of 203 mandatory requirements integrated.
+- **You can record observations and hypotheses only.** Evidence, assessments, causes, corrective actions and conclusions
+  show for catalog cases but cannot be added yet.
+- **Catalog cases are frozen demonstrations**, read-only by design. Only your working copies are editable.
+- **No edit or delete** of a recorded item. The history is append-only, so a mistaken record stays, and there is no
+  duplicate check.
+- **One repository and branch per tab.** The token lives only in the tab's memory. The preview reconnects on reload with
+  its built-in connection; a local build shows the Connect form again.
+- **A new investigation is not added to the list in the tab that created it** until the tab connects again (for
+  example after a reload). Other tabs list it once they connect.
+- **Offline:** changes stay in the tab and Save is not sent until the connection is back. Closing or reloading the tab
+  loses unsaved changes; the app warns first.
+- **Basic conflict handling only.** If another writer changes the same investigation, the save stops as a conflict;
+  resolving it inside the app is not built yet.
+- **Tested in** Chromium at 1280 px and 390 px, with the catalog browser spec also run in WebKit.
+- **Live GitHub tests** run only in the governed gate, which has the credentials. Locally they fail closed as BLOCKED.
+- **Not built yet:** reports and print (Folio), the WDL work items, most of the INV work items, and the remaining UI
+  slices.
+
 ## Run it locally
 
 Prerequisites: the .NET SDK 10.0.402 (pinned by `global.json`) and Node 22.
@@ -47,7 +69,9 @@ The token is kept only in the tab's memory. It is never saved or shown, so you e
 
 `$INDY_INIT` is a checkout of the governed Indy-init repository (the harness lives there, not in this repository).
 
-### Offline checks (what Causa CI runs; no secrets)
+### Offline checks (no secrets)
+
+Causa CI runs the first two lines: the build and `dotnet test` with the offline filter. Run the browser lines locally.
 
 ```bash
 dotnet build Causa.slnx -c Release

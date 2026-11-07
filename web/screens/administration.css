@@ -1,0 +1,4 @@
+/* Owner: ui (T16). Administration. Forma tokens only. */
+.causa-facts { max-inline-size: var(--ef-layout-measure); overflow-wrap: anywhere; }
+.causa-fact[data-tone="critical"] dd { color: var(--ef-color-status-danger); }
+.causa-diagnostics { overflow-wrap: anywhere; }

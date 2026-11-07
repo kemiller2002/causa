@@ -1,0 +1,30 @@
+<!-- Owner: ui (T16). Settings (#/settings, UI-019, UI-020-O2): configurable preferences with their scope, kept apart
+     from the verified connection. Bindings come from Views/Settings.fs. -->
+<template data-if="screen.settings">
+  <div class="ef-container ef-stack causa-screen causa-settings" data-screen="settings">
+    <h1 class="causa-screen__title">Settings</h1>
+    <p class="causa-lead">Preferences for how Causa looks and behaves. They do not change any investigation.</p>
+    <section aria-labelledby="causa-settings-preferences" data-requirement-id="UIR-PREFERENCES">
+      <h2 id="causa-settings-preferences">Preferences</h2>
+      <template data-if="settings.preferences-present">
+        <ul class="ef-stack causa-preferences">
+          <template data-each="settings.preferences" data-key="key">
+            <li class="ef-field causa-preference">
+              <label class="ef-field__label"><span data-text="label"></span>
+                <select class="causa-preference__control" data-on="change" data-event="UIF-PREFERENCE">
+                  <option data-text="effective" selected></option>
+                </select>
+              </label>
+              <p class="ef-field__description">Applies to: <span data-text="scope"></span>. Options: <span data-text="options"></span></p>
+            </li>
+          </template>
+        </ul>
+      </template>
+    </section>
+    <section aria-labelledby="causa-settings-connection">
+      <h2 id="causa-settings-connection">Data repository</h2>
+      <p><span data-text="settings.connection-label"></span>: <span data-text="settings.connection-value"></span></p>
+      <p>The connection is verified with GitHub when you connect; it is not a preference.</p>
+    </section>
+  </div>
+</template>

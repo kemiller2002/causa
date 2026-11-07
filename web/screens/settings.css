@@ -1,0 +1,3 @@
+/* Owner: ui (T16). Settings. Forma tokens only. */
+.causa-preferences { list-style: none; padding: 0; margin: 0; max-inline-size: var(--ef-layout-measure); }
+.causa-preference__control { display: block; min-block-size: var(--ef-layout-target-min); min-inline-size: 12rem; max-inline-size: 100%; }

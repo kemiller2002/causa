@@ -287,8 +287,12 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
     let execute (request: HttpRequest) : HttpOutcome =
         lock gate (fun () ->
             let isMutation = GitHubRequests.isMutation request
-            let s0 = { state with Received = state.Received @ [ (if isMutation then "Mutation" else string request.Method), request.Url ] }
-            let fault, s1 = takeFault isMutation s0
+            let fault, s1' = takeFault isMutation state
+            // A request that fails before sending never reaches GitHub, so GitHub never receives it.
+            let s1 =
+                match fault with
+                | Some FailBeforeSending -> s1'
+                | _ -> { s1' with Received = s1'.Received @ [ (if isMutation then "Mutation" else string request.Method), request.Url ] }
             let token = tokenOf request
             let outcome, s2 =
                 match fault with

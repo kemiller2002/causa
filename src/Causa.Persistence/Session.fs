@@ -301,7 +301,8 @@ module SaveSession =
             | ReconcileHead ->
                 match Classify.classify Operation.ReadHead outcome |> Result.bind Decode.head with
                 | Ok head when head = s.BaseHead -> MachineEvent SaveInput.ReconcileNothingWrittenHeadUnchanged
-                | Ok head -> next (ReconcileCommits 1) (compareRequest head 1)
+                // Pages are read against the branch, so every page lists commits after the expected head up to the head.
+                | Ok _ -> next (ReconcileCommits 1) (compareRequest (CommitOid ctx.Connection.Repository.Branch) 1)
                 | Error _ -> MachineEvent SaveInput.ReconcileReadFailed
             | ReconcileCommits page ->
                 match Classify.classify (Operation.Compare s.BaseHead) outcome with
@@ -315,7 +316,7 @@ module SaveSession =
                         let head = p.Commits |> List.tryLast |> Option.map (fun c -> c.Oid) |> Option.defaultValue s.BaseHead
                         match p.Commits |> List.tryFind (fun c -> c.Message.Split([| '\n' |]) |> Array.exists (fun l -> l.Trim() = markerText)) with
                         | Some marked -> next (ReconcileFilesAt marked.Oid) (Writes.filesAt ctx.NextId ctx.Connection marked.Oid prefix)
-                        | None when p.TotalCommits > page * 100 -> next (ReconcileCommits(page + 1)) (compareRequest head (page + 1))
+                        | None when p.TotalCommits > page * 100 -> next (ReconcileCommits(page + 1)) (compareRequest (CommitOid ctx.Connection.Repository.Branch) (page + 1))
                         | None when Writes.touchesPrefix prefix (Writes.changedFiles answer) -> MachineEvent(SaveInput.StaleHeadSameInvestigation head)
                         | None -> MachineEvent(SaveInput.ReconcileNothingWrittenHeadMoved head)
             | ReconcileFilesAt commit ->

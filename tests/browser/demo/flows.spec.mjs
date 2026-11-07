@@ -11,6 +11,11 @@ const CREDS = {
   branch: process.env.DEMO_BRANCH || '',
   token: process.env.DEMO_TOKEN || '',
 };
+/// DEMO_SKIP_GITHUB=1: only the flows that need no GitHub answer run (1, 2, 5, 8); the others are reported SKIPPED,
+/// never passed. The browser's GitHub requests are blocked before they are sent, so the run adds nothing to any GitHub
+/// rate limit; the app then behaves as if GitHub were unreachable.
+const SKIP_GITHUB = process.env.DEMO_SKIP_GITHUB === '1';
+const needsGitHub = () => test.skip(SKIP_GITHUB, 'needs GitHub: skipped by DEMO_SKIP_GITHUB=1');
 const marker = (label) => `demo-${label}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const note = (text) => test.info().annotations.push({ type: 'note', description: text });
 
@@ -22,7 +27,9 @@ test.beforeEach(() => {
 /// DEMO_GITHUB_DOUBLE (local checks only) the browser's GitHub requests go to that double.
 const freshPage = async (browser) => {
   const context = await browser.newContext({ colorScheme: 'light' });
-  if (process.env.DEMO_GITHUB_DOUBLE) {
+  if (SKIP_GITHUB) {
+    await context.route('https://api.github.com/**', (route) => route.abort('blockedbyclient'));
+  } else if (process.env.DEMO_GITHUB_DOUBLE) {
     await context.route('https://api.github.com/**', async (route) => {
       const u = new URL(route.request().url());
       try {
@@ -154,6 +161,7 @@ test('2. Navigation between Investigations, Administration and Settings', async 
 });
 
 test('3. The connection state', async ({ browser }) => {
+  needsGitHub();
   const page = await freshPage(browser);
   await open(page, '#/');
   const mode = await connectionMode(page);
@@ -172,6 +180,7 @@ test('3. The connection state', async ({ browser }) => {
 });
 
 test('4. The investigation list opens a workspace', async ({ browser }) => {
+  needsGitHub();
   const page = await freshPage(browser);
   await ensureConnected(page);
   await expect(cards(page).first(), 'no investigation is listed').toBeVisible({ timeout: 30000 });
@@ -189,20 +198,39 @@ test('4. The investigation list opens a workspace', async ({ browser }) => {
 
 test('5. New investigation: form, validation and Cancel', async ({ browser }) => {
   const page = await freshPage(browser);
-  await ensureConnected(page);
-  await expect(newInvestigation(page), 'no New investigation action').toBeVisible({ timeout: 30000 });
-  await newInvestigation(page).click();
+  if (SKIP_GITHUB) {
+    // Without GitHub the start screen is opened by its address; the screen and its validation need no GitHub answer.
+    await open(page, '#/investigations/new');
+    const start = page.getByRole('heading', { name: 'New investigation', level: 1 });
+    if (!(await start.isVisible({ timeout: 15000 }).catch(() => false)) && !(await start.waitFor({ timeout: 15000 }).then(() => true).catch(() => false))) {
+      throw new Error(`the start screen did not open without GitHub: the page shows "${(await page.locator('main h1').first().innerText()).trim()}" instead (the app offers New investigation only on a connected repository)`);
+    }
+  } else {
+    await ensureConnected(page);
+    await expect(newInvestigation(page), 'no New investigation action').toBeVisible({ timeout: 30000 });
+    await newInvestigation(page).click();
+  }
   await expect(page.getByRole('heading', { name: 'New investigation', level: 1 })).toBeVisible({ timeout: 20000 });
   for (const name of ['Problem statement', 'Title', 'Primary investigative question', 'Investigation identifier']) await expect(field(page, name), `no ${name} field`).toBeVisible();
   await expect(field(page, 'Investigation identifier'), 'the identifier is not pre-filled').toHaveValue(/^[0-9a-f-]{36}$/i);
-  // An empty problem statement and an over-long title are refused with messages; nothing starts.
-  await field(page, 'Title').fill('t'.repeat(201));
-  await page.getByRole('button', { name: 'Start investigation', exact: true }).click();
-  const alert = page.getByRole('alert').first();
-  await expect(alert, 'no validation summary').toBeVisible({ timeout: 10000 });
-  await expect(alert).toContainText(/problem statement/i);
-  await expect(alert).toContainText(/200/);
-  await expect(page.getByRole('heading', { name: 'New investigation', level: 1 }), 'an invalid form left the start screen').toBeVisible();
+  const startButton = page.getByRole('button', { name: 'Start investigation', exact: true });
+  await expect(startButton, 'no Start investigation button').toBeVisible();
+  if (await startButton.isDisabled()) {
+    const why = (await page.evaluate(() => document.getElementById('causa-start-unavailable')?.textContent || '')).trim();
+    // Without GitHub the app cannot start an investigation; it must say why. Validation runs only when Start can.
+    if (!SKIP_GITHUB) throw new Error(`Start investigation is disabled: ${why || 'no reason shown'}`);
+    expect(why, 'Start is disabled without saying why').not.toBe('');
+    note(`Start disabled without GitHub, with the reason "${why}"; validation not exercised`);
+  } else {
+    // An empty problem statement and an over-long title are refused with messages; nothing starts.
+    await field(page, 'Title').fill('t'.repeat(201));
+    await startButton.click();
+    const alert = page.getByRole('alert').first();
+    await expect(alert, 'no validation summary').toBeVisible({ timeout: 10000 });
+    await expect(alert).toContainText(/problem statement/i);
+    await expect(alert).toContainText(/200/);
+    await expect(page.getByRole('heading', { name: 'New investigation', level: 1 }), 'an invalid form left the start screen').toBeVisible();
+  }
   // Cancel leaves without creating anything.
   const title = marker('cancelled');
   await field(page, 'Problem statement').fill(marker('cancelled-problem'));
@@ -214,6 +242,7 @@ test('5. New investigation: form, validation and Cancel', async ({ browser }) =>
 });
 
 test('6. Start, Save, and reopen in a fresh context', async ({ browser }) => {
+  needsGitHub();
   const page = await freshPage(browser);
   await ensureConnected(page);
   const v = { problem: marker('problem'), title: marker('title'), question: marker('question') };
@@ -251,6 +280,7 @@ test('6. Start, Save, and reopen in a fresh context', async ({ browser }) => {
 });
 
 test('7. A catalog investigation renders', async ({ browser }) => {
+  needsGitHub();
   const page = await freshPage(browser);
   await ensureConnected(page);
   const card = cards(page).filter({ hasText: CATALOG }).first();

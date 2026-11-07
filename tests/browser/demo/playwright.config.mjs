@@ -5,7 +5,8 @@
 //
 // Optional: DEMO_RESULTS (output directory, default tests/browser/demo/results), DEMO_OWNER/DEMO_REPO/DEMO_BRANCH/
 // DEMO_TOKEN (used only when the site shows its Connect form), DEMO_CATALOG_TITLE (default "Apollo 11"),
-// DEMO_GITHUB_DOUBLE (a local harness double's URL; for checking a local build only, never demo evidence).
+// DEMO_GITHUB_DOUBLE (a local harness double's URL; for checking a local build only, never demo evidence),
+// DEMO_SKIP_GITHUB=1 (run only the flows that need no GitHub answer: 1, 2, 5, 8; GitHub requests are blocked).
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,6 @@ export default defineConfig({
     ['json', { outputFile: path.join(results, 'demo-results.json') }],
     [path.join(here, 'summary-reporter.mjs'), { outputFile: path.join(results, 'demo-summary.md') }],
   ],
-  use: { baseURL: process.env.DEMO_URL, colorScheme: 'light', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  use: { baseURL: process.env.DEMO_URL, colorScheme: 'light', actionTimeout: 15_000, navigationTimeout: 45_000, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], launchOptions: chromium } }],
 });

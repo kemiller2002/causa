@@ -14,7 +14,25 @@ const REPO = {
   token: process.env.CAUSA_WRITE_TOKEN || 'harness-token',
 };
 const mark = (label) => `${label}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+// CAUSA_PROVIDER=harness-double answers api.github.com from a local GitHub double (synthetic, never evidence), as the
+// governed journeys do; otherwise nothing is intercepted and the suite talks to the real test repository.
+const routedContexts = new WeakSet();
+const useDouble = async (context) => {
+  if (process.env.CAUSA_PROVIDER !== 'harness-double' || routedContexts.has(context)) return;
+  routedContexts.add(context);
+  const double = process.env.CAUSA_DOUBLE_URL || 'http://127.0.0.1:4610';
+  await context.route('https://api.github.com/**', async (route) => {
+    const r = route.request();
+    const u = new URL(r.url());
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE' };
+    if (r.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    let answer;
+    try { answer = await route.fetch({ url: double + u.pathname + u.search }); } catch { return route.abort('failed'); }
+    await route.fulfill({ status: answer.status(), headers: { ...answer.headers(), ...cors }, body: await answer.body() });
+  });
+};
 const open = async (page, hash = '#/') => {
+  await useDouble(page.context());
   await page.goto(APP + hash);
   await expect(page.locator('#causa-main'), 'the engine did not render its first view').toBeVisible({ timeout: 30000 });
 };

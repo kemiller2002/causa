@@ -37,3 +37,6 @@
 .causa-card__status { margin: 0; }
 .causa-card__unknown { color: var(--ef-color-text-primary); font-style: italic; }
 .causa-card .ef-facts dd { overflow-wrap: anywhere; }
+/* 390 px audit: a one-line card title is a full-size target; lozenges and badges at Forma's small size. */
+.causa-card .ef-card__link { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); }
+.causa-card :is(.ef-status-lozenge, .ef-badge) { font-size: var(--ef-type-size-small); }

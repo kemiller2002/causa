@@ -199,3 +199,9 @@
 /* A flex summary loses the native disclosure marker: draw one (decorative; the summary's state is announced). */
 .causa-focus__summary::before { content: "▸"; color: var(--ef-color-text-primary); }
 details[open] > .causa-focus__summary::before { content: "▾"; }
+/* 390 px audit: section links are full-size targets; the header's lozenge, badge and copy kind read at Forma's small
+   size rather than 11-12 px. */
+.causa-sections__link { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); }
+.causa-save__state,
+.causa-workspace__title .causa-copy-kind,
+.causa-workspace__title .causa-copy-kind .ef-badge { font-size: var(--ef-type-size-small); }

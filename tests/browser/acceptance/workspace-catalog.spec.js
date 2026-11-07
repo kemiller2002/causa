@@ -7,6 +7,7 @@
 //   CAUSA_DOUBLE_URL   the double's base URL (default http://127.0.0.1:4611)
 //   CAUSA_APP_PATH     the application path on the test server (default /dist/index.html)
 import { test, expect } from '@playwright/test';
+import { touchTargets } from '../support/layout-assertions.mjs';
 
 const APP = process.env.CAUSA_APP_PATH || '/dist/index.html';
 const DOUBLE = process.env.CAUSA_DOUBLE_URL || 'http://127.0.0.1:4611';
@@ -198,6 +199,8 @@ test('Challenger causal analysis at 390 px: panels by hypothesis, the full graph
   // Every summary is a full-size target.
   for (const box of await page.locator('summary.causa-focus__summary').evaluateAll((ss) => ss.filter((x) => x.offsetParent).map((x) => x.getBoundingClientRect().height)))
     expect(box).toBeGreaterThanOrEqual(44);
+  // Every tap target on the screen is at least 44 x 44 px (FL-01).
+  expect(await touchTargets(page), 'touch targets under 44 px at 390 px').toEqual([]);
   // The full graph is collapsed: its picture is not shown.
   await expect(page.locator('figure.causa-graph')).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 'horizontal overflow at 390 px').toBeLessThanOrEqual(0);
@@ -208,6 +211,20 @@ test('Challenger causal analysis at 390 px: panels by hypothesis, the full graph
   await panels.nth(1).locator('summary.causa-focus__summary').click();
   await page.locator('section.causa-focus').evaluate((e) => e.scrollIntoView({ block: 'start' }));
   await page.screenshot({ path: process.env.CAUSA_FOCUS_SHOT || test.info().outputPath('challenger-390.png') });
+  expect(errors, 'page errors').toEqual([]);
+  await context.close();
+});
+
+// The investigation list and a workspace header at 390 px: every tap target at least 44 px, no sideways scroll.
+test('the list and a workspace at 390 px keep full-size tap targets', async ({ browser }) => {
+  const { context, page, errors } = await connected(browser, { width: 390, height: 844 });
+  await expect(page.locator('[data-requirement-id="INV-039"] article').first()).toBeVisible({ timeout: 20000 });
+  expect(await touchTargets(page), 'list: touch targets under 44 px').toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await page.getByRole('link', { name: CASES[3].title }).first().click();
+  await expect(page.getByRole('navigation', { name: 'Investigation sections' })).toBeVisible({ timeout: 20000 });
+  expect(await touchTargets(page), 'workspace: touch targets under 44 px').toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   expect(errors, 'page errors').toEqual([]);
   await context.close();
 });

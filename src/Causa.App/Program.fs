@@ -155,6 +155,8 @@ let mutable private state: AdapterState option = None
 let mutable private page = ""
 let mutable private pending: Map<string, Pending> = Map.empty
 let mutable private correlation = 0L
+/// Reconcile timers the engine asked for (HostEffect.Timer), due at a host time; fired by the boundary's tick.
+let mutable private timers: (DateTimeOffset * TimerKey) list = []
 /// The injected deploy connection, kept in memory only (never stored, logged or rendered) so Try again can reuse it.
 let mutable private deployConnection: DeployConnection option = None
 
@@ -179,6 +181,18 @@ let step (current: AdapterState option) (inbound: Inbound) (pendingNow: Map<stri
     | LocationChanged hash ->
         let route = View.route hash
         let s2, fx = ui.Dispatch(UiIntent.Navigate route) (ensure route)
+        s2, fx, false
+    // Browser mechanism relayed by web/boundary.js (no application state there): connectivity and the timer tick.
+    | Event("UIA-CONNECTIVITY", _, value) ->
+        let s = ensure InvestigationsRoute
+        let s2, fx = UiAdapter.browser engine (ConnectivityChanged(value <> Some "offline")) s
+        s2, fx, false
+    | Event("UIA-TICK", _, _) ->
+        let s = ensure InvestigationsRoute
+        let now = DateTimeOffset.UtcNow
+        let due, later = timers |> List.partition (fun (at, _) -> at <= now)
+        timers <- later
+        let s2, fx = due |> List.fold (fun (st, acc) (_, key) -> let st2, more = UiAdapter.browser engine (TimerFired key) st in st2, acc @ more) (s, [])
         s2, fx, false
     | Event("UIA-DEPLOY-RETRY", _, _) ->
         let s = ensure InvestigationsRoute
@@ -278,8 +292,9 @@ let private render (view: AppView) (extra: Bindings) (effects: HostEffect list) 
                 let id = nextCorrelation "http"
                 pending <- pending |> Map.add id (EngineRequest request.Id)
                 writeHttp writer id request
-            // Timers, the leave guard and downloads arrive with the save machine (T19); announcements are in the view.
-            | Timer _
+            | Timer(key, ms) -> timers <- timers @ [ DateTimeOffset.UtcNow.AddMilliseconds(float ms), key ]
+            // The leave guard is the view's shell.unsaved, which web/boundary.js reads on beforeunload; downloads are not
+            // offered in this build; announcements are in the view.
             | SetLeaveGuard _
             | Download _
             | LiveAnnounce _ -> ()
@@ -320,6 +335,7 @@ let dispatch (message: string) : string =
 /// A fresh tab: what a page reload gives the host (used by the host tests; the browser reloads the page instead).
 let reset () =
     state <- None
+    timers <- []
     deployConnection <- None
     pending <- Map.empty
     page <- ""

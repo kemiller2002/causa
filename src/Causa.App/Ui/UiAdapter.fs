@@ -467,8 +467,11 @@ module UiAdapter =
 
     /// The shell's own bindings beyond the AppView: the deploy connection's failure, shown as an alert with Try again.
     let shellBindings (s: AdapterState) : Bindings =
+        let unsaved = s.Model.Sessions |> Map.exists (fun _ x -> not x.Unsaved.IsEmpty || not x.AfterInFlight.IsEmpty)
         Map.ofList
-            [ "deploy.failed", BindingValue.Flag s.Local.DeployFailure.IsSome
+            [ // PERSIST-019: the leave warning and the Disconnect confirmation (web/boundary.js reads it).
+              "shell.unsaved", BindingValue.Text(if unsaved then "true" else "false")
+              "deploy.failed", BindingValue.Flag s.Local.DeployFailure.IsSome
               "deploy.failure-text", BindingValue.Text(s.Local.DeployFailure |> Option.defaultValue "") ]
 
     /// The investigation a route names: a catalog workspace, or a working copy (`workspaces/demo/causa-app-<run>`).

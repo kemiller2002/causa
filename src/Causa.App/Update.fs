@@ -157,6 +157,24 @@ module Update =
                 | None -> model
             | _ -> model
 
+    /// SM-SAVE with the known-offline branches first while the tab is offline (KnownOffline, T19): nothing is sent.
+    let private stepSession (p: Persistence) (ctx: RequestContext) (model: Model) (session: InvestigationSession) (input: SaveInput) =
+        match model.Network with
+        | NetworkState.Offline ->
+            match KnownOffline.step session input with
+            | Some result -> Ok result
+            | None -> (machineFor p model).Step ctx session input
+        | NetworkState.Online -> (machineFor p model).Step ctx session input
+
+    /// SM-LOAD's open, which is known-offline while the tab is offline (KnownOffline.open', T19).
+    let private openLoad (p: Persistence) (ctx: RequestContext) (model: Model) (current: LoadState) (input: LoadInput) =
+        match model.Network, input with
+        | NetworkState.Offline, LoadInput.OpenRequested _ ->
+            match KnownOffline.open' current with
+            | Some result -> Ok result
+            | None -> (machineFor p model).StepLoad ctx current input
+        | _ -> (machineFor p model).StepLoad ctx current input
+
     let private sessionRef (session: InvestigationSession) : InvestigationRef =
         { Address = Writable.address session.Address; Id = session.Id }
 
@@ -229,7 +247,7 @@ module Update =
             | Ok _ ->
                 match backend.Persistence, requestContext backend model (Some ref) with
                 | Some p, Some ctx ->
-                    match (machineFor p model).Step ctx session (SaveInput.Edit envelope) with
+                    match stepSession p ctx model session (SaveInput.Edit envelope) with
                     | Ok(s, effects) ->
                         let fx, sent = hostEffects effects
                         { model with
@@ -247,7 +265,7 @@ module Update =
         | Some _, None, _ -> refuse (NotWired "Saving") model
         | Some _, Some _, None -> refuse (Rejected "Connect a data repository before saving.") model
         | Some session, Some p, Some ctx ->
-            match (machineFor p model).Step ctx session input with
+            match stepSession p ctx model session input with
             | Ok(s, effects) ->
                 let fx, sent = hostEffects effects
                 let model' =
@@ -311,7 +329,7 @@ module Update =
             | Loaded _
             | LoadState.Loading _ -> model, []
             | _ ->
-                match (machineFor p model).StepLoad ctx current (LoadInput.OpenRequested ref) with
+                match openLoad p ctx model current (LoadInput.OpenRequested ref) with
                 | Ok(l, effects) ->
                     let fx, sent = hostEffects effects
                     { model with Loads = model.Loads |> Map.add ref l; NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }, fx
@@ -391,18 +409,26 @@ module Update =
 
     let private listRequested (backend: Backend) (target: ListingTarget) (model: Model) = list backend target model
 
-    let private network (input: NetworkInput) (model: Model) =
-        match input with
-        | NetworkInput.OfflineObserved -> { model with Network = NetworkState.Offline }, [ announce Polite "You are offline." ]
-        | NetworkInput.OnlineObserved -> { model with Network = NetworkState.Online }, [ announce Polite "You are back online." ]
+    /// Connectivity reaches every session (SM-SAVE T-S06, T-S09): offline sends nothing; back online offers Save again.
+    let private network (backend: Backend) (input: NetworkInput) (model: Model) =
+        let model, announcement, saveInput =
+            match input with
+            | NetworkInput.OfflineObserved -> { model with Network = NetworkState.Offline }, announce Polite "You are offline. Changes stay in this tab.", SaveInput.WentOffline
+            | NetworkInput.OnlineObserved -> { model with Network = NetworkState.Online }, announce Polite "You are back online.", SaveInput.WentOnline
+        model.Sessions
+        |> Map.toList
+        |> List.fold (fun (m, fx) (ref, _) -> let m2, more = sessionInput backend ref saveInput m in m2, fx @ more) (model, [ announcement ])
 
     /// One message, one new model and the effects the host performs.
     let update (backend: Backend) (msg: Msg) (model: Model) : Model * HostEffect list =
         match msg with
         | Navigate route -> { model with Route = route }, []
-        | Network input -> network input model
+        | Network input -> network backend input model
         | Browser(ConnectivityChanged online) ->
-            network (if online then NetworkInput.OnlineObserved else NetworkInput.OfflineObserved) model
+            match online, model.Network with
+            | true, NetworkState.Online
+            | false, NetworkState.Offline -> model, []
+            | _ -> network backend (if online then NetworkInput.OnlineObserved else NetworkInput.OfflineObserved) model
         | Browser(HttpCompleted outcome) -> httpCompleted backend outcome model
         | Browser(TimerFired(ReconcileTimer ref)) ->
             match model.Sessions |> Map.tryFind ref, backend.Persistence, requestContext backend model (Some ref) with
@@ -423,7 +449,7 @@ module Update =
             match backend.Persistence, requestContext backend model (Some ref) with
             | Some p, Some ctx ->
                 let current = model.Loads |> Map.tryFind ref |> Option.defaultValue NotLoaded
-                match (machineFor p model).StepLoad ctx current input with
+                match openLoad p ctx model current input with
                 | Ok(l, effects) ->
                     let fx, sent = hostEffects effects
                     { model with Loads = model.Loads |> Map.add ref l; NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }, fx

@@ -265,3 +265,44 @@ type ListedSummaries() =
             Assert.Equal(None, other.Counts)
             Assert.Equal(None, other.LastActivity)
         | other -> Assert.Fail(sprintf "%A" other)
+
+/// Connectivity reaches the sessions (SM-SAVE T-S06, T-S09; PERSIST-018): offline, Save sends nothing; back online,
+/// Save is offered again.
+type Connectivity() =
+    [<Fact>]
+    member _.``offline a save sends nothing, and back online the session is Unsaved again``() =
+        let address = (WorkspaceAddress.workingCopy [] "offline-test").Value
+        let writable = (Writable.ofAddress address).Value
+        let backend =
+            { Fixture.backend with
+                Persistence =
+                    Some
+                        { Connector = GitHubConnect.connector
+                          Machine = SaveMachines.withStorage Fixture.backend.Author
+                          Lister = GitHubLister.lister
+                          Codec = StorageCodecs.codec }
+                WorkingCopy = Some address }
+        let engine = Update.engine backend
+        let model0, _ = engine.Init(Route "#/")
+        let model =
+            { model0 with
+                Connection = Connected true
+                Context = Some { Repository = { Owner = "o"; Name = "r"; Branch = "main" }; Credential = Credential.create "t" }
+                Listings = Map.ofList [ address, { Address = address; ReadAt = CommitOid "head"; Investigations = [] } ] }
+        let id = InvestigationId(Guid.NewGuid())
+        let start =
+            { CommandId = CommandIds.at Fixture.at
+              Investigation = id
+              ExpectedVersion = None
+              Command = Core(StartInvestigation { Title = (NonEmptyText.create "Offline").Value; ObservationId = Guid.NewGuid(); Original = (NonEmptyText.create "No network.").Value }) }
+        let ref = { Address = address; Id = id }
+        let created, _ = engine.Update (Msg.CreateRequested(writable, start)) model
+        Assert.Equal(SaveState.Unsaved, created.Sessions[ref].State)
+        let offline, _ = engine.Update (Msg.Browser(ConnectivityChanged false)) created
+        Assert.Equal(NetworkState.Offline, offline.Network)
+        Assert.Equal(SaveState.Offline, offline.Sessions[ref].State)
+        let saved, effects = engine.Update (Msg.SessionInput(ref, SaveInput.SaveRequested)) offline
+        Assert.DoesNotContain(effects, fun e -> match e with Http _ -> true | _ -> false)
+        Assert.Equal(SaveState.Offline, saved.Sessions[ref].State)
+        let online, _ = engine.Update (Msg.Browser(ConnectivityChanged true)) saved
+        Assert.Equal(SaveState.Unsaved, online.Sessions[ref].State)

@@ -81,6 +81,31 @@ const start = async () => {
 
 shell.retry.addEventListener("click", () => { void start(); });
 
+// Browser signals the engine needs (IF41-APP BrowserSignal), relayed as Limen events through hidden inputs: the
+// browser's connectivity (SM-NETWORK, PERSIST-018) and a tick that fires the engine's reconcile timers (PERSIST-015).
+const relay = (id, value) => {
+  const el = byId(id);
+  if (!el || shell.main.hidden) return;
+  el.value = value;
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+};
+window.addEventListener("online", () => relay("causa-connectivity", "online"));
+window.addEventListener("offline", () => relay("causa-connectivity", "offline"));
+setInterval(() => relay("causa-tick", String(Date.now())), 1000);
+
+// PERSIST-019: unsaved changes exist only in this tab. Leaving warns, and Disconnect asks first.
+const unsaved = () => byId("causa-unsaved")?.value === "true";
+window.addEventListener("beforeunload", (event) => {
+  if (unsaved()) { event.preventDefault(); event.returnValue = ""; }
+});
+document.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target.closest('[data-event="UIA-DISCONNECT"]') : null;
+  if (target && unsaved() && !window.confirm("You have unsaved changes in this tab. Disconnect anyway? They will be lost.")) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}, true);
+
 // Scroll context on Back and Forward (UI-011-O4): each history entry keeps its own scroll position, saved into
 // history.state as the user scrolls and restored once the kernel has rendered the route the browser popped. Only the
 // browser's own scroll offset is kept: no application state.

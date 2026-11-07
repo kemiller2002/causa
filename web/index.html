@@ -97,6 +97,11 @@
       <!-- causa:screens -->
     </main>
 
+    <!-- Browser mechanism only (web/boundary.js): connectivity and the timer tick go to the engine as events; the
+         unsaved flag drives the leave warning and the Disconnect confirmation (PERSIST-018, -019). -->
+    <input type="hidden" id="causa-connectivity" data-on="change" data-event="UIA-CONNECTIVITY">
+    <input type="hidden" id="causa-tick" data-on="change" data-event="UIA-TICK">
+    <input type="hidden" id="causa-unsaved" data-bind-value="shell.unsaved" value="false">
     <p class="ef-visually-hidden" id="causa-live-polite" aria-live="polite" data-text="announce.polite"></p>
     <p class="ef-visually-hidden" id="causa-live-assertive" aria-live="assertive" data-text="announce.assertive"></p>
   </div>

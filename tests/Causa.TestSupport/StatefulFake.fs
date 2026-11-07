@@ -256,7 +256,11 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
         let query = request.Body |> Option.bind Json.parse |> Json.field "query" |> Json.text |> Option.defaultValue ""
         let blob (bytes: byte[] option) =
             match bytes with
-            | Some b -> Json.Object [ "text", Json.String(Encoding.UTF8.GetString b); "isTruncated", Json.Bool false ]
+            | Some b ->
+                // GitHub truncates the text of a large blob (recorded behaviour: isTruncated, text cut).
+                let truncated = b.Length > 512_000
+                let text = if truncated then Encoding.UTF8.GetString(Array.sub b 0 512_000) else Encoding.UTF8.GetString b
+                Json.Object [ "oid", Json.String(gitBlobSha b); "text", Json.String text; "isTruncated", Json.Bool truncated ]
             | None -> Json.Null
         let ref' = Regex.Match(query, "ref\\(qualifiedName: \"refs/heads/([^\"]+)\"\\)")
         if ref'.Success then
@@ -314,6 +318,14 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                         | Some TimeOutAfterApplying -> NotAnswered(request.Id, TransportFailure.TimedOut), s3
                         | _ -> answered, s3
                     | Some _ when request.Url = GitHubRequests.GraphQlUrl -> graphQlRead s1 request, s1
+                    | Some true when request.Method = Post && request.Url = repoPrefix + "git/refs" ->
+                        // create a branch (the live fixture's fresh branch per test class)
+                        let input = request.Body |> Option.bind Json.parse
+                        match Json.field "ref" input |> Json.text, Json.field "sha" input |> Json.text with
+                        | Some r, Some sha when r.StartsWith "refs/heads/" && s1.Commits.ContainsKey sha && not (s1.Branches.ContainsKey(r.Substring 11)) ->
+                            answerJson request.Id 201 (Json.Object [ "ref", Json.String r; "object", Json.Object [ "sha", Json.String sha ] ]),
+                            { s1 with Branches = Map.add (r.Substring 11) sha s1.Branches }
+                        | _ -> recorded request.Id "rest-422-validation", s1
                     | Some _ -> read s1 request, s1
             state <- s2
             outcome)
@@ -507,7 +519,7 @@ module Conformance =
 /// A deterministic test rig for the causa-storage save machine over the stateful fake: it plays the engine's part
 /// (request identities, the base each session rests on, executing Sends and feeding answers back) so a test drives
 /// one save request end to end and inspects every request sent (PAT-02..PAT-10 against the fake).
-type SaveRig(fake: StatefulFake, run: string) =
+type ProviderRig(execute: Execute, connection: ConnectionContext, run: string) =
     let actor = Causa.Domain.Actor.Human(Causa.Domain.NonEmptyText.create "investigator-01" |> Option.get)
     let mutable nextId = 1000L
     let mutable bases : Map<Causa.Domain.InvestigationId, VerifiedInvestigation> = Map.empty
@@ -519,7 +531,7 @@ type SaveRig(fake: StatefulFake, run: string) =
 
     let machine () = SaveMachines.withStorage actor (fun s -> bases.TryFind s.Id)
 
-    let ctx () : RequestContext = { Connection = fake.WriteConnection; NextId = RequestId nextId; MutationInFlightElsewhere = false; Now = now }
+    let ctx () : RequestContext = { Connection = connection; NextId = RequestId nextId; MutationInFlightElsewhere = false; Now = now }
 
     let text (s: string) = Causa.Domain.NonEmptyText.create s |> Option.get
 
@@ -536,7 +548,7 @@ type SaveRig(fake: StatefulFake, run: string) =
         session
 
     and answer (s: InvestigationSession) (request: HttpRequest) : InvestigationSession =
-        let outcome = fake.Execute request
+        let outcome = execute request
         match s.State with
         | SaveState.Conflict(ReadingRemote rid) when rid = request.Id ->
             match (machine ()).InterpretConflict (ctx ()) (ReadingRemote rid) outcome with
@@ -559,7 +571,6 @@ type SaveRig(fake: StatefulFake, run: string) =
         | Ok(s', effects) -> settle s' effects
         | Error f -> failwithf "Step refused %s/%s: %s" f.State f.Input f.Reason
 
-    member _.Fake = fake
     member _.Address = address
     member _.Writable = Writable.ofAddress address |> Option.get
     member _.Actor = actor
@@ -580,7 +591,8 @@ type SaveRig(fake: StatefulFake, run: string) =
     member this.Create (title: string) (problem: string) : InvestigationSession =
         let inv = Causa.Domain.InvestigationId(Guid(Array.init 16 (fun _ -> byte (random.Next 256))))
         let start = this.Command inv (Causa.Domain.StartInvestigation { Title = text title; ObservationId = Guid.NewGuid(); Original = text problem })
-        (machine ()).InitialNew this.Writable inv (fake.Head()) start true
+        let head = (Provider.over execute connection).ReadHead() |> Result.defaultWith (fun e -> failwithf "head read failed: %A" e)
+        (machine ()).InitialNew this.Writable inv head start true
 
     member this.Observe (s: InvestigationSession) (observation: string) : InvestigationSession =
         let cmd = this.Command s.Id (Causa.Domain.RecordObservation { ObservationId = Guid.NewGuid(); Original = text observation; ObservedAt = None; Source = None })
@@ -604,7 +616,7 @@ type SaveRig(fake: StatefulFake, run: string) =
         match m.StepLoad (ctx ()) NotLoaded (LoadInput.OpenRequested target) with
         | Ok(loading, [ Send request ]) ->
             nextId <- nextId + 1L
-            match m.InterpretLoad (ctx ()) loading (fake.Execute request) with
+            match m.InterpretLoad (ctx ()) loading (execute request) with
             | LoadEvent(LoadInput.LoadVerified v) ->
                 bases <- Map.add v.Investigation.Id v bases
                 Ok v
@@ -618,5 +630,61 @@ type SaveRig(fake: StatefulFake, run: string) =
         | Ok v -> v
         | Error f -> failwithf "reload failed: %A" f
 
+    member _.Connection = connection
+
+/// The rig over the stateful fake, with the fake's record of every request.
+type SaveRig(fake: StatefulFake, run: string) =
+    inherit ProviderRig(fake.Execute, fake.WriteConnection, run)
+    member _.Fake = fake
     /// The mutations the fake received (createCommitOnBranch), in order.
     member _.Mutations = fake.State.Received |> List.filter (fun (m, _) -> m = "Mutation") |> List.length
+
+/// Records every request a live rig sends (PAT-02), and can lose the answer to the next mutation after GitHub
+/// applied it (a real commit whose answer the tab never sees).
+type LiveRecorder(live: LiveRun) =
+    let log = ResizeArray<HttpRequest>()
+    let outcomes = ResizeArray<HttpRequest * HttpOutcome>()
+    let mutable loseNextMutationAnswer = false
+    member _.Requests = List.ofSeq log
+    /// Every exchange as the tab saw it (a lost answer as NotAnswered).
+    member _.Exchanges = List.ofSeq outcomes
+    /// The branch heads the tab read (REST ref reads and GraphQL head-and-files reads).
+    member _.HeadsRead =
+        outcomes
+        |> Seq.choose (fun (r, o) ->
+            match o with
+            | Answered(_, 200, _, body) when r.Url.Contains "/git/ref/heads/" -> Json.parse body |> Json.path [ "object"; "sha" ] |> Json.text
+            | Answered(_, 200, _, body) when r.Url = GitHubRequests.GraphQlUrl -> Json.parse body |> Json.path [ "data"; "repository"; "ref"; "target"; "oid" ] |> Json.text
+            | _ -> None)
+        |> List.ofSeq
+    member _.Mutations = log |> Seq.filter GitHubRequests.isMutation |> List.ofSeq
+    member _.LoseNextMutationAnswer() = loseNextMutationAnswer <- true
+    member _.Execute : Execute =
+        fun request ->
+            log.Add request
+            let outcome = live.Execute request
+            let created (body: string) =
+                match Json.parse body |> Json.path [ "data"; "createCommitOnBranch"; "commit"; "oid" ] |> Json.text with
+                | Some oid -> live.Created(CommitOid oid)
+                | None -> ()
+            let seen =
+                match outcome with
+                | Answered(id, _, _, body) when GitHubRequests.isMutation request && loseNextMutationAnswer ->
+                    loseNextMutationAnswer <- false
+                    created body
+                    NotAnswered(id, TransportFailure.LostAfterSending)
+                | Answered(_, _, _, body) when GitHubRequests.isMutation request ->
+                    created body
+                    outcome
+                | _ -> outcome
+            outcomes.Add((request, seen))
+            seen
+
+/// The save rig over real GitHub on a live run's fresh branch (SU-DOTNET-LIVE).
+type LiveSaveRig(recorder: LiveRecorder, live: LiveRun, run: string) =
+    inherit ProviderRig(recorder.Execute, live.WriteConnection, run)
+    member _.Recorder = recorder
+    member _.Live = live
+    static member Create(live: LiveRun, name: string) =
+        let run = (name + "-" + live.RunId).ToLowerInvariant() |> fun r -> if r.Length > 50 then r.Substring(0, 50).TrimEnd('-') else r
+        LiveSaveRig(LiveRecorder live, live, run)

@@ -14,7 +14,9 @@ type FilesAtCommit =
     { Commit: CommitOid
       CommittedAt: DateTimeOffset option
       Files: FileSet option
-      Truncated: bool }
+      Truncated: bool
+      /// The Git blob ids of manifest, events and snapshot at the commit, when all three exist.
+      BlobOids: string list option }
 
 [<RequireQualifiedAccess>]
 module Writes =
@@ -152,7 +154,7 @@ module Writes =
     /// One GraphQL read of the three files and the commit time at a named commit: a read-back or a reconciliation file
     /// read is one request, so one Outstanding identity covers it.
     let filesAt (id: RequestId) (connection: ConnectionContext) (CommitOid commit) (RepoPath prefix) : HttpRequest =
-        let blob alias name = sprintf "%s: object(expression: %s) { ... on Blob { text isTruncated } }" alias (gqlString (sprintf "%s:%s/%s" commit prefix name))
+        let blob alias name = sprintf "%s: object(expression: %s) { ... on Blob { oid text isTruncated } }" alias (gqlString (sprintf "%s:%s/%s" commit prefix name))
         let query =
             sprintf
                 "query { repository(owner: %s, name: %s) { c: object(oid: %s) { oid ... on Commit { committedDate } } %s %s %s } }"
@@ -191,7 +193,11 @@ module Writes =
                     match text "m", text "e", text "s" with
                     | Some m, Some e, Some s -> Some { Manifest = Encoding.UTF8.GetBytes m; Events = Encoding.UTF8.GetBytes e; Snapshot = Encoding.UTF8.GetBytes s }
                     | _ -> None
-                Ok { Commit = commit; CommittedAt = at; Files = files; Truncated = truncated }
+                let oids =
+                    match [ "m"; "e"; "s" ] |> List.map (fun a -> blob a |> Json.field "oid" |> Json.text) with
+                    | [ Some m; Some e; Some s ] -> Some [ m; e; s ]
+                    | _ -> None
+                Ok { Commit = commit; CommittedAt = at; Files = files; Truncated = truncated; BlobOids = oids }
 
     /// The commit a filesAt answer was read at, or None when the answer is not a filesAt answer.
     let filesAtCommitOid (answer: ProviderAnswer) : CommitOid option =

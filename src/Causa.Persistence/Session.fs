@@ -263,12 +263,17 @@ module SaveSession =
         let compareRequest head page = GitHubRequests.compare ctx.NextId ctx.Connection s.BaseHead head page
         let written () = encode s |> Result.toOption
         let filesVerdict (commit: CommitOid) (answer: ProviderAnswer) (matched: Confirmation.T -> SaveInput) (differ: CommitOid -> SaveInput) (unreadable: SaveInput) =
-            match Writes.decodeFilesAt commit answer, written () with
-            | Ok { Files = Some files; Truncated = false; CommittedAt = at }, Some w ->
-                match Confirmation.ofReadBack s.Id commit (defaultArg at ctx.Now) w files with
+            let confirm (at: DateTimeOffset option) (w: FileSet) (readBack: FileSet) =
+                match Confirmation.ofReadBack s.Id commit (defaultArg at ctx.Now) w readBack with
                 | Some c -> MachineEvent(matched c)
                 | None -> MachineEvent(differ commit)
-            | Ok { Files = None }, _ -> MachineEvent(differ commit)
+            match Writes.decodeFilesAt commit answer, written () with
+            | Ok { Files = Some files; Truncated = false; CommittedAt = at }, Some w -> confirm at w files
+            // A file too large for GraphQL text is compared by its Git blob id: equal ids are equal bytes.
+            | Ok { BlobOids = Some oids; CommittedAt = at }, Some w ->
+                let mine = [ w.Manifest; w.Events; w.Snapshot ] |> List.map Canonical.gitBlobSha
+                if mine = oids then confirm at w w else MachineEvent(differ commit)
+            | Ok { Files = None; BlobOids = None }, _ -> MachineEvent(differ commit)
             | _ -> MachineEvent unreadable
         match s.Outstanding with
         | Some(id, awaiting) when id = answered ->

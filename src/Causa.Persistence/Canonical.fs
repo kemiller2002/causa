@@ -165,6 +165,11 @@ module Canonical =
     /// SHA-256 of a JSON document's canonical text without the trailing LF (section 2.11).
     let digest (j: Json) = sha256Hex (utf8 (serialize j))
 
+    /// The Git blob id of some bytes (SHA-1 of "blob <length>\0" + bytes): equal ids mean equal bytes.
+    let gitBlobSha (bytes: byte[]) =
+        let header = Encoding.ASCII.GetBytes(sprintf "blob %d\000" bytes.Length)
+        SHA1.HashData(Array.append header bytes) |> Convert.ToHexString |> fun s -> s.ToLowerInvariant()
+
     /// UUIDv5 (RFC 4122 section 4.3, SHA-1).
     let uuidV5 (ns: Guid) (name: string) : Guid =
         let nsBytes = ns.ToByteArray(true)

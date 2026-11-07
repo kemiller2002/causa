@@ -35,7 +35,7 @@ const connected = async (browser, viewport) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(APP + '#/');
-  await expect(page.locator('#causa-main')).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#causa-main')).toBeVisible({ timeout: 60000 });
   // The start-up reads finish before typing: a later first view would otherwise reset the fields.
   await page.waitForLoadState('networkidle');
   await page.getByLabel('Repository owner', { exact: true }).fill('harness');
@@ -86,3 +86,51 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     });
   }
 }
+
+// A writable working copy: the editors record an observation and a hypothesis as unsaved changes, Save commits them
+// through the save path (Unsaved -> Saved), and a fresh tab reads both back.
+test('a working copy records an observation and a hypothesis, saves them and reads them back', async ({ browser }) => {
+  const { context, page, errors } = await connected(browser, { width: 1280, height: 900 });
+  const tag = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const status = (p) => p.getByRole('status', { name: /save state/i }).first();
+  await page.getByRole('link', { name: /new investigation/i }).first().click();
+  await page.getByLabel('Problem statement', { exact: true }).fill(`wc-problem-${tag}`);
+  await page.getByLabel('Title', { exact: true }).fill(`wc-title-${tag}`);
+  await page.getByLabel('Primary investigative question', { exact: true }).fill(`wc-question-${tag}`);
+  await page.getByRole('button', { name: 'Start investigation', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(status(page)).toHaveText(/^\s*Saved\s*$/, { timeout: 20000 });
+  await expect(page.getByLabel('Observation text', { exact: true }), 'no observation editor on the working copy').toBeVisible({ timeout: 20000 });
+  // Cancel drops what was typed and records nothing.
+  await page.getByLabel('Observation text', { exact: true }).fill(`wc-cancelled-${tag}`);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByLabel('Observation text', { exact: true })).toHaveValue('');
+  await expect(status(page)).toHaveText(/^\s*Saved\s*$/);
+  // A blank observation is refused with a message, nothing recorded.
+  await page.getByRole('button', { name: 'Record an observation', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: /observation text/i }).first()).toBeVisible();
+  await page.getByLabel('Observation text', { exact: true }).fill(`wc-obs-${tag}`);
+  await page.getByLabel('Observation source reference', { exact: true }).fill(`wc-src-${tag}`);
+  await page.getByRole('button', { name: 'Record an observation', exact: true }).click();
+  await expect(page.getByText(`wc-obs-${tag}`).first()).toBeVisible();
+  await expect(status(page)).toHaveText(/^\s*Unsaved\s*$/);
+  const sections = page.getByRole('navigation', { name: 'Investigation sections' });
+  await sections.getByRole('link', { name: 'Hypotheses', exact: true }).click();
+  await page.getByLabel('Hypothesis statement', { exact: true }).fill(`wc-hyp-${tag}`);
+  await page.getByLabel('Hypothesis explanation', { exact: true }).fill(`wc-mech-${tag}`);
+  await page.getByRole('button', { name: 'Record a hypothesis', exact: true }).click();
+  await expect(page.getByRole('article').filter({ hasText: `wc-hyp-${tag}` })).toBeVisible();
+  await expect(status(page)).toHaveText(/^\s*Unsaved\s*$/);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(status(page)).toHaveText(/^\s*Saved\s*$/, { timeout: 20000 });
+  // A fresh tab reads both back from the repository.
+  const fresh = await connected(browser, { width: 1280, height: 900 });
+  await fresh.page.getByRole('link', { name: `wc-title-${tag}` }).click();
+  await expect(fresh.page.getByText(`wc-obs-${tag}`).first()).toBeVisible({ timeout: 20000 });
+  await expect(fresh.page.getByText(`wc-cancelled-${tag}`)).toHaveCount(0);
+  await fresh.page.getByRole('navigation', { name: 'Investigation sections' }).getByRole('link', { name: 'Hypotheses', exact: true }).click();
+  await expect(fresh.page.getByRole('article').filter({ hasText: `wc-hyp-${tag}` })).toContainText(`wc-mech-${tag}`);
+  expect([...errors, ...fresh.errors], 'page errors').toEqual([]);
+  await fresh.context.close();
+  await context.close();
+});

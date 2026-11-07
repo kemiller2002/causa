@@ -1,7 +1,7 @@
 {
   "schema": "indy-init.r9-suite-preflight/1",
   "plan": "VP-1e3c66bcc958",
-  "root": "/home/user/causa-t0",
+  "root": "/home/user/causa",
   "requireTests": false,
   "suites": [
     {

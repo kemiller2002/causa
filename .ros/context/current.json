@@ -2,9 +2,9 @@
   "schemaVersion": "1.0.0",
   "protocolVersion": "1.0.0",
   "repository": "causa-t0",
-  "actor": "ros-bootstrap",
+  "actor": "claude",
   "startedAt": "2026-11-07T15:53:41.921Z",
-  "updatedAt": "2026-11-07T15:53:41.921Z",
+  "updatedAt": "2026-11-07T16:19:51Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -20,6 +20,17 @@
       ],
       "updatedAt": "2026-11-07T15:53:41.921Z",
       "completedAt": "2026-11-07T15:53:41.921Z"
+    },
+    {
+      "id": "WI-0001",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-11-07T16:19:51Z",
+      "telemetryExecutionIds": [
+        "EXE-20261107T161951789Z-0e52f273"
+      ]
     }
   ]
 }

@@ -16,7 +16,12 @@
   "generated": "generated",
   "repository": {
     "id": "causa-t0",
-    "type": "application"
+    "type": "application",
+    "identity": {
+      "provider": "github",
+      "repositoryId": "github:1448701478",
+      "repository": "kemiller2002/causa"
+    }
   },
   "workProtocol": {
     "version": "1.0.0",

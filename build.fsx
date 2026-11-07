@@ -118,6 +118,42 @@ let vendor (package: string) (name: string) () =
     requireDirectory source "run npm ci first"
     |> Result.map (fun () -> copyDirectory source (Path.Combine(dist, "vendor", name)))
 
+/// The Limen capability packs (`capabilities/<name>/`) the application registers. web/boundary.js imports only the
+/// kernel (`@echelon-foundry/limen` -> vendor/limen/index.js), whose static imports reach no pack, so none ships.
+/// Unregistered packs are left out because some reference browser APIs the application must not contain:
+/// coordination (navigator.locks, BroadcastChannel; PERSIST-004) and store (indexedDB; PERSIST-003). A pack added
+/// here must not reference any API in `forbiddenBrowserApis`; the "check the site" step enforces it.
+let limenPacks : string list = []
+
+/// Browser APIs no shipped script may reference (PAT-13: PERSIST-003-O5, PERSIST-004-O4). The engine's _framework
+/// (the .NET runtime) is outside this check, as in the PERSIST-003/004 browser specs.
+let forbiddenBrowserApis = [ "navigator.locks"; "BroadcastChannel"; "indexedDB"; "caches.open"; "storage.getDirectory" ]
+
+let vendorLimen () =
+    let source = path [ "node_modules"; "@echelon-foundry"; "limen"; "dist" ]
+    requireDirectory source "run npm ci first"
+    |> Result.map (fun () ->
+        let target = Path.Combine(dist, "vendor", "limen")
+        Directory.CreateDirectory target |> ignore
+        for file in Directory.GetFiles source do
+            File.Copy(file, Path.Combine(target, Path.GetFileName file), true)
+        for dir in Directory.GetDirectories source do
+            let name = Path.GetFileName dir
+            if name = "capabilities" then
+                for pack in limenPacks do
+                    copyDirectory (Path.Combine(dir, pack)) (Path.Combine(target, name, pack))
+            else
+                copyDirectory dir (Path.Combine(target, name)))
+
+/// Every shipped script and page outside _framework, checked for the forbidden browser APIs.
+let forbiddenApiUses () =
+    [ for f in Directory.GetFiles(dist, "*", SearchOption.AllDirectories) do
+          let rel = Path.GetRelativePath(dist, f).Replace('\\', '/')
+          if not (rel.StartsWith "_framework/") && Regex.IsMatch(rel, @"\.(js|mjs|html)$") then
+              let text = File.ReadAllText f
+              for api in forbiddenBrowserApis do
+                  if text.Contains api then yield sprintf "%s references %s" rel api ]
+
 let engine () =
     let publishDir = path [ "src"; "Causa.Host"; "bin"; "publish" ]
     if Directory.Exists publishDir then Directory.Delete(publishDir, true)
@@ -314,7 +350,10 @@ let requireSite () =
     @ (if skipEngine then [] else [ "_framework/dotnet.js" ])
     |> List.filter (fun f -> not (File.Exists(Path.Combine(dist, f))))
     |> function
-        | [] -> Ok()
+        | [] ->
+            match forbiddenApiUses () with
+            | [] -> Ok()
+            | uses -> Error(sprintf "dist/ references forbidden browser APIs (PERSIST-003/004): %s" (String.Join("; ", uses)))
         | missing -> Error(sprintf "dist/ lacks %s" (String.Join(", ", missing)))
 
 let steps =
@@ -325,7 +364,7 @@ let steps =
       { Name = "compose index.html"; Run = index }
       { Name = "copy web assets"; Run = webAssets }
       { Name = "vendor Forma"; Run = vendor "design-system" "forma" }
-      { Name = "vendor Limen"; Run = vendor "limen" "limen" }
+      { Name = "vendor Limen (registered packs only)"; Run = vendorLimen }
       if not skipEngine then { Name = "publish the engine"; Run = engine }
       { Name = "write provenance"; Run = provenance }
       { Name = "deploy connection"; Run = deployConnection }

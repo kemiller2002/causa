@@ -8,6 +8,8 @@
       <section class="ef-stack causa-panel causa-connect" aria-labelledby="causa-connect-heading" data-requirement-id="EXT-DATA-002">
         <h2 id="causa-connect-heading">Connect data repository</h2>
         <p class="causa-connect__state">Connection: <span data-text="connection.state"></span></p>
+        <!-- PERSIST-020-O4: the tab is the only place unsaved work exists; there is no local recovery. -->
+        <p class="causa-connect__tab-note" id="causa-connect-tab-note" role="note">Unsaved changes exist only in this tab and are lost when it closes. Save to keep them in your data repository.</p>
         <form class="ef-form causa-connect__form" data-event="UIA-CONNECT" novalidate>
           <div class="ef-field">
             <label class="ef-field__label" for="causa-conn-owner">Repository owner</label>
@@ -38,7 +40,7 @@
             <p class="causa-tone" data-tone="critical" role="alert"><span aria-hidden="true">✕ </span>GitHub refused the access token. Enter a valid token and connect again.</p>
           </template>
           <template data-if="connection.connect-offered">
-            <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="connection.connect-disabled">Connect data repository</button>
+            <button class="ef-button causa-action-primary" type="submit" aria-describedby="causa-connect-tab-note" data-bind-disabled="connection.connect-disabled">Connect data repository</button>
           </template>
           <template data-if="connection.connecting"><p role="status">Connecting…</p></template>
         </form>
@@ -48,6 +50,7 @@
     <template data-if="connection.connected">
       <section class="ef-cluster causa-connected" aria-label="Connected repository">
         <p>Connected to <strong data-text="connection.connected-to"></strong>. <span data-text="connection.write-scope"></span></p>
+        <p class="causa-connect__tab-note" role="note">Unsaved changes exist only in this tab and are lost when it closes. Save to keep them in your data repository.</p>
         <template data-if="list.new-offered">
           <a class="ef-button causa-action-primary" href="#/investigations/new" data-event="UIA-NEW-INVESTIGATION">New investigation</a>
         </template>

@@ -1,74 +1,388 @@
-// Owner: domain. Written at bootstrap by requirements-compiler v41; the owner replaces this content.
-// The domain stubs of the interface contracts; the domain owner implements the full shapes.
+// Owner: domain (T13). IF41-DOMAIN, Boundary A: the kernel's values. The command and event unions, the envelopes and
+// Decision are the frozen contract (unchanged in shape); the payload types the bootstrap left opaque are defined here
+// with exactly the fields of their causa-storage wire records (contract/v1.0.0 section 7, v1.1.0 section 4), so that
+// encoding then decoding any stored event reproduces it. Pure: no clock, randomness, network or provider types.
 namespace Causa.Domain
 
 open System
 
-/// Abbreviated from docs/FSHARP-TYPE-SHAPES.md (sections 2, 30-38) for the contract typecheck only. The domain owner
-/// implements the full shapes; these stubs fix only the names the boundaries use.
 type InvestigationId = InvestigationId of Guid
 type EventId = EventId of Guid
 type AggregateVersion = AggregateVersion of int64
-type Investigation = { Id: InvestigationId; Version: AggregateVersion }
-/// v4.1.2 (ODR-V412-02): the command and event bodies of FSHARP-TYPE-SHAPES sections 31 and 33. The case names are
-/// frozen here so every consumer can tell commands and events apart; each payload type is the domain owner's to
-/// define (opaque in this stub, as the other stubs abbreviate their shapes).
-type SemanticId = class end
-type ExtensionEnvelope = class end
-type StartInvestigation = class end
-type RecordObservation = class end
-type RecordHypothesis = class end
-type FalsifyHypothesis = class end
-type ReopenHypothesis = class end
-type AdmitEvidence = class end
-type RelateEvidence = class end
-type IdentifyUnknown = class end
-type RecordAssumption = class end
-type RecordContradiction = class end
-type RecordPrediction = class end
-type RecordInvestigationAction = class end
-type RecordFinding = class end
-type EstablishNegativeKnowledge = class end
-type RecordCausalAssertion = class end
-type ConfirmCause = class end
-type RecordCorrectiveAction = class end
-type RecordVerificationCriterion = class end
-type RecordVerification = class end
-type ReopenInvestigation = class end
-type RecordProposal = class end
-/// v4.1.6 (ODR-V416-01): the commands OD-CR-01 A names that v4.1.6 carries (RC-1 A, S-1 B). RecordConclusion emits
-/// exactly one ConclusionRecorded, which causa-storage v1.0.0 already stores (proposals/RECORD-CONCLUSION.md section 4); its
-/// payload is exactly the Conclusion wire record. ReviseEvidence and ReviseObservation emit the causa-storage 1.1.0
-/// events EvidenceRevised and ObservationRevised (descriptive metadata only; admitted content is never revised,
-/// OD-CR-06 A). Opaque like every command payload; the domain owner defines them.
-type RecordConclusion = class end
-type ReviseEvidence = class end
-type ReviseObservation = class end
-type InvestigationStarted = class end
-type Observation = class end
-type Hypothesis = class end
-type NonEmptyText = class end
-type Scope = class end
-type Evidence = class end
-type EvidenceRelationship = class end
-type Unknown = class end
-type Assumption = class end
-type Contradiction = class end
-type Prediction = class end
-type InvestigationAction = class end
-type Finding = class end
-type CausalAssertion = class end
-type CorrectiveAction = class end
-type VerificationCriterion = class end
-type Verification = class end
-type Proposal = class end
 type HypothesisId = HypothesisId of Guid
 type CorrectiveActionId = CorrectiveActionId of Guid
 type ProposalId = ProposalId of Guid
 type CausalAssertionId = CausalAssertionId of Guid
-/// v4.1.5 E1: the commands whose events now carry the wire's fields carry them too (reason; evidence ids), opaque
-/// like the other command payloads, so Decide can produce events that encode.
-type MarkHypothesis = class end
+
+/// Wire `text`: non-blank, kept verbatim. The only constructor refuses blank or whitespace-only text.
+[<Struct; CustomEquality; CustomComparison>]
+type NonEmptyText =
+    private
+    | NonEmptyText of string
+    member t.Value = let (NonEmptyText s) = t in s
+    override t.ToString() = t.Value
+    override t.Equals(o) =
+        match o with
+        | :? NonEmptyText as other -> String.Equals(t.Value, other.Value, StringComparison.Ordinal)
+        | _ -> false
+    override t.GetHashCode() = StringComparer.Ordinal.GetHashCode t.Value
+    interface IComparable with
+        member t.CompareTo(o) =
+            match o with
+            | :? NonEmptyText as other -> String.CompareOrdinal(t.Value, other.Value)
+            | _ -> invalidArg "o" "not a NonEmptyText"
+
+[<RequireQualifiedAccess>]
+module NonEmptyText =
+    let create (text: string) : NonEmptyText option =
+        if String.IsNullOrWhiteSpace text then None else Some(NonEmptyText text)
+
+    let value (t: NonEmptyText) = t.Value
+
+/// A semantic identity of an extension (namespace/name@version), never interpreted by the core.
+type SemanticId = SemanticId of string
+
+type ExtensionEnvelope = { Semantic: SemanticId; PayloadJson: string }
+
+// ---- Enumerations (contract v1.0.0 section 6; relationship kinds extended by v1.1.0 section 4.3) ----------------
+
+[<RequireQualifiedAccess>]
+type Lifecycle =
+    | Draft
+    | Active
+    | AwaitingEvidence
+    | AwaitingVerification
+    | Resolved
+    | Closed
+    | Archived
+
+[<RequireQualifiedAccess>]
+type HypothesisState =
+    | Proposed
+    | Plausible
+    | Supported
+    | Weakened
+    | Falsified
+    | Superseded
+
+[<RequireQualifiedAccess>]
+type UnknownState =
+    | Identified
+    | Investigating
+    | UnknownResolved
+    | UnknownAcceptedResidual
+    | UnknownSuperseded
+
+[<RequireQualifiedAccess>]
+type Materiality =
+    | Blocking
+    | Material
+    | NonMaterial
+    | Informational
+
+[<RequireQualifiedAccess>]
+type AssumptionState =
+    | ExplicitUnverified
+    | ProvisionallyAccepted
+    | AssumptionVerified
+    | AssumptionRejected
+    | AssumptionExpired
+
+[<RequireQualifiedAccess>]
+type ContradictionState =
+    | Detected
+    | Triaged
+    | ContradictionInvestigating
+    | ContradictionResolved
+    | ContradictionAcceptedResidual
+    | ContradictionSuperseded
+
+[<RequireQualifiedAccess>]
+type ActionState =
+    | ActionProposed
+    | ActionApproved
+    | ActionInProgress
+    | ActionCompleted
+    | ActionInterpreted
+    | ActionRejected
+    | ActionCancelled
+
+[<RequireQualifiedAccess>]
+type ActionKind =
+    | Test
+    | Inspection
+    | Query
+    | Comparison
+    | Experiment
+
+[<RequireQualifiedAccess>]
+type CauseState =
+    | CauseProposed
+    | CauseConfirmed
+    | CauseReopened
+    | CauseSuperseded
+
+[<RequireQualifiedAccess>]
+type CauseRole =
+    | RootCause
+    | ContributingFactor
+    | Trigger
+    | EnablingCondition
+
+[<RequireQualifiedAccess>]
+type CorrectiveActionState =
+    | CorrectionProposed
+    | CorrectionApproved
+    | CorrectionInProgress
+    | CorrectionImplemented
+    | CorrectionAwaitingVerificationOfEffect
+    | CorrectionVerifiedEffective
+    | CorrectionVerificationFailed
+    | CorrectionReworkRequired
+    | CorrectionCancelled
+
+[<RequireQualifiedAccess>]
+type CorrectiveActionKind =
+    | Mitigation
+    | Workaround
+    | Correction
+    | Prevention
+
+[<RequireQualifiedAccess>]
+type EvidenceCategory =
+    | DirectObservation
+    | Measurement
+    | Log
+    | Document
+    | ExperimentResult
+    | Testimony
+    | ExternalReference
+
+[<RequireQualifiedAccess>]
+type VerificationStatus =
+    | Unverified
+    | PartiallyVerified
+    | Verified
+    | Invalidated
+
+[<RequireQualifiedAccess>]
+type RelationshipKind =
+    | Supports
+    | Contradicts
+    | Discriminates
+    | Insufficient
+    /// causa-storage 1.1.0 only; never support.
+    | ConsistentWith
+    /// causa-storage 1.1.0 only; never support.
+    | Inconclusive
+
+[<RequireQualifiedAccess>]
+type PredictionStrength =
+    | Necessary
+    | Expected
+    | DiscriminatingPrediction
+    | NonDiscriminating
+
+[<RequireQualifiedAccess>]
+type PredictionTiming =
+    | Prospective
+    | Retrospective
+
+[<RequireQualifiedAccess>]
+type VerificationOutcome =
+    | Satisfied
+    | Failed
+    | Inconclusive
+
+[<RequireQualifiedAccess>]
+type ConclusionStrength =
+    | PlausibleExplanation
+    | LeadingExplanation
+    | SupportedCause
+    | ConfirmedCause
+    | AcceptedWithResidualUncertainty
+
+[<RequireQualifiedAccess>]
+type ProposalKind =
+    | ProposedHypothesis
+    | ProposedUnknown
+    | ProposedAction
+
+[<RequireQualifiedAccess>]
+type ProposalState =
+    | ProposalActive
+    | ProposalAccepted
+    | ProposalRejected
+
+[<RequireQualifiedAccess>]
+type ContentKind =
+    | Text
+    | Artifact
+
+/// Envelope actor (contract v1.0.0 section 5.3). An agent may appear only on ProposalRecorded (D-004).
+[<RequireQualifiedAccess>]
+type Actor =
+    | Human of actorId: NonEmptyText
+    | System of actorId: NonEmptyText
+    | Agent of actorId: NonEmptyText * provider: NonEmptyText * model: NonEmptyText
+
+// ---- Event payloads: exactly the wire records --------------------------------------------------------------------
+
+type InvestigationStarted = { Title: NonEmptyText; ObservationId: Guid; Original: NonEmptyText }
+type Observation = { ObservationId: Guid; Original: NonEmptyText; ObservedAt: DateTimeOffset option }
+type ObservationRevision = { ObservationId: Guid; Original: NonEmptyText; Source: NonEmptyText option }
+type Hypothesis = { HypothesisId: HypothesisId; Statement: NonEmptyText; Mechanism: NonEmptyText option }
+
+/// HypothesisTransitioned without `to` and `command`, which the CoreEvent case determines (FIELD-MAPPING).
+type HypothesisTransition =
+    { HypothesisId: HypothesisId
+      From: HypothesisState
+      Reason: NonEmptyText
+      EvidenceIds: Guid list }
+
+type Evidence =
+    { EvidenceId: Guid
+      ContentKind: ContentKind
+      Content: NonEmptyText
+      Category: EvidenceCategory
+      Source: NonEmptyText
+      CapturedAt: DateTimeOffset option }
+
+type EvidenceSupersession = { EvidenceId: Guid; ReplacementEvidenceId: Guid; Reason: NonEmptyText }
+type EvidenceVerificationAssessment = { EvidenceId: Guid; Verification: VerificationStatus }
+type EvidenceRevision = { EvidenceId: Guid; Label: NonEmptyText; Source: NonEmptyText; SourceUrl: string option }
+
+type EvidenceRelationship =
+    { RelationshipId: Guid
+      EvidenceId: Guid
+      HypothesisId: HypothesisId
+      Kind: RelationshipKind
+      Rationale: NonEmptyText option }
+
+type Unknown = { UnknownId: Guid; Question: NonEmptyText; Materiality: Materiality }
+type UnknownTransition = { UnknownId: Guid; State: UnknownState; Basis: NonEmptyText }
+type Assumption = { AssumptionId: Guid; Proposition: NonEmptyText; Materiality: Materiality }
+type AssumptionTransition = { AssumptionId: Guid; State: AssumptionState }
+
+type Contradiction =
+    { ContradictionId: Guid
+      Statement: NonEmptyText
+      EvidenceIds: Guid list
+      Materiality: Materiality }
+
+type ContradictionTransition = { ContradictionId: Guid; State: ContradictionState; Basis: NonEmptyText }
+
+type Prediction =
+    { PredictionId: Guid
+      HypothesisId: HypothesisId
+      Statement: NonEmptyText
+      Strength: PredictionStrength
+      Timing: PredictionTiming }
+
+type InvestigationAction =
+    { ActionId: Guid
+      Kind: ActionKind
+      Purpose: NonEmptyText
+      TargetHypothesisIds: HypothesisId list }
+
+type InvestigationActionTransition = { ActionId: Guid; State: ActionState }
+type Finding = { FindingId: Guid; ActionId: Guid; OriginalResult: NonEmptyText; Interpretation: NonEmptyText option }
+
+type NegativeKnowledge =
+    { NegativeKnowledgeId: Guid
+      Statement: NonEmptyText
+      Scope: NonEmptyText
+      BasisEvidenceIds: Guid list }
+
+type CausalMember = { HypothesisId: HypothesisId; Role: CauseRole }
+
+type CausalAssertion =
+    { CauseId: CausalAssertionId
+      Outcome: NonEmptyText
+      Members: CausalMember list
+      Mechanism: NonEmptyText option }
+
+/// CausalAssertionConfirmed: `policy` is the policy id the cause gate applied.
+type CauseConfirmation = { CauseId: CausalAssertionId; Policy: NonEmptyText }
+
+type CorrectiveAction =
+    { CorrectiveActionId: CorrectiveActionId
+      Kind: CorrectiveActionKind
+      Description: NonEmptyText
+      TargetCauseIds: CausalAssertionId list }
+
+type VerificationCriterion =
+    { CriterionId: Guid
+      CorrectiveActionId: CorrectiveActionId
+      ExpectedOutcome: NonEmptyText
+      Method: NonEmptyText option }
+
+type Verification = { VerificationId: Guid; CriterionId: Guid; Outcome: VerificationOutcome; EvidenceIds: Guid list }
+
+type Conclusion =
+    { ConclusionId: Guid
+      Statement: NonEmptyText
+      Strength: ConclusionStrength
+      CauseIds: CausalAssertionId list
+      ResidualUncertainty: NonEmptyText option }
+
+type Proposal = { ProposalId: ProposalId; Kind: ProposalKind; Text: NonEmptyText; Rationale: NonEmptyText option }
+
+/// A scoped statement (FSHARP-TYPE-SHAPES section 6); no stored event carries one in causa-storage v1.
+type Scope = { Statement: NonEmptyText }
+
+// ---- Command payloads: what the user entered. Ids are chosen by the caller, so the kernel stays pure --------------
+
+type StartInvestigation = { Title: NonEmptyText; ObservationId: Guid; Original: NonEmptyText }
+/// A source, when entered, travels in an ObservationRevised of the same group (v1.1.0 section 4.5).
+type RecordObservation = { ObservationId: Guid; Original: NonEmptyText; ObservedAt: DateTimeOffset option; Source: NonEmptyText option }
+type ReviseObservation = { ObservationId: Guid; Original: NonEmptyText; Source: NonEmptyText option }
+type RecordHypothesis = { HypothesisId: HypothesisId; Statement: NonEmptyText; Mechanism: NonEmptyText option }
+type MarkHypothesis = { HypothesisId: HypothesisId; Reason: NonEmptyText; EvidenceIds: Guid list }
+type FalsifyHypothesis = { HypothesisId: HypothesisId; Reason: NonEmptyText; EvidenceIds: Guid list }
+type ReopenHypothesis = { HypothesisId: HypothesisId; Reason: NonEmptyText; EvidenceIds: Guid list }
+
+/// AdmitEvidence emits EvidenceAdmitted then EvidenceRevised with the label and URL (v1.1.0 section 4.5).
+type AdmitEvidence =
+    { EvidenceId: Guid
+      ContentKind: ContentKind
+      Content: NonEmptyText
+      Category: EvidenceCategory
+      Source: NonEmptyText
+      CapturedAt: DateTimeOffset option
+      Label: NonEmptyText
+      SourceUrl: string option }
+
+type ReviseEvidence = { EvidenceId: Guid; Label: NonEmptyText; Source: NonEmptyText; SourceUrl: string option }
+
+type RelateEvidence =
+    { RelationshipId: Guid
+      EvidenceId: Guid
+      HypothesisId: HypothesisId
+      Kind: RelationshipKind
+      Rationale: NonEmptyText option }
+
+type IdentifyUnknown = { UnknownId: Guid; Question: NonEmptyText; Materiality: Materiality }
+type RecordAssumption = { AssumptionId: Guid; Proposition: NonEmptyText; Materiality: Materiality }
+type RecordContradiction = { ContradictionId: Guid; Statement: NonEmptyText; EvidenceIds: Guid list; Materiality: Materiality }
+
+/// The timing is decided by the engine, not requested (A11).
+type RecordPrediction = { PredictionId: Guid; HypothesisId: HypothesisId; Statement: NonEmptyText; Strength: PredictionStrength }
+
+type RecordInvestigationAction = { ActionId: Guid; Kind: ActionKind; Purpose: NonEmptyText; TargetHypothesisIds: HypothesisId list }
+type RecordFinding = { FindingId: Guid; ActionId: Guid; OriginalResult: NonEmptyText; Interpretation: NonEmptyText option }
+type EstablishNegativeKnowledge = { NegativeKnowledgeId: Guid; Statement: NonEmptyText; Scope: NonEmptyText; BasisEvidenceIds: Guid list }
+type RecordCausalAssertion = { CauseId: CausalAssertionId; Outcome: NonEmptyText; Members: CausalMember list; Mechanism: NonEmptyText option }
+type ConfirmCause = { CauseId: CausalAssertionId }
+type RecordCorrectiveAction = { CorrectiveActionId: CorrectiveActionId; Kind: CorrectiveActionKind; Description: NonEmptyText; TargetCauseIds: CausalAssertionId list }
+type RecordVerificationCriterion = { CriterionId: Guid; CorrectiveActionId: CorrectiveActionId; ExpectedOutcome: NonEmptyText; Method: NonEmptyText option }
+type RecordVerification = { VerificationId: Guid; CriterionId: Guid; Outcome: VerificationOutcome; EvidenceIds: Guid list }
+type RecordConclusion = { ConclusionId: Guid; Statement: NonEmptyText; Strength: ConclusionStrength; CauseIds: CausalAssertionId list; ResidualUncertainty: NonEmptyText option }
+type ReopenInvestigation = { Reason: NonEmptyText }
+type RecordProposal = { ProposalId: ProposalId; Kind: ProposalKind; Text: NonEmptyText; Rationale: NonEmptyText option }
+
+// ---- The frozen contract (IF41-DOMAIN), unchanged ----------------------------------------------------------------
+
 type CoreCommand =
     | StartInvestigation of StartInvestigation
     | ActivateInvestigation
@@ -110,24 +424,11 @@ type Command =
 /// nine cases carry the wire's extra fields; 22 cases are added; HypothesisFalsified no longer carries a Scope the
 /// wire does not have. Payload types stay the domain owner's to define (opaque here, as in v4.1.2), with exactly
 /// the fields of their wire records: encoding then decoding any stored event must reproduce its canonical bytes.
-type Lifecycle = class end
-type HypothesisTransition = class end
-type EvidenceSupersession = class end
-type EvidenceVerificationAssessment = class end
-type UnknownTransition = class end
-type AssumptionTransition = class end
-type ContradictionTransition = class end
-type InvestigationActionTransition = class end
-type NegativeKnowledge = class end
-type CauseConfirmation = class end
-type Conclusion = class end
 /// v4.1.6 (ODR-V416-01): the two causa-storage 1.1.0 events (S-1 B), each exactly its wire record:
 /// EvidenceRevised {evidenceId, label, source, sourceUrl} and ObservationRevised {observationId, original, source}.
 /// The 1.1.0 relationship kinds consistentWith and inconclusive belong to EvidenceRelationship's kind, which is the
 /// domain owner's type; no case is added for them. A reassessment is a new EvidenceRelationshipRecorded for the same
 /// pair and the latest is current (S-8 B).
-type EvidenceRevision = class end
-type ObservationRevision = class end
 type CoreEvent =
     | InvestigationStarted of InvestigationStarted
     | InvestigationActivated of from: Lifecycle
@@ -187,7 +488,12 @@ type EventPayload =
     | ExtensionEvent of SemanticId * payloadJson: string
 /// v4.1.5 E1: the stored envelope's provenance (occurredAt, actor, correlationId, formatVersion, semanticVersion),
 /// opaque here and the domain owner's to define with exactly the wire fields.
-type EventProvenance = class end
+type EventProvenance =
+    { OccurredAt: DateTimeOffset
+      Actor: Actor
+      CorrelationId: Guid
+      FormatVersion: string
+      SemanticVersion: string }
 type EventEnvelope = { EventId: EventId; Investigation: InvestigationId; Version: AggregateVersion; Provenance: EventProvenance; Payload: EventPayload }
 type Blocker = { Code: string; Message: string }
 type Decision =

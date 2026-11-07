@@ -1,0 +1,87 @@
+<!-- Owner: ui-2 (WI-INV-START, reassigned). investigation-start (#/investigations/new, S01): problem statement (INV-001),
+     title (INV-002), primary investigative question (INV-023), the pre-filled investigation identifier (INV-006), where
+     the investigation will be written (INV-005), the domain profile when one applies (INV-003), Start (INV-004) and
+     Cancel (INV-022), with the catalog's validation (INV-019..021, INV-023, INV-006). Bindings: Views/Start.fs. Every
+     field is labelled by its catalog name, the accessible name the governed journeys use. -->
+<template data-if="screen.investigation-start">
+  <div class="ef-container ef-stack causa-screen causa-start" data-screen="investigation-start">
+    <h1 class="causa-screen__title">New investigation</h1>
+    <p class="causa-lead">Describe what went wrong in your own words. Causa keeps your problem statement exactly as you write it.</p>
+
+    <p class="causa-start__destination" data-requirement-id="INV-005">
+      <span class="causa-start__destination-label">Will be saved to:</span> <span data-text="start.destination"></span>
+    </p>
+
+    <template data-if="start.profile-present">
+      <p class="causa-start__profile" data-requirement-id="INV-003">Domain profile: <span data-text="start.profile"></span></p>
+    </template>
+
+    <form class="ef-form ef-stack causa-panel causa-start__form" data-event="INV-004" novalidate aria-labelledby="causa-start-heading">
+      <h2 id="causa-start-heading" class="ef-visually-hidden">Investigation details</h2>
+
+      <template data-if="start.errors-present">
+        <div class="ef-validation-summary" role="alert" aria-labelledby="causa-start-errors-title">
+          <p class="ef-validation-summary__title" id="causa-start-errors-title">The investigation was not started. Correct the following:</p>
+          <ul class="ef-validation-summary__list">
+            <template data-each="start.errors" data-key="field"><li data-text="message"></li></template>
+          </ul>
+        </div>
+      </template>
+
+      <div class="ef-field">
+        <label class="ef-field__label" for="causa-start-problem">Problem statement</label>
+        <p class="ef-field__description" id="causa-start-problem-help">Required. What happened, as you observed it. <span data-requirement-id="INV-021" data-text="start.problem-count"></span></p>
+        <textarea id="causa-start-problem" name="problem" rows="6" required aria-required="true"
+          aria-describedby="causa-start-problem-help causa-start-problem-error" data-bind-aria-invalid="start.problem-aria-invalid"
+          data-requirement-id="INV-001" data-on="input" data-event="INV-001" data-bind-value="start.problem"></textarea>
+        <p class="ef-field__error causa-field-error" id="causa-start-problem-error" data-requirement-id="INV-019" data-text="start.problem-error"></p>
+      </div>
+
+      <div class="ef-field">
+        <label class="ef-field__label" for="causa-start-title">Title</label>
+        <p class="ef-field__description" id="causa-start-title-help">Optional. A short name for the investigation list. <span data-text="start.title-count"></span></p>
+        <input id="causa-start-title" name="title" type="text" autocomplete="off"
+          aria-describedby="causa-start-title-help causa-start-title-error" data-bind-aria-invalid="start.title-aria-invalid"
+          data-requirement-id="INV-002" data-on="input" data-event="INV-002" data-bind-value="start.title">
+        <p class="ef-field__error causa-field-error" id="causa-start-title-error" data-requirement-id="INV-020" data-text="start.title-error"></p>
+      </div>
+
+      <div class="ef-field">
+        <label class="ef-field__label" for="causa-start-question">Primary investigative question</label>
+        <p class="ef-field__description" id="causa-start-question-help">Optional. The question this investigation should answer. <span data-text="start.question-count"></span></p>
+        <textarea id="causa-start-question" name="question" rows="3"
+          aria-describedby="causa-start-question-help causa-start-question-error" data-bind-aria-invalid="start.question-aria-invalid"
+          data-requirement-id="INV-023" data-on="input" data-event="INV-023" data-bind-value="start.question"></textarea>
+        <p class="ef-field__error causa-field-error" id="causa-start-question-error" data-text="start.question-error"></p>
+      </div>
+
+      <div class="ef-field">
+        <label class="ef-field__label" for="causa-start-identifier">Investigation identifier</label>
+        <p class="ef-field__description" id="causa-start-identifier-help">Generated for you. It identifies the investigation in its address and cannot be changed after it starts.</p>
+        <input id="causa-start-identifier" name="identifier" type="text" autocomplete="off" spellcheck="false" required aria-required="true"
+          aria-describedby="causa-start-identifier-help causa-start-identifier-error" data-bind-aria-invalid="start.identifier-aria-invalid"
+          data-requirement-id="INV-006" data-on="input" data-event="INV-006" data-bind-value="start.identifier">
+        <p class="ef-field__error causa-field-error" id="causa-start-identifier-error" data-text="start.identifier-error"></p>
+      </div>
+
+      <template data-if="start.refused">
+        <div class="ef-alert ef-fault-inline causa-failure" role="alert">
+          <p class="ef-alert__title">The investigation was not started.</p>
+          <ul><template data-each="start.refusals" data-key="reason"><li data-text="reason"></li></template></ul>
+          <p>Nothing was written. Your text is still here.</p>
+        </div>
+      </template>
+      <template data-if="start.submitting"><p role="status">Starting the investigation…</p></template>
+      <template data-if="start.start-explained"><p class="causa-start__unavailable" id="causa-start-unavailable" data-text="start.start-unavailable"></p></template>
+
+      <div class="ef-cluster causa-start__actions">
+        <template data-if="start.start-offered">
+          <button class="ef-button causa-action-primary" type="submit" data-requirement-id="INV-004" data-bind-disabled="start.start-disabled">Start investigation</button>
+        </template>
+        <template data-if="start.cancel-offered">
+          <button class="ef-button" type="button" aria-label="Cancel investigation start" data-requirement-id="INV-022" data-event="INV-022" data-bind-disabled="start.cancel-disabled">Cancel</button>
+        </template>
+      </div>
+    </form>
+  </div>
+</template>

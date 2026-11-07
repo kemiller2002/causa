@@ -433,3 +433,84 @@ type SaveOnce() =
         match fresh.Loads |> Map.tryFind ref with
         | Some(Loaded v) -> Assert.Equal((1, 1), count v.Investigation)
         | other -> Assert.Fail(sprintf "the fresh tab did not load it: %A" other)
+
+/// The tab that saved keeps every section of the investigation when it reopens it from the list: the sections come
+/// from the current investigation, with the working copy's editors offered, on the session and the loaded branch alike.
+type ReopenAfterSave() =
+    [<Fact>]
+    member _.``start, record a hypothesis, save, list, reopen in the same tab: Causal Analysis is listed``() =
+        let fake = Causa.TestSupport.StatefulFake()
+        let address = (WorkspaceAddress.workingCopy [] "reopen").Value
+        let backend =
+            { Fixture.backend with
+                Persistence =
+                    Some
+                        { Connector = GitHubConnect.connector
+                          Machine = SaveMachines.withStorage Fixture.backend.Author
+                          Lister = GitHubLister.lister
+                          Codec = StorageCodecs.codec }
+                WorkingCopy = Some address
+                Now = fun () -> DateTimeOffset.UtcNow }
+        let engine = Update.engine backend
+        let config =
+            { Fixture.config with
+                NewIdentifier = Guid.NewGuid
+                Run = "reopen"
+                Now = fun () -> DateTimeOffset.UtcNow
+                SessionLocal = false
+                CanSave = true
+                InvestigationOf = Update.investigationOf backend
+                WorkingCopy = Some address }
+        let ui = UiAdapter.backend config engine
+        let rec settle (s: AdapterState) (effects: HostEffect list) =
+            match effects with
+            | [] -> s
+            | Http r :: rest -> let s2, more = UiAdapter.browser engine (HttpCompleted(fake.Execute r)) s in settle s2 (rest @ more)
+            | _ :: rest -> settle s rest
+        let go intent s = let s2, fx = ui.Dispatch intent s in settle s2 fx
+        let event name value s =
+            match Events.toIntent name None value with
+            | Some intent -> go intent s
+            | None -> failwithf "no intent for event %s" name
+        let sections (s: AdapterState) =
+            match (ui.Project s).Screen with
+            | WorkspaceScreen v ->
+                match v.Frame with
+                | Ready f -> f.Sections |> List.map (fun l -> l.Destination)
+                | other -> failwithf "no frame: %A" other
+            | other -> failwithf "not a workspace: %A" other
+        let s0 = fst (ui.Init InvestigationsRoute)
+        let connected =
+            { s0 with
+                Local =
+                    { s0.Local with
+                        Credential = Some fake.WriteConnection.Credential
+                        Form = { Owner = fake.Owner; Repository = fake.Name; Branch = fake.Branch; CredentialEntered = true } } }
+            |> go (UiIntent.Activate(Actions.connect, None))
+        Assert.Equal(Connected true, connected.Model.Connection)
+        let started =
+            connected
+            |> go (UiIntent.Navigate StartRoute)
+            |> event "INV-001" (Some "The nightly export stopped at 02:10.")
+            |> event "INV-023" (Some "Why did the export stop?")
+            |> event "INV-004" None
+        let route = started.Local.Route
+        let target =
+            match route with
+            | WorkspaceRoute(t, _) -> t
+            | other -> failwithf "the start did not open the workspace: %A %A" other started.Local.Submission
+        let recorded =
+            started
+            |> go (UiIntent.Input(Fields.hypothesisStatement, "The export job lost its database lock", None))
+            |> go (UiIntent.Activate(Actions.recordHypothesis, None))
+        Assert.Contains(CausalAnalysis, sections recorded)
+        let saved = recorded |> go (UiIntent.Activate(Actions.save, None))
+        Assert.True(
+            saved.Model.Sessions |> Map.forall (fun _ v -> match v.State with SaveState.Saved _ -> true | _ -> false),
+            sprintf "the save did not finish: %A" (saved.Model.Sessions |> Map.map (fun _ v -> v.State)))
+        Assert.Contains(CausalAnalysis, sections saved)
+        let reopened =
+            saved
+            |> go (UiIntent.Navigate InvestigationsRoute)
+            |> go (UiIntent.Navigate(WorkspaceRoute(target, Overview)))
+        Assert.Equal<Section list>([ Overview; CausalAnalysis; HypothesesSection; TimelineSection ], sections reopened)

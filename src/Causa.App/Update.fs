@@ -9,11 +9,14 @@ namespace Causa.App
 open System
 open Causa.Domain
 open Causa.Persistence
+open Causa.App.Ui
 
-/// The persistence adapter the persistence lane provides (IF41-ERRORS, IF41-SAVE, IF41-STORAGE).
+/// The persistence adapter the persistence lane provides (IF41-ERRORS, IF41-SAVE, IF41-STORAGE). The save machine is
+/// built per use from the base history a session rests on (its verified load, or none for a new investigation), so
+/// the encoder can reproduce the exact bytes on read-back and resend (Program.fs: SaveMachines.withStorage).
 type Persistence =
     { Connector: Connector
-      Machine: SaveMachine
+      Machine: (InvestigationSession -> VerifiedInvestigation option) -> SaveMachine
       Lister: WorkspaceLister
       Codec: StorageCodec }
 
@@ -69,19 +72,28 @@ module Update =
             sprintf "The investigation changed (expected version %d, found %d)." expected actual
         | Duplicate _ -> "That command was already applied."
 
-    /// Applies one command to a state through the kernel: decide, then the events it allows, evolved in order.
+    /// The save machine for the model's sessions, each resting on its verified base (Loads), or on none when new.
+    let machineFor (p: Persistence) (model: Model) : SaveMachine =
+        p.Machine(fun s ->
+            match model.Loads |> Map.tryFind { Address = Writable.address s.Address; Id = s.Id } with
+            | Some(Loaded v) -> Some v
+            | _ -> None)
+
+    /// Applies one command to a state through the kernel: decide, then the events it allows, evolved in order. The
+    /// events carry the command's own RequestedAt (its UUIDv7 id), never the time of this re-decision.
     let apply (backend: Backend) (state: Investigation option) (command: CommandEnvelope) : Result<Investigation, string> =
-        match backend.Kernel.Decide backend.Policies backend.Actor state command with
-        | Allowed payloads ->
+        match backend.Kernel.Decide backend.Policies backend.Actor state command, CommandIds.requestedAt command.CommandId with
+        | _, None -> Error "The command has no UUIDv7 identity, so its time cannot be fixed; it is refused."
+        | Allowed payloads, Some requestedAt ->
             let current = state |> Option.map (fun i -> i.Version) |> Option.defaultValue (AggregateVersion 0L)
-            Events.envelopes command.Investigation current command.CommandId (backend.Now()) backend.Author backend.StorageVersion payloads
+            Events.envelopes command.Investigation current command.CommandId requestedAt backend.Author backend.StorageVersion payloads
             |> List.fold
                 (fun acc env -> acc |> Result.bind (fun s -> backend.Kernel.Evolve s env |> Result.map Some |> Result.mapError (fun e -> e.Reason)))
                 (Ok state)
             |> Result.bind (function
                 | Some i -> Ok i
                 | None -> Error "The command produced no investigation.")
-        | other -> Error(describe other)
+        | other, _ -> Error(describe other)
 
     /// The investigation a session shows: its verified base (a load), or nothing for a new one, with every unsaved
     /// command applied in order. Session-local until the save machine confirms it (PERSIST-031).
@@ -134,7 +146,7 @@ module Update =
                 let online = model.Network = NetworkState.Online
                 let session =
                     match backend.Persistence, model.Listings |> Map.tryFind ref.Address with
-                    | Some p, Some listing -> Ok(p.Machine.InitialNew writable command.Investigation listing.ReadAt command online)
+                    | Some p, Some listing -> Ok((machineFor p model).InitialNew writable command.Investigation listing.ReadAt command online)
                     | Some _, None -> Error "List the working copy before creating in it: its head is not known."
                     | None, _ ->
                         // No provider: the same state InitialNew reaches (Unsaved online, Offline offline), with no
@@ -168,7 +180,7 @@ module Update =
             | Ok _ ->
                 match backend.Persistence, requestContext backend model (Some ref) with
                 | Some p, Some ctx ->
-                    match p.Machine.Step ctx session (SaveInput.Edit envelope) with
+                    match (machineFor p model).Step ctx session (SaveInput.Edit envelope) with
                     | Ok(s, effects) ->
                         let fx, sent = hostEffects effects
                         { model with
@@ -186,7 +198,7 @@ module Update =
         | Some _, None, _ -> refuse (NotWired "Saving") model
         | Some _, Some _, None -> refuse (Rejected "Connect a data repository before saving.") model
         | Some session, Some p, Some ctx ->
-            match p.Machine.Step ctx session input with
+            match (machineFor p model).Step ctx session input with
             | Ok(s, effects) ->
                 let fx, sent = hostEffects effects
                 { model with
@@ -251,7 +263,7 @@ module Update =
                     match model.Sessions |> Map.tryFindKey (fun _ s -> s.Outstanding |> Option.exists (fun (id, _) -> id = rid)) with
                     | Some ref ->
                         let session = model.Sessions[ref]
-                        match p.Machine.Interpret ctx session outcome with
+                        match (machineFor p model).Interpret ctx session outcome with
                         | NextRequest(s, request) ->
                             { model with Sessions = model.Sessions |> Map.add ref s; NextRequestId = nextId model.NextRequestId }, [ Http request ]
                         | MachineEvent input -> sessionInput backend ref input model
@@ -271,11 +283,11 @@ module Update =
                         | None ->
                             match model.Loads |> Map.tryFindKey (fun _ l -> match l with LoadState.Loading(id, _) -> id = rid | _ -> false) with
                             | Some ref ->
-                                match p.Machine.InterpretLoad ctx model.Loads[ref] outcome with
+                                match (machineFor p model).InterpretLoad ctx model.Loads[ref] outcome with
                                 | LoadNextRequest(l, request) ->
                                     { model with Loads = model.Loads |> Map.add ref l; NextRequestId = nextId model.NextRequestId }, [ Http request ]
                                 | LoadEvent input ->
-                                    match p.Machine.StepLoad ctx model.Loads[ref] input with
+                                    match (machineFor p model).StepLoad ctx model.Loads[ref] input with
                                     | Ok(l, effects) ->
                                         let fx, sent = hostEffects effects
                                         { model with Loads = model.Loads |> Map.add ref l; NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }, fx
@@ -307,7 +319,7 @@ module Update =
         | Browser(TimerFired(ReconcileTimer ref)) ->
             match model.Sessions |> Map.tryFind ref, backend.Persistence, requestContext backend model (Some ref) with
             | Some session, Some p, Some ctx ->
-                match p.Machine.ReconcileDue ctx session with
+                match (machineFor p model).ReconcileDue ctx session with
                 | Ok(s, effects) ->
                     let fx, sent = hostEffects effects
                     { model with Sessions = model.Sessions |> Map.add ref s; NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }, fx
@@ -323,7 +335,7 @@ module Update =
             match backend.Persistence, requestContext backend model (Some ref) with
             | Some p, Some ctx ->
                 let current = model.Loads |> Map.tryFind ref |> Option.defaultValue NotLoaded
-                match p.Machine.StepLoad ctx current input with
+                match (machineFor p model).StepLoad ctx current input with
                 | Ok(l, effects) ->
                     let fx, sent = hostEffects effects
                     { model with Loads = model.Loads |> Map.add ref l; NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }, fx

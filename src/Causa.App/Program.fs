@@ -1,19 +1,24 @@
-// Owner: integration (T10). The engine entry the browser host calls (src/Causa.Host/Host.cs, IF41-APP): one Limen
-// message in, one Limen answer out, both as JSON. The engine keeps one value, the current route, and projects an
-// AppView for it through View.bindings (CR-2). Until the slices that wire Engine/Update over the real persistence
-// land, the AppView comes from the boot backend below, which says so: its Origin is a FixtureBackend label, never
-// IntegratedBackend, and it shows no data it does not have (every system fact is FactUnknown).
+// Owner: integration (T10, T17). The engine entry the browser host calls (src/Causa.Host/Host.cs, IF41-APP): one Limen
+// message in, one Limen answer out, both as JSON. T17 wires the real path: a Limen event becomes a UiIntent
+// (Ui/Events.fs), the adapter (Ui/UiAdapter.fs) turns it into an engine message, the engine (Update.fs) decides it
+// through the domain kernel, and the adapter projects the AppView that View.bindings renders. Persistence is the
+// Backend's optional adapter: None until the persistence lane's slices are merged (T19/T20), so today every accepted
+// command stays in the tab, unsaved, and the screens say so.
 module Causa.App.Program
 
+open System
 open System.IO
 open System.Text
 open System.Text.Json
+open Causa.Domain
 open Causa.Ui.Contracts
+open Causa.App.Ui
 
 /// The Limen browser-to-engine messages the engine distinguishes (Limen 0.9.1 protocol).
 type Inbound =
     | Initialize of hash: string
     | LocationChanged of hash: string
+    | Event of name: string * key: string option * value: string option
     | Other of kind: string
     | Malformed
 
@@ -43,83 +48,60 @@ let parse (message: string) : Inbound =
         match root |> tryProperty "kind" |> Option.bind tryString with
         | Some "Initialize" -> Initialize(hash ())
         | Some "LocationChanged" -> LocationChanged(hash ())
+        | Some "Event" ->
+            let event = root |> tryProperty "event"
+            let field name = event |> Option.bind (tryProperty name) |> Option.bind tryString
+            match field "name" with
+            | Some name -> Event(name, field "key", field "value")
+            | None -> Malformed
         | Some kind -> Other kind
         | None -> Malformed
     with :? JsonException -> Malformed
 
-/// The boot backend: what the engine can show before persistence is wired, with nothing invented.
-module Boot =
-    let origin = FixtureBackend(FixtureLabel.create "integration boot backend (no persistence wired yet)")
+/// The engine's backend: the one domain kernel, the host clock, and no persistence adapter yet.
+let backend: Backend =
+    { Kernel = Kernel.kernel
+      Policies = Policies.coreDefault
+      Actor = { ActorId = "causa-user" }
+      Author = Actor.Human(NonEmptyText.create "causa-user" |> Option.get)
+      Now = fun () -> DateTimeOffset.UtcNow
+      StorageVersion = "1.1.0"
+      Persistence = None }
 
-    let connection: ConnectionView =
-        { State = Disconnected
-          Form = { Owner = ""; Repository = ""; Branch = ""; CredentialEntered = false }
-          Errors = []
-          Connect = Available
-          Disconnect = NotOffered
-          Connected = None
-          WriteScope = WriteScopeUnknown }
+let config: AdapterConfig =
+    { NewIdentifier = Guid.NewGuid
+      Now = fun () -> DateTimeOffset.UtcNow
+      Run = "session"
+      SessionLocal = backend.Persistence.IsNone
+      ValidateStart = Causa.App.Views.StartScreen.validate }
 
-    let list: InvestigationListView =
-        { Connection = connection
-          Investigations = NotRequested
-          Sort = ByUpdated
-          NewInvestigation = NotOffered
-          State = ScreenReady }
+let ui = UiAdapter.backend config (Update.engine backend)
 
-    let private unknown label = { Label = label; Status = FactUnknown }
+/// The tab's state (the browser host is single-threaded; this is the only mutable value).
+let mutable private state: AdapterState option = None
 
-    let administration: AdministrationView =
-        { Provider = unknown "Persistence provider"
-          Repository = unknown "Data repository"
-          Connection = unknown "Connection"
-          Catalog = unknown "Investigation catalog"
-          StorageContract = unknown "Storage contract"
-          ApplicationVersion = unknown "Application version"
-          DeployedCommit = unknown "Deployed commit"
-          DataValidation = unknown "Data validation"
-          Diagnostics = [] }
-
-    let settings: SettingsView =
-        { Preferences =
-            [ { Id = "theme"
-                Label = "Colour theme"
-                Scope = SessionScope
-                Options = [ "Light" ]
-                Effective = "Light" } ]
-          ConnectionPreference = unknown "Data repository connection" }
-
-    let notFound (requested: string) : NotFoundView =
-        { Requested = requested
-          Copy = Causa.App.Views.States.notFoundCopy }
-
-    /// Start and workspace routes need a connected repository; before Connect the list's connection region is shown.
-    let screen (route: UiRoute) : ScreenView =
-        match route with
-        | InvestigationsRoute
-        | StartRoute
-        | WorkspaceRoute _ -> ListScreen list
-        | AdministrationRoute -> AdministrationScreen administration
-        | SettingsRoute -> SettingsScreen settings
-        | NotFoundRoute requested -> NotFoundScreen(notFound requested)
-
-    let view (route: UiRoute) : AppView =
-        { Route = route
-          Primary = Causa.App.Views.Shell.primaryLinks route
-          Screen = screen route
-          Announcements = []
-          Origin = origin }
-
-/// The engine's state: the current route.
-let mutable private current: UiRoute = InvestigationsRoute
-
-/// Pure step: the next route for a message.
-let step (state: UiRoute) (inbound: Inbound) : UiRoute =
+/// Pure step: the next adapter state for a message.
+let step (current: AdapterState option) (inbound: Inbound) : AdapterState =
+    let ensure route =
+        match current with
+        | Some s -> s
+        | None -> ui.Init route |> fst
     match inbound with
-    | Initialize hash
-    | LocationChanged hash -> View.route hash
+    | Initialize hash ->
+        let route = View.route hash
+        match current with
+        | None -> ui.Init route |> fst
+        | Some s -> ui.Dispatch(UiIntent.Navigate route) s |> fst
+    | LocationChanged hash ->
+        let route = View.route hash
+        ui.Dispatch(UiIntent.Navigate route) (ensure route) |> fst
+    | Event(name, key, value) ->
+        let s = ensure InvestigationsRoute
+        match Events.toIntent name key value with
+        | Some intent -> ui.Dispatch intent s |> fst
+        | None -> s
     | Other _
-    | Malformed -> state
+    | Malformed -> ensure InvestigationsRoute
 
 let private render (view: AppView) : string =
     use stream = new MemoryStream()
@@ -136,7 +118,9 @@ let private render (view: AppView) : string =
     )
     Encoding.UTF8.GetString(stream.ToArray())
 
-/// One Limen message (JSON) in, one Limen answer (JSON) out.
+/// One Limen message (JSON) in, one Limen answer (JSON) out. Host effects other than announcements (HTTP, timers,
+/// the leave guard, downloads) arrive with the persistence adapter; the adapter keeps announcements in the view.
 let dispatch (message: string) : string =
-    current <- step current (parse message)
-    current |> Boot.view |> render
+    let next = step state (parse message)
+    state <- Some next
+    next |> ui.Project |> render

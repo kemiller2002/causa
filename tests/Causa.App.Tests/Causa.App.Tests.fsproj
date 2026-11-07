@@ -5,6 +5,7 @@
   <ItemGroup>
     <Compile Include="StateMachines/SMCONNECTION.fs" />
     <Compile Include="StateMachines/SMNETWORK.fs" />
+    <Compile Include="Ui/StartTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Causa.Domain/Causa.Domain.fsproj" />

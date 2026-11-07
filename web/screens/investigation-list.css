@@ -1,6 +1,6 @@
 /* Owner: ui (T16). investigation-list. Reads published Forma --ef-* tokens only and declares none (UI-016-O8). */
 .causa-screen { padding-block: var(--ef-layout-block-space); }
-.causa-screen__title { margin: 0; }
+.causa-screen__title { margin: 0; font-size: var(--ef-type-size-h2); }
 .causa-lead { max-inline-size: var(--ef-layout-measure); }
 .causa-panel {
   padding: var(--ef-layout-stack-space);
@@ -31,4 +31,4 @@
 /* Measured: Forma's secondary text on this surface is 4.0:1, under 4.5:1 for normal text (UI-016-O11). */
 .causa-panel p, .causa-panel .ef-field__description, .causa-lead { color: var(--ef-color-text-primary); }
 /* The Connect card's heading reads as a card title, not a page title. */
-.causa-connect h2 { font-size: var(--ef-type-size-h3); margin: 0; }
+.causa-connect h2 { font-size: var(--ef-type-size-h3); margin: 0; max-inline-size: none; }

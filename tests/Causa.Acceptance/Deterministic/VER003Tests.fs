@@ -20,7 +20,7 @@ type VER003Tests() =
         let summary = drift |> Json.prop "summary"
         let count k = summary |> Option.bind (Json.prop k) |> Option.map (fun v -> v.GetInt32()) |> Option.defaultValue -1
         let findings = Json.items "findings" drift
-        Gate.noDefects
+        Gate.assertNoDefects
             "compatibility evidence"
             [ if drift |> Json.prop "ready" |> Option.map (fun v -> v.GetBoolean()) <> Some true then yield "the T0 stack-drift report is not ready"
               for k in [ "DRIFT"; "BLOCKED"; "UNVERIFIED" ] do
@@ -36,7 +36,7 @@ type VER003Tests() =
                   let p = Json.strOr "path" e
                   if not (Repo.exists p) then yield sprintf "compatibility evidence %s is missing" p ]
         // The installed npm tree is exactly the verified release: version, release tarball, integrity.
-        Gate.noDefects
+        Gate.assertNoDefects
             "installed npm packages"
             [ for s in locked do
                   if s.NpmPackage <> "" then
@@ -53,31 +53,31 @@ type VER003Tests() =
     /// known compatible release.
     [<Fact>]
     member _.``VER-003-O2``() =
-        Gate.noDefects "stale selections" (staleSelections checks excs)
-        Gate.noDefects
+        Gate.assertNoDefects "stale selections" (staleSelections checks excs)
+        Gate.assertNoDefects
             "exceptions"
             [ for e in excs do
                   if not (hasException excs e.System e.Version) then yield sprintf "the exception for %s lacks approval, scope, rationale or expiry" e.System
                   if not (decisions |> List.exists (fun d -> d.Id = e.System && d.Selected = e.Version)) then
                       yield sprintf "the exception for %s %s names no selected release" e.System e.Version ]
         let older = { checks.Head with System = "limen"; Candidate = "0.9.0"; NewestStable = "0.9.1" }
-        Gate.defectsFound "a fallback without an exception" (staleSelections [ older ] [])
+        Gate.assertRejects "a fallback without an exception" (staleSelections [ older ] [])
         let unapproved = { System = "limen"; Version = "0.9.0"; Approval = ""; Scope = "run"; Rationale = "incompatible"; Expires = "next run" }
-        Gate.defectsFound "a fallback whose exception has no approval" (staleSelections [ older ] [ unapproved ])
-        Gate.noDefects
+        Gate.assertRejects "a fallback whose exception has no approval" (staleSelections [ older ] [ unapproved ])
+        Gate.assertNoDefects
             "a fallback with an authorized exception"
             (staleSelections [ older ] [ { unapproved with Approval = "ODR-EXAMPLE A" } ])
 
     /// Never silently fall back to an old version: every pin in the repository is the selected release.
     [<Fact>]
     member _.``VER-003-O3``() =
-        Gate.noDefects "silent fallbacks" (fallbacks (decisions |> List.map (fun d -> d.Id, d.Selected)) (declaredVersions locked))
-        Gate.noDefects
+        Gate.assertNoDefects "silent fallbacks" (fallbacks (decisions |> List.map (fun d -> d.Id, d.Selected)) (declaredVersions locked))
+        Gate.assertNoDefects
             "lock against selection"
             [ for s in locked do
                   match decisions |> List.tryFind (fun d -> d.Id = s.Id) with
                   | Some d when d.Selected <> s.Version -> yield sprintf "%s: lock %s, selection %s" s.Id s.Version d.Selected
                   | _ -> () ]
-        Gate.defectsFound
+        Gate.assertRejects
             "an older pinned version"
             (fallbacks [ "limen", "0.9.1" ] (fun _ -> [ "package.json @echelon-foundry/limen", "0.9.0" ]))

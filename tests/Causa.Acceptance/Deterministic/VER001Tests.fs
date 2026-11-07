@@ -329,13 +329,15 @@ module ReleaseRecord =
     let integrationKinds =
         set [ "runtime"; "process-tool"; "verification-tool"; "bootstrap-tool"; "build-tool"; "locked-not-integrated" ]
 
+/// The assertions the VER tests make: each fails the test through xUnit with every defect listed.
 module Gate =
-    let noDefects (what: string) (defects: string list) =
-        if not defects.IsEmpty then
-            failwithf "%s:\n  %s" what (String.Join("\n  ", defects))
+    /// Asserts that a check found no defect.
+    let assertNoDefects (what: string) (defects: string list) =
+        Assert.True(defects.IsEmpty, sprintf "%s:\n  %s" what (String.Join("\n  ", defects)))
 
-    let defectsFound (what: string) (defects: string list) =
-        if defects.IsEmpty then failwithf "the gate accepted %s" what
+    /// Asserts that the gate rejects a bad case (it is not vacuous).
+    let assertRejects (what: string) (defects: string list) =
+        Assert.False(defects.IsEmpty, sprintf "the gate accepted %s" what)
 
 open ReleaseRecord
 
@@ -349,12 +351,12 @@ type VER001Tests() =
     [<Fact>]
     member _.``VER-001-O1``() =
         // The lock is the governed one, byte for byte.
-        Gate.noDefects
+        Gate.assertNoDefects
             "the locked set"
             [ let pinned = record |> Json.prop "lock" |> Option.map (Json.strOr "sha256") |> Option.defaultValue ""
               if Repo.sha256 lockPath <> pinned then yield sprintf "%s sha256 %s differs from the pinned %s" lockPath (Repo.sha256 lockPath) pinned ]
         // Every decision selects what the lock holds, and the lock's version is the newest stable release.
-        Gate.noDefects
+        Gate.assertNoDefects
             "selections against the lock"
             [ for d in decisions do
                   match locked |> List.tryFind (fun s -> s.Id = d.Id) with
@@ -362,25 +364,25 @@ type VER001Tests() =
                   | Some s -> yield sprintf "%s selects %s but the lock holds %s" d.Id d.Selected s.Version
                   | None -> yield sprintf "%s is selected but not in the lock" d.Id ]
         let checks = checks record
-        Gate.noDefects
+        Gate.assertNoDefects
             "selections against the freshness checks"
             [ for d in decisions do
                   match checks |> List.tryFind (fun c -> c.System = d.Id) with
                   | Some c when c.Candidate = d.Selected -> ()
                   | Some c -> yield sprintf "%s selects %s but its freshness check's candidate is %s" d.Id d.Selected c.Candidate
                   | None -> yield sprintf "%s has no freshness check" d.Id ]
-        Gate.noDefects "stale selections" (staleSelections checks (exceptions record))
+        Gate.assertNoDefects "stale selections" (staleSelections checks (exceptions record))
         // The repository builds with exactly the selected versions.
-        Gate.noDefects "declared versions" (fallbacks (decisions |> List.map (fun d -> d.Id, d.Selected)) (declaredVersions locked))
+        Gate.assertNoDefects "declared versions" (fallbacks (decisions |> List.map (fun d -> d.Id, d.Selected)) (declaredVersions locked))
         // The gate is not vacuous: an older selection without an exception fails it.
         let older = { checks.Head with Candidate = "0.0.1"; NewestStable = "9.9.9" }
-        Gate.defectsFound "a selection older than the newest stable release" (staleSelections [ older ] [])
+        Gate.assertRejects "a selection older than the newest stable release" (staleSelections [ older ] [])
 
     /// The applicable systems include Praxis, Ordo, Dokimos, Percepta, Forma, Forma workflow, Limen, Folio and every
     /// Echelon dependency the repository actually integrates.
     [<Fact>]
     member _.``VER-001-O2``() =
-        Gate.noDefects
+        Gate.assertNoDefects
             "systems VER-001-O2 names"
             [ for id in namedSystems do
                   match decisions |> List.tryFind (fun d -> d.Id = id) with
@@ -389,7 +391,7 @@ type VER001Tests() =
                   | None -> yield sprintf "%s has no release decision" id ]
         let decided = decisions |> List.map (fun d -> d.Id) |> set
         let excluded = notApplicable record |> List.map fst |> set
-        Gate.noDefects
+        Gate.assertNoDefects
             "integrated Echelon dependencies"
             [ for name, _ in packageJsonSpecs () do
                   if name.StartsWith "@echelon-foundry/" then
@@ -402,7 +404,7 @@ type VER001Tests() =
                       match locked |> List.tryFind (fun s -> s.NugetPackage = id) with
                       | Some s when decided.Contains s.Id -> ()
                       | _ -> yield sprintf "%s integrates %s but no release decision covers it" project id ]
-        Gate.noDefects
+        Gate.assertNoDefects
             "release-set components"
             [ for s in locked do
                   if s.Kind = "registry-component" && not (decided.Contains s.Id) then
@@ -415,7 +417,7 @@ type VER001Tests() =
     /// a runtime dependency.
     [<Fact>]
     member _.``VER-001-O3``() =
-        Gate.noDefects
+        Gate.assertNoDefects
             "owners and release channels"
             [ for d in decisions do
                   if String.IsNullOrWhiteSpace d.Owner then yield sprintf "%s: no owner" d.Id
@@ -434,7 +436,7 @@ type VER001Tests() =
         // A runtime dependency is one the application actually declares; a locked system the application does not use
         // is recorded as such, and the record must not claim otherwise.
         let npmDeclared = packageJsonSpecs () |> List.map fst |> set
-        Gate.noDefects
+        Gate.assertNoDefects
             "runtime classification"
             [ for d in decisions do
                   let s = locked |> List.tryFind (fun s -> s.Id = d.Id)

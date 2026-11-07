@@ -1,0 +1,115 @@
+name: Deploy to GitHub Pages
+
+# The deployment target is not decided yet (Indy-init RQR-005; D-203 prefers
+# GitHub Pages "where practical"). This workflow is wired but inert: it runs
+# only when the repository variable DEPLOY_TARGET is `github-pages` and Pages
+# is enabled with source "GitHub Actions". It deploys what `npm run build`
+# writes to dist/. See DEPLOYMENT.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: vars.DEPLOY_TARGET == 'github-pages'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # `npm run build` is `dotnet fsi build.fsx`: it needs the .NET SDK global.json pins (rollForward disable).
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install npm dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "::warning::package-lock.json is not committed; installing without a lockfile. Commit it so every run installs the same tree."
+            npm install --no-audit --no-fund
+          fi
+
+      # Test data connection (Indy-init ODR-COMP-P13 / ODR-R10-36, an owner-approved
+      # exception for a TEST deployment only). This build alone receives four
+      # optional repository secrets; with CAUSA_DEPLOY_CONNECTION=1 the build writes
+      # dist/deploy-connection.json so the deployed app connects to
+      # REPO_OWNER/DATA_SOURCE on branch CAUSA_BRANCH with DATA_ACCESS_KEY_CAUSA.
+      # The site is public: anyone can read that key from it. Use a least-privilege,
+      # revocable key for a test repository only. Unset secrets are empty, and a
+      # build that ignores CAUSA_DEPLOY_CONNECTION is unchanged. See DEPLOYMENT.md.
+      - name: Build the site
+        env:
+          CAUSA_DEPLOY_CONNECTION: "1"
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
+          DATA_SOURCE: ${{ secrets.DATA_SOURCE }}
+          CAUSA_BRANCH: ${{ secrets.CAUSA_BRANCH }}
+          DATA_ACCESS_KEY_CAUSA: ${{ secrets.DATA_ACCESS_KEY_CAUSA }}
+        run: npm run build
+
+      - name: Require the site bundle
+        run: |
+          if [ ! -f dist/index.html ]; then
+            echo "::error::npm run build must write the deployable site, including dist/index.html. See DEPLOYMENT.md."
+            exit 1
+          fi
+
+      # The credential scan of what is published: any GitHub token literal fails,
+      # except the one deploy key, and that only in dist/deploy-connection.json. A
+      # build without the key may ship no connection. Findings name the file, never
+      # the value.
+      - name: Scan the site for credentials
+        env:
+          DATA_ACCESS_KEY_CAUSA: ${{ secrets.DATA_ACCESS_KEY_CAUSA }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          pattern='gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}'
+          config=dist/deploy-connection.json
+          status=0
+          for f in $(grep -rlaE "$pattern" dist | grep -vxF "$config"); do
+            echo "::error file=$f::a GitHub token literal is in the published site"; status=1
+          done
+          if [ -n "${DATA_ACCESS_KEY_CAUSA:-}" ]; then
+            for f in $(grep -rlaF -- "$DATA_ACCESS_KEY_CAUSA" dist | grep -vxF "$config"); do
+              echo "::error file=$f::the deploy key is outside $config"; status=1
+            done
+            if [ -f "$config" ]; then
+              others=$(grep -oaE "$pattern" "$config" | grep -vxF -- "$DATA_ACCESS_KEY_CAUSA" | wc -l)
+              if [ "$others" -ne 0 ]; then echo "::error file=$config::a credential other than the deploy key"; status=1; fi
+            fi
+          elif [ -f "$config" ] && grep -q '"connection"' "$config"; then
+            echo "::error file=$config::a connection in a build without the deploy key"; status=1
+          fi
+          if [ "$status" -eq 0 ]; then echo "Credential scan: PASS"; fi
+          exit "$status"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

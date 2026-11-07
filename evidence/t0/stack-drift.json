@@ -1,0 +1,507 @@
+{
+  "schema": "indy-init.stack-drift-report/1",
+  "ready": true,
+  "summary": {
+    "PASS": 55,
+    "DRIFT": 0,
+    "BLOCKED": 0,
+    "UNVERIFIED": 0
+  },
+  "findings": [
+    {
+      "system": "echelon-current",
+      "check": "release set",
+      "expected": "1.37.0 bc7d163d7ff4bda0eeafe741b3bc0aedf93427526184fe347862ac69f9abe22f",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "limen",
+      "check": "release manifest",
+      "expected": "0.9.1 54f088e76880308b2db1f7d447ad946d95d1a7f384893f0da2ae63937f6a1655",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "limen-fsharp",
+      "check": "release manifest",
+      "expected": "0.9.0 d8aec120fdaff6bb2a9dcd6e4d79b8a92d69f8cc0227de1c6b7166c6c3b8ce3a",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma",
+      "check": "release manifest",
+      "expected": "0.13.0 cc096c903785434ac4f664e709819a2599765c16b66ebd9825db87930b0fc2d5",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "folio",
+      "check": "release manifest",
+      "expected": "0.4.1 d453d980ce7f81e3c5bd227e34bd8d287417ea79ca09aa97ae9fdc56a28c6880",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "praxis",
+      "check": "release manifest",
+      "expected": "3.25.0 b42b9cf7cf2b3a436f7419c03fccc32d123abe0594839889fe8b6372cfb46a41",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dokimos",
+      "check": "release manifest",
+      "expected": "0.11.1 c5bf0df99823aaf1f3d2fc0f11f56cc92f266952df4733e32f18719a56f9b285",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "ordo",
+      "check": "release manifest",
+      "expected": "1.20.0 ac58cf8b42542ad3ad3cb3d5e9e95abaf660e3dcef5b84f85a6b52b7255563c0",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "percepta-semantic",
+      "check": "release manifest",
+      "expected": "0.4.0 07e4e640816e480b456ad3ce6e3562cc7aae8717a75db5683a2addcac02b1ee8",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "percepta",
+      "check": "release manifest",
+      "expected": "0.1.0 07b6291c63ff25e6b669edb8c845e48ba76831b6a6133efa4ad3a390439b1b2b",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "aegis",
+      "check": "release manifest",
+      "expected": "1.0.0 4530cfa3396c1e57d3e1a6500c661cd2d520236e852d1d9e88aa44c385d0bd6b",
+      "actual": "match",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "echelon-current",
+      "check": "toolchain lock profile version",
+      "expected": "1.37.0",
+      "actual": "1.37.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "echelon-current",
+      "check": "toolchain lock registry commit",
+      "expected": "575240233d1fc32b57cfa827ea1031b68609fc58",
+      "actual": "575240233d1fc32b57cfa827ea1031b68609fc58",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "praxis",
+      "check": "toolchain lock expected tool",
+      "expected": "3.25.0",
+      "actual": "3.25.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dokimos",
+      "check": "toolchain lock expected tool",
+      "expected": "0.11.1",
+      "actual": "0.11.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "percepta-semantic",
+      "check": "toolchain lock expected tool",
+      "expected": "0.4.0",
+      "actual": "0.4.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "ordo",
+      "check": "toolchain lock expected tool",
+      "expected": "1.20.0",
+      "actual": "1.20.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "conditor",
+      "check": "toolchain lock Conditor",
+      "expected": "0.10.21",
+      "actual": "0.10.21",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dotnet-sdk",
+      "check": "global.json",
+      "expected": "10.0.402",
+      "actual": "10.0.402",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dotnet-sdk",
+      "check": "installed SDK (dotnet --version)",
+      "expected": "10.0.402",
+      "actual": "10.0.402",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "praxis",
+      "check": "installed praxis",
+      "expected": "3.25.0",
+      "actual": "3.25.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dokimos",
+      "check": "installed dokimos",
+      "expected": "0.11.1",
+      "actual": "0.11.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "ordo",
+      "check": "installed ordo",
+      "expected": "1.20.0",
+      "actual": "1.20.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "percepta-semantic",
+      "check": "installed percepta",
+      "expected": "0.4.0",
+      "actual": "0.4.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "percepta",
+      "check": "installed percepta-repo",
+      "expected": "0.1.0",
+      "actual": "0.1.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "conditor",
+      "check": "binary digest",
+      "expected": "27fe83a2f2c8fe83893a73ab0e21e7e9142475f222f13d0edf18387ab03796c6",
+      "actual": "27fe83a2f2c8fe83893a73ab0e21e7e9142475f222f13d0edf18387ab03796c6",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "limen",
+      "check": "artifact echelon-foundry-limen-0.9.1.tgz",
+      "expected": "a7dd300577a145ff56bfa2d8ebae21e864c00b1409e701ebb3704cc367d4ddc8",
+      "actual": "a7dd300577a145ff56bfa2d8ebae21e864c00b1409e701ebb3704cc367d4ddc8",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "limen-fsharp",
+      "check": "artifact EchelonFoundry.Limen.Contract.0.9.0.nupkg",
+      "expected": "1db1ec2c19f45331b31fc0d13a876259e12efa4de7509f6ee4939567984c2817",
+      "actual": "1db1ec2c19f45331b31fc0d13a876259e12efa4de7509f6ee4939567984c2817",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma",
+      "check": "artifact echelon-foundry-design-system-0.13.0.tgz",
+      "expected": "2f9ceeb6ea99a54f6cf4ffa03e3a69fd609dd60a89ddbd99680811cca2d43725",
+      "actual": "2f9ceeb6ea99a54f6cf4ffa03e3a69fd609dd60a89ddbd99680811cca2d43725",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "folio",
+      "check": "artifact echelon-foundry-print-components-0.4.1.tgz",
+      "expected": "57c6a0eccad41e6acef7c0b91a6e072276b0ebaddda27fbb3b36abd956aeea1b",
+      "actual": "57c6a0eccad41e6acef7c0b91a6e072276b0ebaddda27fbb3b36abd956aeea1b",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dokimos",
+      "check": "artifact EchelonFoundry.Dokimos.Cli.0.11.1.nupkg",
+      "expected": "bbc9ce6d70347923807a4e5a51ff738ba2e6be81905ab036975be8eab6becb71",
+      "actual": "bbc9ce6d70347923807a4e5a51ff738ba2e6be81905ab036975be8eab6becb71",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "ordo",
+      "check": "artifact ordo-construction.nupkg",
+      "expected": "bb17b2da3d006a9bd4e3275a8b1660102090a758891d4babc6ffbab8d64a805f",
+      "actual": "bb17b2da3d006a9bd4e3275a8b1660102090a758891d4babc6ffbab8d64a805f",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "aegis",
+      "check": "artifact EchelonFoundry.Aegis.Core.1.0.0.nupkg",
+      "expected": "24255d245463f1ce819ce98f10bc5f6a062f8b3342d0bf4eee00fef9a45a835d",
+      "actual": "24255d245463f1ce819ce98f10bc5f6a062f8b3342d0bf4eee00fef9a45a835d",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma",
+      "check": "declared in causa-t0: package.json",
+      "expected": "0.13.0",
+      "actual": "0.13.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma-workflow",
+      "check": "declared in causa-t0: package.json",
+      "expected": "1.2.0",
+      "actual": "1.2.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "limen",
+      "check": "declared in causa-t0: package.json",
+      "expected": "0.9.1",
+      "actual": "0.9.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "folio",
+      "check": "declared in causa-t0: package.json",
+      "expected": "0.4.1",
+      "actual": "0.4.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma",
+      "check": "installed in causa-t0: node_modules/@echelon-foundry/design-system/package.json",
+      "expected": "0.13.0",
+      "actual": "0.13.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "folio",
+      "check": "installed in causa-t0: node_modules/@echelon-foundry/print-components/package.json",
+      "expected": "0.4.1",
+      "actual": "0.4.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "limen",
+      "check": "installed in causa-t0: node_modules/@echelon-foundry/limen/package.json",
+      "expected": "0.9.1",
+      "actual": "0.9.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma-workflow",
+      "check": "installed in causa-t0: node_modules/@echelon-foundry/forma-workflow/package.json",
+      "expected": "1.2.0",
+      "actual": "1.2.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "praxis",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "3.25.0",
+      "actual": "3.25.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "ordo",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "1.20.0",
+      "actual": "1.20.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "percepta",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "0.1.0",
+      "actual": "0.1.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "aegis",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "1.0.0",
+      "actual": "1.0.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "limen",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "0.9.1",
+      "actual": "0.9.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "0.13.0",
+      "actual": "0.13.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "folio",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "0.4.1",
+      "actual": "0.4.1",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "forma-workflow",
+      "check": "component in causa-t0: conditor.json",
+      "expected": "1.2.0",
+      "actual": "1.2.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "aegis",
+      "check": "EchelonFoundry.Aegis.Core in causa-t0: src/engine/App.Engine.fsproj",
+      "expected": "1.0.0",
+      "actual": "1.0.0",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dotnet-sdk",
+      "check": "setup-dotnet in causa-t0: .github/workflows/ci.yml:26",
+      "expected": "global-json-file",
+      "actual": "global-json-file",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dotnet-sdk",
+      "check": "setup-dotnet in causa-t0: .github/workflows/build-and-test.yml:29",
+      "expected": "global-json-file",
+      "actual": "global-json-file",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dotnet-sdk",
+      "check": "setup-dotnet in causa-t0: .github/workflows/candidate-acceptance.yml:66",
+      "expected": "global-json-file",
+      "actual": "global-json-file",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dotnet-sdk",
+      "check": "setup-dotnet in causa-t0: .github/workflows/verification-gate.yml:70",
+      "expected": "global-json-file",
+      "actual": "global-json-file",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    },
+    {
+      "system": "dotnet-sdk",
+      "check": "setup-dotnet in causa-t0: .github/workflows/deploy-pages.yml:31",
+      "expected": "global-json-file",
+      "actual": "global-json-file",
+      "status": "PASS",
+      "required": true,
+      "correction": ""
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "protocolVersion": "1.0.0",
+  "repository": "causa-t0",
+  "actor": "ros-bootstrap",
+  "startedAt": "2026-11-07T15:53:41.921Z",
+  "updatedAt": "2026-11-07T15:53:41.921Z",
+  "baselineDirtyPaths": [],
+  "workItems": [
+    {
+      "id": "ROS-INSTALL-3-25-0",
+      "type": "mechanical",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "installation",
+          "path": ".ros/installation.json"
+        }
+      ],
+      "updatedAt": "2026-11-07T15:53:41.921Z",
+      "completedAt": "2026-11-07T15:53:41.921Z"
+    }
+  ]
+}

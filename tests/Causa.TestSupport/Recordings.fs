@@ -183,10 +183,18 @@ module LiveEnv =
         | Read -> "CAUSA_GITHUB_TOKEN"
         | Write -> "CAUSA_WRITE_TOKEN"
 
+    /// The governed test repository: `testRepository` of the competition lock (Indy-init
+    /// kickoff/competition/toolchain.lock.json), the only repository the gate's minted tokens can reach. The governed
+    /// gate's suite step sets the tokens but not CAUSA_TEST_OWNER/REPO/BRANCH (run 42399293179), so the live suites use
+    /// these when the variables are absent and a token is present; the variables always override.
+    let governedTestRepository : Repository = { Owner = "kemiller2002"; Name = "causa-acceptance-r10"; Branch = "causa-acceptance" }
+
     /// The repository under test, or the names of the missing variables.
     let repository () : Result<Repository, string> =
+        let anyToken = (env "CAUSA_GITHUB_TOKEN").IsSome || (env "CAUSA_WRITE_TOKEN").IsSome
         match env "CAUSA_TEST_OWNER", env "CAUSA_TEST_REPO", env "CAUSA_TEST_BRANCH" with
         | Some owner, Some name, Some branch -> Ok { Owner = owner; Name = name; Branch = branch }
+        | None, None, None when anyToken -> Ok governedTestRepository
         | o, r, b ->
             let missing = [ if o.IsNone then "CAUSA_TEST_OWNER"; if r.IsNone then "CAUSA_TEST_REPO"; if b.IsNone then "CAUSA_TEST_BRANCH" ]
             Error(sprintf "BLOCKED: no repository: %s not set" (String.Join(", ", missing)))

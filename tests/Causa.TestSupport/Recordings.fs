@@ -223,7 +223,7 @@ module LiveHttp =
         | true, uri ->
             match uri with
             | null -> false
-            | u -> u.Scheme = "https" && u.Host = "api.github.com"
+            | u -> u.Scheme = "https" && u.Host = "api.github.com" && u.IsDefaultPort && String.IsNullOrEmpty u.UserInfo
         | _ -> false
 
     let private methodOf =

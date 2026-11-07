@@ -226,6 +226,9 @@ module StorageVersion =
     let v100 = "1.0.0"
     let v110 = "1.1.0"
 
+    /// The storage versions this kernel reads; any other version (1.2.0, 2.0.0, ...) is refused whole (v1.1.0 section 3).
+    let isSupported (version: string) = version = v100 || version = v110
+
 [<RequireQualifiedAccess>]
 module EventRegistry =
     /// v1.0.0 section 7 (31 types), then the two v1.1.0 types (v1.1.0 section 4.4).
@@ -239,6 +242,14 @@ module EventRegistry =
           "ConclusionRecorded"; "ProposalRecorded"; "ProposalWasAccepted"; "ProposalWasRejected" ]
 
     let v110Types = v100Types @ [ "EvidenceRevised"; "ObservationRevised" ]
+
+    /// Whether an eventType is registered for a storage version: a 1.0.0 history knows exactly the 31 v1.0.0 types, so
+    /// a 1.0.0 line with EvidenceRevised is CAUSA.UNKNOWN_EVENT_TYPE (v1.1.0 section 3). Unregistered types fail closed.
+    let isRegistered (storageVersion: string) (eventType: string) =
+        match storageVersion with
+        | "1.0.0" -> List.contains eventType v100Types
+        | "1.1.0" -> List.contains eventType v110Types
+        | _ -> false
 
     let private lifecycleChange command target =
         Some { EventType = "LifecycleChanged"; Command = Some command; Target = Some target }

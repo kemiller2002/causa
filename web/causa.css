@@ -123,3 +123,13 @@ html { color-scheme: light; }
   color: var(--causa-navy);
   border-color: var(--causa-ivory);
 }
+
+/* The skip link shows only for keyboard focus: focus moved by script or a pointer keeps it visually hidden. */
+.causa-site .ef-skip-link:focus:not(:focus-visible) {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

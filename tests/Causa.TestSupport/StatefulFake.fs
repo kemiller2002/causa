@@ -240,6 +240,40 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                     let s2, c = apply s b message changes
                     s2, recordedWith id "graphql-commit-created" [ recordedOidA, c.Oid; "2026-11-07T17:00:00Z", c.CommittedAt.ToString("yyyy-MM-ddTHH:mm:ssZ") ], true
 
+    /// GraphQL reads persistence sends (files at a commit; head and files of a branch), answered from the fake's trees.
+    let graphQlRead (s: FakeState) (request: HttpRequest) : HttpOutcome =
+        let id = request.Id
+        let query = request.Body |> Option.bind Json.parse |> Json.field "query" |> Json.text |> Option.defaultValue ""
+        let blob (bytes: byte[] option) =
+            match bytes with
+            | Some b -> Json.Object [ "text", Json.String(Encoding.UTF8.GetString b); "isTruncated", Json.Bool false ]
+            | None -> Json.Null
+        let ref' = Regex.Match(query, "ref\\(qualifiedName: \"refs/heads/([^\"]+)\"\\)")
+        if ref'.Success then
+            match s.Branches.TryFind ref'.Groups[1].Value with
+            | None -> answerJson id 200 (Json.Object [ "data", Json.Object [ "repository", Json.Object [ "ref", Json.Null ] ] ])
+            | Some oid ->
+                let c = s.Commits[oid]
+                let files =
+                    [ for m in Regex.Matches(query, "(\\w+): file\\(path: \"([^\"]+)\"\\)") ->
+                        let path = m.Groups[2].Value
+                        m.Groups[1].Value,
+                        (match c.Tree.TryFind path with
+                         | Some b -> Json.Object [ "path", Json.String path; "object", blob (Some b) ]
+                         | None -> Json.Null) ]
+                answerJson id 200 (Json.Object [ "data", Json.Object [ "repository", Json.Object [ "ref", Json.Object [ "target", Json.Object([ "oid", Json.String oid; "committedDate", Json.String(c.CommittedAt.ToString "yyyy-MM-ddTHH:mm:ssZ") ] @ files) ] ] ] ])
+        else
+            let commit = Regex.Match(query, "c: object\\(oid: \"([0-9a-f]+)\"\\)")
+            let c = if commit.Success then s.Commits.TryFind commit.Groups[1].Value else None
+            let blobs =
+                [ for m in Regex.Matches(query, "(\\w+): object\\(expression: \"([0-9a-f]+):([^\"]+)\"\\)") ->
+                    m.Groups[1].Value, blob (s.Commits.TryFind m.Groups[2].Value |> Option.bind (fun c -> c.Tree.TryFind m.Groups[3].Value)) ]
+            let cJson =
+                match c with
+                | Some c -> Json.Object [ "oid", Json.String c.Oid; "committedDate", Json.String(c.CommittedAt.ToString "yyyy-MM-ddTHH:mm:ssZ") ]
+                | None -> Json.Null
+            answerJson id 200 (Json.Object [ "data", Json.Object [ "repository", Json.Object(("c", cJson) :: blobs) ] ])
+
     let execute (request: HttpRequest) : HttpOutcome =
         lock gate (fun () ->
             let isMutation = GitHubRequests.isMutation request
@@ -261,6 +295,7 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                         | Some LoseAfterApplying -> NotAnswered(request.Id, TransportFailure.LostAfterSending), s3
                         | Some TimeOutAfterApplying -> NotAnswered(request.Id, TransportFailure.TimedOut), s3
                         | _ -> answered, s3
+                    | Some _ when request.Url = GitHubRequests.GraphQlUrl -> graphQlRead s1 request, s1
                     | Some _ -> read s1 request, s1
             state <- s2
             outcome)

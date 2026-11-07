@@ -215,7 +215,7 @@ module GitHubRequests =
 
     /// Whether a request is the mutation (createCommitOnBranch); every other request persistence builds is a read.
     let isMutation (request: HttpRequest) =
-        request.Method = Post && request.Url = GraphQlUrl
+        request.Method = Post && request.Url = GraphQlUrl && (defaultArg request.Body "").Contains "createCommitOnBranch"
 
     /// Base64 as GitHub's contents API sends it (wrapped at 60 columns with '\n').
     let decodeBase64 (text: string) : byte[] option =

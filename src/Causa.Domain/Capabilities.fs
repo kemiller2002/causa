@@ -3,7 +3,7 @@
 // the UI never offers an action Decide would refuse for a reason shown here.
 namespace Causa.Domain
 
-type Capability = { Id: string; Blockers: Blocker list }
+type CommandCapability = { Id: string; Blockers: Blocker list }
 
 [<RequireQualifiedAccess>]
 module Capabilities =
@@ -14,7 +14,7 @@ module Capabilities =
 
     /// Every core command with its blockers in this state (empty: available). Commands that create something new
     /// are available whenever the investigation is open; those that act on an entity need one in a suitable state.
-    let evaluate (policies: PolicySet) (i: Investigation) : Capability list =
+    let evaluate (policies: PolicySet) (i: Investigation) : CommandCapability list =
         let opened = if Investigation.isOpen i then [] else [ Blockers.notOpen i ]
         let whenOpen extra = opened @ extra
         let cap id blockers = { Id = id; Blockers = blockers }

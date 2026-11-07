@@ -16,7 +16,7 @@ open Causa.App.Ui
 
 /// The Limen browser-to-engine messages the engine distinguishes (Limen 0.9.1 protocol).
 type Inbound =
-    | Initialize of hash: string
+    | Initialize of origin: string * path: string * hash: string
     | LocationChanged of hash: string
     | Event of name: string * key: string option * value: string option
     | Other of kind: string
@@ -45,8 +45,10 @@ let parse (message: string) : Inbound =
             |> Option.bind (tryProperty "hash")
             |> Option.bind tryString
             |> Option.defaultValue ""
+        let locationField name =
+            root |> tryProperty "location" |> Option.bind (tryProperty name) |> Option.bind tryString |> Option.defaultValue ""
         match root |> tryProperty "kind" |> Option.bind tryString with
-        | Some "Initialize" -> Initialize(hash ())
+        | Some "Initialize" -> Initialize(locationField "origin", locationField "path", hash ())
         | Some "LocationChanged" -> LocationChanged(hash ())
         | Some "Event" ->
             let event = root |> tryProperty "event"
@@ -87,7 +89,7 @@ let step (current: AdapterState option) (inbound: Inbound) : AdapterState =
         | Some s -> s
         | None -> ui.Init route |> fst
     match inbound with
-    | Initialize hash ->
+    | Initialize(_, _, hash) ->
         let route = View.route hash
         match current with
         | None -> ui.Init route |> fst
@@ -103,7 +105,19 @@ let step (current: AdapterState option) (inbound: Inbound) : AdapterState =
     | Other _
     | Malformed -> ensure InvestigationsRoute
 
-let private render (view: AppView) : string =
+/// Where the page is served (origin and path, from Initialize): a navigation the engine asks for stays on it.
+let mutable private page = ""
+
+/// A Limen navigation request when the engine moved the route itself (an accepted Start opens its workspace). Never in
+/// answer to LocationChanged: the browser has already moved (Limen routing rule).
+let navigation (before: UiRoute option) (after: UiRoute) (inbound: Inbound) : string option =
+    match inbound, before with
+    | Event _, Some previous when previous <> after && page <> "" -> Some(page + Navigation.format after)
+    | _ -> None
+
+let mutable private correlation = 0L
+
+let private render (view: AppView) (push: string option) : string =
     use stream = new MemoryStream()
     (
         use writer = new Utf8JsonWriter(stream)
@@ -111,6 +125,16 @@ let private render (view: AppView) : string =
         writer.WritePropertyName "view"
         View.writeBindings writer (View.bindings view)
         writer.WriteStartArray "effects"
+        match push with
+        | Some url ->
+            correlation <- correlation + 1L
+            writer.WriteStartObject()
+            writer.WriteString("kind", "Navigation")
+            writer.WriteString("operation", "push")
+            writer.WriteString("correlationId", sprintf "nav-%d" correlation)
+            writer.WriteString("url", url)
+            writer.WriteEndObject()
+        | None -> ()
         writer.WriteEndArray()
         writer.WriteStartArray "cancellations"
         writer.WriteEndArray()
@@ -121,6 +145,11 @@ let private render (view: AppView) : string =
 /// One Limen message (JSON) in, one Limen answer (JSON) out. Host effects other than announcements (HTTP, timers,
 /// the leave guard, downloads) arrive with the persistence adapter; the adapter keeps announcements in the view.
 let dispatch (message: string) : string =
-    let next = step state (parse message)
+    let inbound = parse message
+    match inbound with
+    | Initialize(origin, path, _) -> page <- origin + path
+    | _ -> ()
+    let before = state |> Option.map (fun s -> s.Local.Route)
+    let next = step state inbound
     state <- Some next
-    next |> ui.Project |> render
+    render (ui.Project next) (navigation before next.Local.Route inbound)

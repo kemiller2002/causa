@@ -74,7 +74,8 @@ module UiAdapter =
     /// A stable identifier derived from another and a purpose (the start command and its first observation), so the
     /// same submission always produces the same command (idempotent retries; Decide reports Duplicate).
     let derivedId (from: Guid) (purpose: string) =
-        let bytes = MD5.HashData(Encoding.UTF8.GetBytes(from.ToString("D") + "/" + purpose))
+        // SHA-256, not MD5: MD5 is not available in the browser (.NET WebAssembly).
+        let bytes = SHA256.HashData(Encoding.UTF8.GetBytes(from.ToString("D") + "/" + purpose)) |> Array.truncate 16
         bytes[6] <- (bytes[6] &&& 0x0Fuy) ||| 0x30uy
         bytes[8] <- (bytes[8] &&& 0x3Fuy) ||| 0x80uy
         Guid(bytes)

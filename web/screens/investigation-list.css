@@ -1,12 +1,13 @@
 /* Owner: ui (T16). investigation-list. Reads published Forma --ef-* tokens only and declares none (UI-016-O8). */
 .causa-screen { padding-block: var(--ef-layout-block-space); }
 .causa-screen__title { margin: 0; }
-.causa-lead { max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-secondary); }
+.causa-lead { max-inline-size: var(--ef-layout-measure); }
 .causa-panel {
   padding: var(--ef-layout-stack-space);
   border: 1px solid var(--ef-color-border-functional);
   border-radius: var(--ef-shape-radius);
-  background: var(--ef-color-surface-secondary);
+  background: var(--ef-color-surface-primary);
+  color: var(--ef-color-text-primary);
   max-inline-size: var(--ef-layout-measure);
 }
 .causa-connect__form input { inline-size: 100%; min-block-size: var(--ef-layout-target-min); box-sizing: border-box; }
@@ -27,3 +28,5 @@
 .causa-tone[data-tone="critical"] { color: var(--causa-coral-strong, var(--ef-color-status-danger)); }
 .causa-tone[data-tone="attention"] { color: var(--ef-color-status-warning); }
 .causa-loading { display: flex; gap: var(--ef-primitive-space-2); align-items: center; }
+/* Measured: Forma's secondary text on this surface is 4.0:1, under 4.5:1 for normal text (UI-016-O11). */
+.causa-panel p, .causa-panel .ef-field__description, .causa-lead { color: var(--ef-color-text-primary); }

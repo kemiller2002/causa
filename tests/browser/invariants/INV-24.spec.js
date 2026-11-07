@@ -29,6 +29,8 @@ const DESTINATIONS = [
 ];
 // The engine has rendered its first view: the loading shell is gone and the screen's heading is shown.
 const open = async (page, hash = '#/') => {
+  // A fresh document every time: a hash-only change would keep the previous page's focus and marks.
+  await page.goto('about:blank');
   await page.goto(APP + hash);
   await expect(page.locator('#causa-main'), 'the engine did not render its first view').toBeVisible({ timeout: 30000 });
   await expect(page.locator('main h1').first()).toBeVisible({ timeout: 15000 });

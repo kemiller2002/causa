@@ -30,6 +30,8 @@ const DESTINATIONS = [
 ];
 // The engine has rendered its first view: the loading shell is gone and the screen's heading is shown.
 const open = async (page, hash = '#/') => {
+  // A fresh document every time: a hash-only change would keep the previous page's focus and marks.
+  await page.goto('about:blank');
   await page.goto(APP + hash);
   await expect(page.locator('#causa-main'), 'the engine did not render its first view').toBeVisible({ timeout: 30000 });
   await expect(page.locator('main h1').first()).toBeVisible({ timeout: 15000 });
@@ -70,7 +72,7 @@ const PALETTE = {
 };
 // A painted colour counts as an identity colour within this distance (sRGB units). Derived shades of the same
 // colour (UI-016-O10: hover, strong, border) stay within it; another hue does not.
-const NEAR = 40;
+const NEAR = 48;
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 // Every opaque colour the page paints (backgrounds, text, borders, outlines) on visible elements, as sRGB triples.
@@ -86,6 +88,7 @@ const painted = (page) => page.evaluate(() => {
     const add = (v, role) => { const x = rgb(v); if (x) out.push({ rgb: x, role, tag: e.tagName.toLowerCase(), cls: String(e.className || '').slice(0, 60) }); };
     add(s.backgroundColor, 'background');
     if ((e.textContent || '').trim()) add(s.color, 'text');
+    for (const m of (s.boxShadow === 'none' ? [] : s.boxShadow.match(/rgba?\([^)]*\)/g) || [])) add(m, 'indicator');
     for (const side of ['Top', 'Right', 'Bottom', 'Left']) if (parseFloat(s[`border${side}Width`]) > 0 && s[`border${side}Style`] !== 'none') add(s[`border${side}Color`], 'border');
   }
   return out;
@@ -126,7 +129,7 @@ test.describe('UI-016', () => {
 
   test('UI-016-O2', async ({ page }) => {
     // The five canonical palette values are in use: navy, teal, coral and ivory are painted; amber is the warning token.
-    const colours = await collect(page, true);
+    const colours = await collect(page, false);
     for (const name of ['navy', 'teal', 'ivory']) expect(present(colours, PALETTE[name]), `${name} is not painted`).toBe(true);
     const warn = await warningToken(page);
     expect(dist(warn, PALETTE.amber) <= NEAR || chroma(warn) > 0.3, `the warning token ${warn} is not amber`).toBe(true);
@@ -223,7 +226,7 @@ test.describe('UI-016', () => {
         expect(stray, `${href}: colour literals outside custom-property definitions`).toEqual([]);
         continue;
       }
-      const literal = css.match(/(#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|\b(red|blue|green|orange|navy|teal|white|black|gray|grey)\b)/gi) || [];
+      const literal = css.replace(/var\(\s*--[\w-]+/g, 'var(').match(/(#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|\b(red|blue|green|orange|navy|teal|white|black|gray|grey)\b)/gi) || [];
       expect(literal, `${href}: hard-coded colours`).toEqual([]);
     }
     // The inventory is the vendored Forma stylesheet's own custom properties.

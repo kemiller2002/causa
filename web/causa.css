@@ -1,0 +1,94 @@
+/* Owner: integration (T10). Loading shell and layout only. Reads published Forma --ef-* tokens and declares none of
+   its own (forma-layout-contract.json: web/causa.css composes Forma classes and sets layout only through Forma
+   custom properties). Screen styles live in web/screens/<screen>.css, owned by the UI roles. */
+
+/* Causa is a light application: pin native controls light too, whatever the OS scheme (Forma sets light dark). */
+html { color-scheme: light; }
+
+.causa-site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.causa-boot {
+  max-width: var(--ef-layout-width-standard);
+  margin: var(--ef-space-6) auto;
+  padding: var(--ef-space-4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.causa-boot__title {
+  margin: 0 0 var(--ef-space-2);
+}
+
+.causa-boot-fault {
+  margin: var(--ef-space-6) var(--ef-space-4);
+}
+
+.causa-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.causa-main:focus {
+  outline: none;
+}
+
+[hidden] { display: none !important; }
+
+@media (max-width: 48rem) {
+  .causa-boot {
+    margin: var(--ef-space-4) auto;
+    padding: var(--ef-space-3);
+  }
+}
+
+/* Causa identity (UI-016) on the shared shell, through the theme's custom properties only (web/causa-theme.css). */
+.causa-masthead {
+  background: var(--causa-navy);
+  color: var(--causa-on-navy);
+}
+
+.causa-masthead a {
+  color: var(--causa-on-navy);
+}
+
+.causa-masthead .ef-navigation-shell__persistent {
+  grid-auto-flow: column;
+  justify-content: start;
+}
+
+.causa-masthead .ef-navigation-shell__compact > summary {
+  color: var(--causa-on-navy);
+}
+
+/* The current page is marked without relying on colour: forced-colours mode drops the box-shadow, the underline and
+   weight remain (UI-016-O13). */
+.causa-masthead .causa-primary a[aria-current="page"] {
+  box-shadow: inset 0 calc(-1 * var(--ef-space-1)) 0 var(--causa-teal);
+  text-decoration: underline;
+  font-weight: var(--ef-type-weight-strong);
+}
+
+.causa-context {
+  margin: 0;
+  padding: var(--ef-space-2) var(--ef-space-4);
+  color: var(--causa-navy-mist);
+}
+
+.causa-context a {
+  color: var(--causa-on-navy);
+}
+
+.causa-site {
+  background: var(--causa-ivory);
+}
+
+.causa-boot__title {
+  display: flex;
+  align-items: center;
+  gap: var(--ef-space-2);
+  color: var(--causa-navy);
+}

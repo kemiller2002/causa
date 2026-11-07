@@ -73,14 +73,14 @@ type VER008Tests() =
               for name, spec in packageJsonSpecs () do
                   if isExactRelease spec then yield name, spec ]
             |> List.distinct
-        Gate.noDefects "installed npm artifacts" (compare npmLocked installedNpm)
+        Gate.assertNoDefects "installed npm artifacts" (compare npmLocked installedNpm)
         let central = centralPackageVersions () |> Map.ofList
         let resolved = resolvedLibraries ()
         // (pinned package, resolved library, an assembly of it loaded in this process)
         let loaded =
             [ "FSharp.Core", "FSharp.Core", typeof<list<int>>.Assembly
               "xunit", "xunit.extensibility.core", typeof<FactAttribute>.Assembly ]
-        Gate.noDefects
+        Gate.assertNoDefects
             "loaded .NET artifacts"
             [ for package, library, assembly in loaded do
                   match central.TryFind package, resolved.TryFind library with
@@ -95,18 +95,16 @@ type VER008Tests() =
                       if not (fileVersions |> List.exists (same fileVersion)) then
                           yield sprintf "FAIL: the loaded %s (file version %s) is not the resolved %s %s" (assembly.GetName().Name) fileVersion library version ]
         let sdk = Repo.json "global.json" |> Json.prop "sdk" |> Option.bind (Json.str "version") |> Option.defaultValue ""
-        match Tooling.run Tooling.dotnet [ "--version" ] None with
-        | Ok o when o.Out.Trim() = sdk -> ()
-        | Ok o -> failwithf "FAIL: the .NET SDK in use is %s but global.json locks %s" (o.Out.Trim()) sdk
-        | Error e -> failwith e
+        let sdkInUse = (Tooling.run Tooling.dotnet [ "--version" ] None |> Tooling.orFail).Out.Trim()
+        Assert.Equal(sdk, sdkInUse)
         let drift = Repo.json "evidence/t0/stack-drift.json"
         let counts =
             drift |> Json.prop "summary" |> Option.map Json.entries |> Option.defaultValue []
             |> List.map (fun (k, v) -> k, v.GetInt32()) |> Map.ofList
-        Gate.noDefects "compatibility evidence" (evidenceDefects (drift |> Json.prop "ready" |> Option.exists (fun v -> v.GetBoolean())) counts)
+        Gate.assertNoDefects "compatibility evidence" (evidenceDefects (drift |> Json.prop "ready" |> Option.exists (fun v -> v.GetBoolean())) counts)
         // The gate is mandatory: the Causa CI workflow runs this suite on every pull request with the npm tree installed.
         let ci = Repo.text ".github/workflows/ci.yml"
-        Gate.noDefects
+        Gate.assertNoDefects
             "the mandatory gate"
             [ if not (Regex.IsMatch(ci, @"(?m)^\s*pull_request:")) then yield "Causa CI does not run on pull requests"
               if not (ci.Contains "npm ci") then yield "Causa CI does not install the locked npm tree"
@@ -115,20 +113,19 @@ type VER008Tests() =
     /// Missing dependencies, stale evidence, unverified artifacts or skipped gates give BLOCKED or FAIL, never PASS.
     [<Fact>]
     member _.``VER-008-O2``() =
-        Gate.defectsFound "a locked package that is not installed" (compare [ "@echelon-foundry/limen", "0.9.1" ] (fun _ -> None))
-        Gate.defectsFound "an installed version that differs from the lock" (compare [ "@echelon-foundry/limen", "0.9.1" ] (fun _ -> Some "0.9.0"))
-        Gate.defectsFound "evidence that is not ready" (evidenceDefects false (Map.ofList [ "DRIFT", 0; "BLOCKED", 0; "UNVERIFIED", 0 ]))
-        Gate.defectsFound "evidence with an unverified artifact" (evidenceDefects true (Map.ofList [ "DRIFT", 0; "BLOCKED", 0; "UNVERIFIED", 1 ]))
-        Gate.defectsFound "evidence that omits a count" (evidenceDefects true (Map.ofList [ "DRIFT", 0 ]))
-        match (compare [ "@echelon-foundry/limen", "0.9.1" ] (fun _ -> None)) with
-        | [ d ] when d.StartsWith "BLOCKED" -> ()
-        | other -> failwithf "a missing dependency must be BLOCKED: %A" other
+        Gate.assertRejects "a locked package that is not installed" (compare [ "@echelon-foundry/limen", "0.9.1" ] (fun _ -> None))
+        Gate.assertRejects "an installed version that differs from the lock" (compare [ "@echelon-foundry/limen", "0.9.1" ] (fun _ -> Some "0.9.0"))
+        Gate.assertRejects "evidence that is not ready" (evidenceDefects false (Map.ofList [ "DRIFT", 0; "BLOCKED", 0; "UNVERIFIED", 0 ]))
+        Gate.assertRejects "evidence with an unverified artifact" (evidenceDefects true (Map.ofList [ "DRIFT", 0; "BLOCKED", 0; "UNVERIFIED", 1 ]))
+        Gate.assertRejects "evidence that omits a count" (evidenceDefects true (Map.ofList [ "DRIFT", 0 ]))
+        let missing = compare [ "@echelon-foundry/limen", "0.9.1" ] (fun _ -> None)
+        Assert.True((match missing with [ d ] -> d.StartsWith "BLOCKED" | _ -> false), sprintf "a missing dependency must be BLOCKED: %A" missing)
         // Stale freshness evidence fails (VER-002's baseline window), and the CI workflow refuses skipped or empty runs.
         let lockedAt = DateTimeOffset.Parse(record () |> Json.strOr "baselineLockedAt")
         let stale = { (checks (record ())).Head with CheckedAt = "2026-10-01T00:00:00Z" }
-        if checkedAtBaseline lockedAt DateTimeOffset.UtcNow stale then failwith "stale freshness evidence was accepted"
+        Assert.False(checkedAtBaseline lockedAt DateTimeOffset.UtcNow stale, "stale freshness evidence was accepted")
         let ci = Repo.text ".github/workflows/ci.yml"
-        Gate.noDefects
+        Gate.assertNoDefects
             "the CI workflow's fail-closed checks"
             [ if not (ci.Contains "Skipped:[[:space:]]*[1-9]") then yield "Causa CI does not fail a run that skips tests"
               if not (ci.Contains "Tests are declared but none passed") then yield "Causa CI does not fail an empty test run"
@@ -136,7 +133,7 @@ type VER008Tests() =
               if Regex.IsMatch(ci, @"continue-on-error:\s*true") then yield "Causa CI lets a step fail without failing the run" ]
         // No test in this project is skipped or switched off.
         let sources = Directory.GetFiles(Repo.path "tests", "*.fs", SearchOption.AllDirectories)
-        Gate.noDefects
+        Gate.assertNoDefects
             "skipped tests"
             [ for f in sources do
                   if Regex.IsMatch(File.ReadAllText f, @"\[<\s*(Fact|Theory)\s*\(\s*Skip\s*=") then yield sprintf "%s skips a test" f ]

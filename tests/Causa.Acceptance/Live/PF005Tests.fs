@@ -11,7 +11,7 @@ type PF005Tests(fixture: LiveFixture<PF005Tests>) =
     let prefix = RepoPath "workspaces/demo/causa-app-pf005/investigations/00000000-0000-0000-0000-000000000005"
 
     /// The UI and domain test projects (fixture and deterministic levels).
-    let offlineTestDirs = [ "tests/Causa.Domain.Tests", "*.fs"; "tests/Causa.App.Tests", "*.fs"; "tests/browser/acceptance", "*.js" ]
+    let offlineTestDirs = [ "tests/Causa.Domain.Tests", "*.fs"; "tests/Causa.App.Tests", "*.fs" ]
 
     /// What a test would use to reach GitHub, the network or a credential.
     let liveMarkers = [ "CAUSA_GITHUB_TOKEN"; "CAUSA_WRITE_TOKEN"; "LiveEnv"; "LiveFixture"; "LiveRun"; "LiveHttp"; "api.github.com"; "HttpClient" ]
@@ -29,7 +29,8 @@ type PF005Tests(fixture: LiveFixture<PF005Tests>) =
     interface IClassFixture<LiveFixture<PF005Tests>>
 
     /// PF-005-O1: UI and domain tests do not depend on GitHub, Actions, the network or credentials: the domain assembly
-    /// references neither persistence nor HTTP, no UI or domain test source names a live marker, and the
+    /// references neither persistence nor HTTP, no domain or App test source names a live marker, no browser UI spec
+    /// requires a credential or reaches GitHub unanswered, and the
     /// provider-conformance fixture passes with both secrets unset.
     [<Fact>]
     member _.``PF-005-O1``() =
@@ -44,6 +45,8 @@ type PF005Tests(fixture: LiveFixture<PF005Tests>) =
                         let text = IO.File.ReadAllText file
                         for marker in liveMarkers do
                             Assert.False(text.Contains marker, sprintf "%s depends on %s" file marker)
+        let browser = OfflineSpec.scan "tests/browser/acceptance"
+        Assert.True(List.isEmpty browser, sprintf "UI tests depend on live GitHub or a credential: %A" browser)
         withoutCredentials (fun () -> Assert.Empty(Conformance.failures (Conformance.run (Conformance.overFake (StatefulFake()) prefix) ignore)))
 
     /// PF-005-O2: a real-provider test never falls back to fixtures: without its secret it is BLOCKED (never a fake

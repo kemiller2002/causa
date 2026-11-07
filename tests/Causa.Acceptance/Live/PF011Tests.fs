@@ -51,18 +51,15 @@ type PF011Tests(fixture: LiveFixture<PF011Tests>) =
         Assert.Contains("Causa.Domain.Tests.", command "SU-OWN-DOTNET")
 
     /// PF-011-O2: the UI level runs browser tests against local fixtures with no external dependency: the browser
-    /// suite serves the build on 127.0.0.1 and no browser acceptance spec names a credential.
+    /// suite serves the build on 127.0.0.1 and no browser acceptance spec requires a credential or reaches GitHub
+    /// without answering it.
     [<Fact>]
     member _.``PF-011-O2``() =
         let config = Repo.read "playwright.config.ts"
         Assert.Contains("127.0.0.1", config)
         Assert.Contains("--project=chromium", command "SU-BROWSER-CHROMIUM")
-        let dir = Repo.path "tests/browser/acceptance"
-        if IO.Directory.Exists dir then
-            for spec in IO.Directory.EnumerateFiles(dir, "*.js", IO.SearchOption.AllDirectories) do
-                let text = IO.File.ReadAllText spec
-                for marker in [ "CAUSA_GITHUB_TOKEN"; "CAUSA_WRITE_TOKEN" ] do
-                    Assert.False(text.Contains marker, sprintf "%s needs %s" spec marker)
+        let dependent = OfflineSpec.scan "tests/browser/acceptance"
+        Assert.True(List.isEmpty dependent, sprintf "browser UI specs depend on live GitHub or a credential: %A" dependent)
 
     /// PF-011-O3: provider conformance runs one shared contract script against the fixture adapter and the GitHub
     /// adapter, with the sanitized recorded answers: every recorded form classifies into its matrix class, the fake

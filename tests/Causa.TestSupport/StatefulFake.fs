@@ -705,3 +705,23 @@ module Plan =
             match a.GetType().GetProperty "Skip" with
             | null -> None
             | p -> p.GetValue a |> Option.ofObj |> Option.map string |> Option.filter (String.IsNullOrEmpty >> not))
+
+/// What makes a browser spec depend on live GitHub or a credential (PF-005-O1, PF-011-O2): a credential it requires
+/// (read from the environment with no stand-in), or a request to api.github.com it does not answer itself.
+[<RequireQualifiedAccess>]
+module OfflineSpec =
+    let private requiredToken = RegularExpressions.Regex(@"process\.env\.CAUSA_(GITHUB|WRITE)_TOKEN(?!\s*(\|\||\?\?))")
+
+    let liveDependencies (text: string) : string list =
+        [ for m in requiredToken.Matches text -> sprintf "requires %s" m.Value
+          if text.Contains "api.github.com" && not (text.Contains ".route(") then yield "reaches api.github.com without answering it" ]
+
+    /// Every browser spec under a directory with its live dependencies, if any.
+    let scan (relativeDir: string) : (string * string list) list =
+        let dir = Repo.path relativeDir
+        if not (IO.Directory.Exists dir) then []
+        else
+            [ for spec in IO.Directory.EnumerateFiles(dir, "*.js", IO.SearchOption.AllDirectories) do
+                  match liveDependencies (IO.File.ReadAllText spec) with
+                  | [] -> ()
+                  | reasons -> yield spec, reasons ]

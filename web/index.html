@@ -1,0 +1,58 @@
+<!doctype html>
+<!-- Owner: integration (T10). The application shell. It renders, with its loading placeholder, before the .NET
+     WebAssembly engine starts (FL-08, WASM-LOAD-001). build.fsx writes dist/index.html from this file: it inlines every
+     web/screens/*.html fragment at the screens marker and links every web/screens/*.css at the screen-styles marker.
+     Each fragment is one <template data-if="screen.<name>"> in Limen 0.9.1 binding grammar; the engine's view decides
+     which screen is mounted. UI roles change this file only through a change request integration applies. -->
+<html lang="en" data-ef-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Causa</title>
+  <link rel="stylesheet" href="vendor/forma/all.css">
+  <link rel="stylesheet" href="causa.css">
+  <!-- causa:screen-styles -->
+  <script type="importmap">
+    { "imports": { "@echelon-foundry/limen": "./vendor/limen/index.js" } }
+  </script>
+  <script type="module" src="boundary.js"></script>
+</head>
+<body>
+  <div class="ef-site causa-site">
+    <a class="ef-skip-link" href="#causa-main">Skip to main content</a>
+
+    <!-- Loading shell: visible from the first paint until the engine has rendered its first view. -->
+    <section class="ef-skeleton causa-boot" id="causa-boot" aria-busy="true" aria-labelledby="causa-boot-title">
+      <h1 class="causa-boot__title" id="causa-boot-title">Causa</h1>
+      <p role="status" id="causa-boot-status">Loading Causa…</p>
+      <div class="ef-skeleton__line ef-skeleton__line--title" aria-hidden="true"></div>
+      <div class="ef-skeleton__line" aria-hidden="true"></div>
+      <div class="ef-skeleton__line" aria-hidden="true"></div>
+      <div class="ef-skeleton__line ef-skeleton__line--short" aria-hidden="true"></div>
+    </section>
+
+    <!-- Boot fault: shown only if the engine cannot start. It says what happened, what was preserved, and offers a
+         working retry (FL-08b, FL-08c). -->
+    <aside class="ef-alert ef-fault-banner causa-boot-fault" id="causa-boot-fault" role="alert"
+           data-ef-intent="banner" data-ef-severity="critical" aria-labelledby="causa-boot-fault-title" hidden>
+      <div class="ef-alert__icon ef-fault-banner__marker" aria-hidden="true">!!</div>
+      <div class="ef-fault-banner__body">
+        <p class="ef-fault__severity">Critical</p>
+        <h2 class="ef-alert__title" id="causa-boot-fault-title">Causa could not start</h2>
+        <p id="causa-boot-fault-message">The application engine did not load in this browser.</p>
+        <p>Nothing was changed: your investigations stay as they were saved in your data repository.</p>
+      </div>
+      <div class="ef-recovery-actions" role="group" aria-label="Recovery actions">
+        <button type="button" id="causa-boot-retry">Retry</button>
+      </div>
+    </aside>
+
+    <main class="causa-main" id="causa-main" tabindex="-1" hidden>
+      <!-- causa:screens -->
+    </main>
+
+    <p class="ef-visually-hidden" id="causa-live-polite" aria-live="polite"></p>
+    <p class="ef-visually-hidden" id="causa-live-assertive" aria-live="assertive"></p>
+  </div>
+</body>
+</html>

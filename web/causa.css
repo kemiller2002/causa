@@ -1,0 +1,46 @@
+/* Owner: integration (T10). Loading shell and layout only. Reads published Forma --ef-* tokens and declares none of
+   its own (forma-layout-contract.json: web/causa.css composes Forma classes and sets layout only through Forma
+   custom properties). Screen styles live in web/screens/<screen>.css, owned by the UI roles. */
+
+/* Causa is a light application: pin native controls light too, whatever the OS scheme (Forma sets light dark). */
+html { color-scheme: light; }
+
+.causa-site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.causa-boot {
+  max-width: var(--ef-layout-width-standard);
+  margin: var(--ef-space-6) auto;
+  padding: var(--ef-space-4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.causa-boot__title {
+  margin: 0 0 var(--ef-space-2);
+}
+
+.causa-boot-fault {
+  margin: var(--ef-space-6) var(--ef-space-4);
+}
+
+.causa-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.causa-main:focus {
+  outline: none;
+}
+
+[hidden] { display: none !important; }
+
+@media (max-width: 48rem) {
+  .causa-boot {
+    margin: var(--ef-space-4) auto;
+    padding: var(--ef-space-3);
+  }
+}

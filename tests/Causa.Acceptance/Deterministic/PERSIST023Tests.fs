@@ -392,7 +392,7 @@ module Pat12 =
                 [ sprintf "Saved reached from %s by %s without a read-back confirmation" (stateName before.State) (inputName input) ]
         | _ -> []
 
-    let saveMachinePairs (machine: SaveMachine) : PairResult list =
+    let private driveSave (machine: SaveMachine) : PairResult list =
         let byState = saveStateValues |> List.groupBy stateName |> Map.ofList
         [ for stateLabel in MachineTables.saveStates do
               let sessions = byState.[stateLabel] |> List.collect candidates
@@ -418,7 +418,7 @@ module Pat12 =
                             yield "legal pair: no candidate session satisfied any guard (every Step failed)" ]
                   { State = stateLabel; Event = event; Legal = allowed.IsSome; Reached = reached; Problems = List.distinct problems } ]
 
-    let conflictMachinePairs (machine: SaveMachine) : PairResult list =
+    let private driveConflict (machine: SaveMachine) : PairResult list =
         [ for view in conflictViews do
               let stateLabel = conflictName view
               for input in conflictInputs do
@@ -438,6 +438,14 @@ module Pat12 =
                         if allowed.IsSome && List.isEmpty reached then
                             yield "legal pair: no candidate satisfied any guard (every StepConflict failed)" ]
                   { State = stateLabel; Event = event; Legal = allowed.IsSome; Reached = reached; Problems = List.distinct problems } ]
+
+    // The drive is pure, so its result for one machine is computed once and shared by the tests of both classes.
+    let private memo (drive: SaveMachine -> PairResult list) =
+        let cache = Collections.Concurrent.ConcurrentDictionary<SaveMachine, Lazy<PairResult list>>(HashIdentity.Reference)
+        fun (machine: SaveMachine) -> cache.GetOrAdd(machine, fun m -> lazy (drive m)).Value
+
+    let saveMachinePairs : SaveMachine -> PairResult list = memo driveSave
+    let conflictMachinePairs : SaveMachine -> PairResult list = memo driveConflict
 
     let report (results: PairResult list) =
         results

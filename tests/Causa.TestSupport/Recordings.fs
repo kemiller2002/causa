@@ -382,3 +382,37 @@ type LiveFixture<'TestClass>() =
     interface IDisposable with
         member _.Dispose() =
             if run.IsValueCreated then (run.Value :> IDisposable).Dispose()
+
+/// Test values of the domain's types that must compile against both the bootstrap stub and the full IF41-DOMAIN
+/// record (T13): an Investigation built field by field through F# reflection, with its id and version and every other
+/// field at its default. It is only ever compared or carried, never read: a test that needs a real investigation
+/// replays a history through Kernel.kernel.
+[<RequireQualifiedAccess>]
+module TestValues =
+    open Microsoft.FSharp.Reflection
+
+    /// The empty or first value of a type: Empty for a list or map, the first field-less case of a union, "" for a
+    /// string, the default of a value type.
+    let private orNull (x: obj | null) : obj = Unchecked.nonNull x
+
+    let rec private neutral (t: Type) : obj =
+        match t.GetProperty("Empty", Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static) with
+        | null ->
+            if t = typeof<string> then orNull (box "")
+            elif t.IsValueType then orNull (Activator.CreateInstance t)
+            elif FSharpType.IsUnion(t, Reflection.BindingFlags.Public ||| Reflection.BindingFlags.NonPublic) then
+                let case = FSharpType.GetUnionCases(t, Reflection.BindingFlags.Public ||| Reflection.BindingFlags.NonPublic) |> Array.head
+                orNull (FSharpValue.MakeUnion(case, case.GetFields() |> Array.map (fun f -> neutral f.PropertyType), Reflection.BindingFlags.Public ||| Reflection.BindingFlags.NonPublic))
+            else Unchecked.defaultof<obj>
+        | empty -> orNull (empty.GetValue null)
+
+    let investigation (id: Causa.Domain.InvestigationId) (version: Causa.Domain.AggregateVersion) : Causa.Domain.Investigation =
+        let t = typeof<Causa.Domain.Investigation>
+        let values =
+            FSharpType.GetRecordFields(t)
+            |> Array.map (fun f ->
+                match f.Name with
+                | "Id" -> box id
+                | "Version" -> box version
+                | _ -> neutral f.PropertyType)
+        FSharpValue.MakeRecord(t, values) :?> Causa.Domain.Investigation

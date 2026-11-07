@@ -81,7 +81,7 @@ type PF009Tests(fixture: LiveFixture<PF009Tests>) =
         Assert.Equal("AuthenticationFailed", Conformance.kind (w.ReadHead()))
         let otherRequest : Execute = fun r -> fake.Execute { r with Id = RequestId 999L }
         Assert.Equal("Malformed", Conformance.kind ((Provider.over otherRequest fake.ReadConnection).ReadHead()))
-        let newer = Loaded { Investigation = { Id = target.Id; Version = Causa.Domain.AggregateVersion 2L }; History = []; ReadAt = CommitOid "b"; Address = address; Bytes = { Manifest = [||]; Events = [||]; Snapshot = [||] } }
+        let newer = Loaded { Investigation = TestValues.investigation target.Id (Causa.Domain.AggregateVersion 2L); History = []; ReadAt = CommitOid "b"; Address = address; Bytes = { Manifest = [||]; Events = [||]; Snapshot = [||] } }
         Assert.Equal(newer, fst (m.StepLoad (AppLoad.context fake.ReadConnection) newer (LoadInput.SupersededReply(RequestId 1L)) |> Result.defaultWith (fun f -> failwithf "%A" f)))
         let live = fixture.Run
         Assert.Equal("ok", Conformance.kind (live.Reader.ReadHead()))

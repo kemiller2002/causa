@@ -263,12 +263,17 @@ module SaveSession =
         let compareRequest head page = GitHubRequests.compare ctx.NextId ctx.Connection s.BaseHead head page
         let written () = encode s |> Result.toOption
         let filesVerdict (commit: CommitOid) (answer: ProviderAnswer) (matched: Confirmation.T -> SaveInput) (differ: CommitOid -> SaveInput) (unreadable: SaveInput) =
-            match Writes.decodeFilesAt commit answer, written () with
-            | Ok { Files = Some files; Truncated = false; CommittedAt = at }, Some w ->
-                match Confirmation.ofReadBack s.Id commit (defaultArg at ctx.Now) w files with
+            let confirm (at: DateTimeOffset option) (w: FileSet) (readBack: FileSet) =
+                match Confirmation.ofReadBack s.Id commit (defaultArg at ctx.Now) w readBack with
                 | Some c -> MachineEvent(matched c)
                 | None -> MachineEvent(differ commit)
-            | Ok { Files = None }, _ -> MachineEvent(differ commit)
+            match Writes.decodeFilesAt commit answer, written () with
+            | Ok { Files = Some files; Truncated = false; CommittedAt = at }, Some w -> confirm at w files
+            // A file too large for GraphQL text is compared by its Git blob id: equal ids are equal bytes.
+            | Ok { BlobOids = Some oids; CommittedAt = at }, Some w ->
+                let mine = [ w.Manifest; w.Events; w.Snapshot ] |> List.map Canonical.gitBlobSha
+                if mine = oids then confirm at w w else MachineEvent(differ commit)
+            | Ok { Files = None; BlobOids = None }, _ -> MachineEvent(differ commit)
             | _ -> MachineEvent unreadable
         match s.Outstanding with
         | Some(id, awaiting) when id = answered ->
@@ -301,7 +306,8 @@ module SaveSession =
             | ReconcileHead ->
                 match Classify.classify Operation.ReadHead outcome |> Result.bind Decode.head with
                 | Ok head when head = s.BaseHead -> MachineEvent SaveInput.ReconcileNothingWrittenHeadUnchanged
-                | Ok head -> next (ReconcileCommits 1) (compareRequest head 1)
+                // Pages are read against the branch, so every page lists commits after the expected head up to the head.
+                | Ok _ -> next (ReconcileCommits 1) (compareRequest (CommitOid ctx.Connection.Repository.Branch) 1)
                 | Error _ -> MachineEvent SaveInput.ReconcileReadFailed
             | ReconcileCommits page ->
                 match Classify.classify (Operation.Compare s.BaseHead) outcome with
@@ -313,9 +319,9 @@ module SaveSession =
                     | Ok p ->
                         let markerText = Writes.markerText (Writes.marker s)
                         let head = p.Commits |> List.tryLast |> Option.map (fun c -> c.Oid) |> Option.defaultValue s.BaseHead
-                        match p.Commits |> List.tryFind (fun c -> c.Message.Contains markerText) with
+                        match p.Commits |> List.tryFind (fun c -> c.Message.Split([| '\n' |]) |> Array.exists (fun l -> l.Trim() = markerText)) with
                         | Some marked -> next (ReconcileFilesAt marked.Oid) (Writes.filesAt ctx.NextId ctx.Connection marked.Oid prefix)
-                        | None when p.TotalCommits > page * 100 -> next (ReconcileCommits(page + 1)) (compareRequest head (page + 1))
+                        | None when p.TotalCommits > page * 100 -> next (ReconcileCommits(page + 1)) (compareRequest (CommitOid ctx.Connection.Repository.Branch) (page + 1))
                         | None when Writes.touchesPrefix prefix (Writes.changedFiles answer) -> MachineEvent(SaveInput.StaleHeadSameInvestigation head)
                         | None -> MachineEvent(SaveInput.ReconcileNothingWrittenHeadMoved head)
             | ReconcileFilesAt commit ->
@@ -354,10 +360,6 @@ module SaveSession =
 [<RequireQualifiedAccess>]
 module SaveMachines =
 
-    /// Until the IF41-STORAGE codec is wired, no file set verifies: a load or a conflict re-read fails truthfully.
-    let private noCodec : WorkspaceAddress.T -> CommitOid -> FileSet -> Result<VerifiedInvestigation, VerificationFailure list> =
-        fun _ _ _ -> Error [ ReaderStage("CODEC-NOT-WIRED", "manifest.json", None, "the IF41-STORAGE codec is not wired into the save machine yet") ]
-
     /// The machine over an encoder and a verifier (the IF41-STORAGE codec's Encode and Verify).
     let create
         (encode: SessionEncoder)
@@ -373,5 +375,85 @@ module SaveMachines =
           InterpretLoad = LoadMachine.interpret verify
           StepLoad = LoadMachine.step }
 
-    /// The machine the application uses: the provisional encoder and no codec yet (see Writes.provisionalEncoder).
-    let machine : SaveMachine = create Writes.provisionalEncoder noCodec
+    /// The machine over causa-storage: saves write the base history plus the engine-decided unsaved commands
+    /// (Writes.storageEncoder), loads and conflict re-reads verify with the IF41-STORAGE codec. The engine builds it
+    /// with the base each session rests on (its Loaded VerifiedInvestigation; None for a new investigation).
+    let withStorage (actor: Actor) (baseOf: InvestigationSession -> VerifiedInvestigation option) : SaveMachine =
+        create (Writes.storageEncoder actor baseOf) StorageCodecs.codec.Verify
+
+    /// The machine value the contract tests find by reflection. Its encoder writes a deterministic placeholder file set
+    /// from the session alone, because a session carries no base history or command times; the application uses
+    /// withStorage, which writes causa-storage files. Loads and conflict re-reads verify with the real codec.
+    let machine : SaveMachine = create Writes.provisionalEncoder StorageCodecs.codec.Verify
+
+/// INV-023 (UB-023): P19 decided by the owner in chat, not yet recorded (Indy-init#195). causa-storage 1.1.0 has no field for the primary
+/// investigative question: UI-FIELD-MAP UB-023 maps it to InvestigationDetailsRevised.question, which 1.1.0 defers
+/// to 1.2.0. Until then the question is stored as one UnknownIdentified (materiality informational, the least
+/// committal value), sent as the command right after StartInvestigation (two adjacent command groups in one commit),
+/// and the earliest-created unknown reads back
+/// as the primary question. It also appears among the open unknowns (the owner accepted this in P19).
+[<RequireQualifiedAccess>]
+module PrimaryQuestion =
+    open Causa.Domain
+
+    /// The commands that start an investigation: the start, then the question as an informational unknown.
+    let startCommands (start: CommandEnvelope) (question: string) (questionCommandId: Guid) (unknownId: Guid) : CommandEnvelope list =
+        match NonEmptyText.create question with
+        | None -> [ start ]
+        | Some q ->
+            [ start
+              { CommandId = questionCommandId
+                Investigation = start.Investigation
+                ExpectedVersion = Some(AggregateVersion 1L)
+                Command = Core(IdentifyUnknown { UnknownId = unknownId; Question = q; Materiality = Materiality.Informational }) } ]
+
+    /// The primary question on reload: the question of the earliest-created unknown in history order.
+    let ofInvestigation (investigation: Investigation) : string option =
+        investigation.Timeline
+        |> List.tryPick (fun e ->
+            match e.Payload with
+            | CoreEvent(UnknownIdentified u) -> Some u.Question.Value
+            | _ -> None)
+
+/// Reapply (PERSIST-012-O3/O4, T-C07): each unsaved command re-decided in its original order through the engine at
+/// the GitHub version. Accepted commands become the unsaved changes on that version; refused ones are listed with
+/// the engine's reason and never applied. Nothing is saved.
+[<RequireQualifiedAccess>]
+module Reapply =
+    open Causa.Domain
+
+    let redecide (actor: Actor) (remote: VerifiedInvestigation) (commands: CommandEnvelope list) : CommandEnvelope list * RefusedCommand list =
+        let actorId = match actor with Actor.Human a | Actor.System a | Actor.Agent(a, _, _) -> a.Value
+        let version = match remote.History with e :: _ -> e.Provenance.FormatVersion | [] -> "1.1.0"
+        let reason (d: Decision) =
+            match d with
+            | Blocked bs -> bs |> List.map (fun b -> b.Message) |> String.concat " "
+            | RequiresReview rs -> String.concat " " rs
+            | UnsupportedSemantics ids -> "unsupported: " + String.concat ", " ids
+            | Conflict(AggregateVersion e, AggregateVersion a) -> sprintf "expected version %d, found %d" e a
+            | Duplicate _ -> "already applied"
+            | Allowed _ -> ""
+        let folder (state: Investigation, accepted, refused) (cmd: CommandEnvelope) =
+            // Re-decided at the GitHub version: the version the command observed no longer applies.
+            let cmd' = { cmd with ExpectedVersion = None }
+            match Kernel.kernel.Decide Policies.coreDefault { ActorId = actorId } (Some state) cmd' with
+            | Allowed payloads ->
+                let at = Writes.requestedAt cmd.CommandId |> Option.defaultValue DateTimeOffset.UnixEpoch
+                let (AggregateVersion v0) = state.Version
+                let (InvestigationId g) = state.Id
+                let evolved =
+                    payloads
+                    |> List.mapi (fun k p ->
+                        let v = v0 + int64 k + 1L
+                        { EventId = EventId(Guid(Canonical.eventId (Canonical.guidText g) v (Canonical.guidText cmd.CommandId)))
+                          Investigation = state.Id
+                          Version = AggregateVersion v
+                          Provenance = { OccurredAt = at; Actor = actor; CorrelationId = cmd.CommandId; FormatVersion = version; SemanticVersion = version }
+                          Payload = p })
+                    |> List.fold (fun acc e -> acc |> Result.bind (fun s -> Kernel.kernel.Evolve (Some s) e)) (Ok state)
+                match evolved with
+                | Ok s -> s, accepted @ [ cmd' ], refused
+                | Error e -> state, accepted, refused @ [ { Command = cmd; Reason = e.Reason } ]
+            | other -> state, accepted, refused @ [ { Command = cmd; Reason = reason other } ]
+        let _, accepted, refused = commands |> List.fold folder (remote.Investigation, [], [])
+        accepted, refused

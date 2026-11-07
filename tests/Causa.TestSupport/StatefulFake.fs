@@ -27,6 +27,8 @@ type Fault =
     | TimeOutAfterApplying
     /// GitHub answers with a recorded form instead (a secondary rate limit, a 502, ...), applying nothing.
     | AnswerWith of form: string
+    /// Another writer commits an unrelated file just before this request is handled (the branch advances).
+    | AdvanceFirst
 
 /// Which recorded stale-head form the fake answers a moved head with: GitHub sends both (INV-22).
 type StaleForm =
@@ -42,7 +44,7 @@ type FakeState =
       Faults: (bool * Fault) list
       StaleForm: StaleForm
       Clock: DateTimeOffset
-      /// Every request the fake received, in order (method, url), with no credential.
+      /// Every request the fake received, in order (method, url; "Mutation" for createCommitOnBranch), with no credential.
       Received: (string * string) list
       Sequence: int }
 
@@ -195,11 +197,19 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                         answerJson id 200 (Json.Object [ "status", Json.String "diverged"; "ahead_by", Json.Number(decimal ahead.Length); "behind_by", Json.Number 1M; "total_commits", Json.Number(decimal ahead.Length); "commits", Json.Array [] ])
                     | Some i ->
                         let after = headLine |> List.take i |> List.rev
+                        let baseTree, headTree = s.Commits[baseOid].Tree, s.Commits[headOid].Tree
+                        let changed =
+                            Seq.append (Map.keys baseTree) (Map.keys headTree)
+                            |> Seq.distinct
+                            |> Seq.filter (fun p -> baseTree.TryFind p <> headTree.TryFind p)
+                            |> Seq.map (fun p -> Json.Object [ "filename", Json.String p ])
+                            |> List.ofSeq
                         let perPage = query url "per_page" |> Option.map int |> Option.defaultValue 250 |> min 250
                         let page = query url "page" |> Option.map int |> Option.defaultValue 1 |> max 1
                         let listed = after |> List.skip (min after.Length ((page - 1) * perPage)) |> List.truncate perPage
                         answerJson id 200 (Json.Object [ "status", Json.String(if after.IsEmpty then "identical" else "ahead"); "ahead_by", Json.Number(decimal after.Length); "behind_by", Json.Number 0M
                                                          "total_commits", Json.Number(decimal after.Length)
+                                                         "files", Json.Array changed
                                                          "commits", Json.Array(listed |> List.map (fun o -> Json.Object [ "sha", Json.String o; "commit", Json.Object [ "message", Json.String s.Commits[o].Message ] ])) ])
             | _ -> recorded id "rest-404-file"
 
@@ -246,7 +256,11 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
         let query = request.Body |> Option.bind Json.parse |> Json.field "query" |> Json.text |> Option.defaultValue ""
         let blob (bytes: byte[] option) =
             match bytes with
-            | Some b -> Json.Object [ "text", Json.String(Encoding.UTF8.GetString b); "isTruncated", Json.Bool false ]
+            | Some b ->
+                // GitHub truncates the text of a large blob (recorded behaviour: isTruncated, text cut).
+                let truncated = b.Length > 512_000
+                let text = if truncated then Encoding.UTF8.GetString(Array.sub b 0 512_000) else Encoding.UTF8.GetString b
+                Json.Object [ "oid", Json.String(gitBlobSha b); "text", Json.String text; "isTruncated", Json.Bool truncated ]
             | None -> Json.Null
         let ref' = Regex.Match(query, "ref\\(qualifiedName: \"refs/heads/([^\"]+)\"\\)")
         if ref'.Success then
@@ -277,14 +291,22 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
     let execute (request: HttpRequest) : HttpOutcome =
         lock gate (fun () ->
             let isMutation = GitHubRequests.isMutation request
-            let s0 = { state with Received = state.Received @ [ string request.Method, request.Url ] }
-            let fault, s1 = takeFault isMutation s0
+            let fault, s1' = takeFault isMutation state
+            // A request that fails before sending never reaches GitHub, so GitHub never receives it.
+            let s1 =
+                match fault with
+                | Some FailBeforeSending -> s1'
+                | _ -> { s1' with Received = s1'.Received @ [ (if isMutation then "Mutation" else string request.Method), request.Url ] }
             let token = tokenOf request
             let outcome, s2 =
                 match fault with
                 | Some FailBeforeSending -> NotAnswered(request.Id, TransportFailure.FailedBeforeSending), s1
                 | Some LoseBeforeApplying -> NotAnswered(request.Id, TransportFailure.LostAfterSending), s1
                 | Some(AnswerWith form) -> recorded request.Id form, s1
+                | Some AdvanceFirst when isMutation ->
+                    let s2, _ = apply s1 initialBranch (sprintf "other writer %d" s1.Sequence) [ sprintf "workspaces/demo/other/f%d.json" s1.Sequence, Some(Encoding.UTF8.GetBytes "{}") ]
+                    let s3, answered, _ = mutate s2 request
+                    answered, s3
                 | _ ->
                     match token |> Option.bind s1.Tokens.TryFind with
                     | None -> (if isMutation then recorded request.Id "graphql-401-bad-credentials" else recorded request.Id "rest-401-bad-credentials"), s1
@@ -296,6 +318,14 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                         | Some TimeOutAfterApplying -> NotAnswered(request.Id, TransportFailure.TimedOut), s3
                         | _ -> answered, s3
                     | Some _ when request.Url = GitHubRequests.GraphQlUrl -> graphQlRead s1 request, s1
+                    | Some true when request.Method = Post && request.Url = repoPrefix + "git/refs" ->
+                        // create a branch (the live fixture's fresh branch per test class)
+                        let input = request.Body |> Option.bind Json.parse
+                        match Json.field "ref" input |> Json.text, Json.field "sha" input |> Json.text with
+                        | Some r, Some sha when r.StartsWith "refs/heads/" && s1.Commits.ContainsKey sha && not (s1.Branches.ContainsKey(r.Substring 11)) ->
+                            answerJson request.Id 201 (Json.Object [ "ref", Json.String r; "object", Json.Object [ "sha", Json.String sha ] ]),
+                            { s1 with Branches = Map.add (r.Substring 11) sha s1.Branches }
+                        | _ -> recorded request.Id "rest-422-validation", s1
                     | Some _ -> read s1 request, s1
             state <- s2
             outcome)
@@ -488,6 +518,180 @@ module Conformance =
         member r.Passed = List.isEmpty (failures r.Probes)
         member r.IsLiveVerification = r.Mode = "live-github" && r.Passed && not (List.isEmpty r.CreatedCommits)
 
+/// A deterministic test rig for the causa-storage save machine over the stateful fake: it plays the engine's part
+/// (request identities, the base each session rests on, executing Sends and feeding answers back) so a test drives
+/// one save request end to end and inspects every request sent (PAT-02..PAT-10 against the fake).
+type ProviderRig(execute: Execute, connection: ConnectionContext, run: string) =
+    let actor = Causa.Domain.Actor.Human(Causa.Domain.NonEmptyText.create "investigator-01" |> Option.get)
+    let mutable nextId = 1000L
+    let mutable bases : Map<Causa.Domain.InvestigationId, VerifiedInvestigation> = Map.empty
+    let mutable now = DateTimeOffset(2026, 11, 7, 18, 0, 0, TimeSpan.Zero)
+    let mutable scheduled : int list = []
+    let mutable announced : string list = []
+    let address = WorkspaceAddress.workingCopy [] run |> Option.get
+
+    let machine () = SaveMachines.withStorage actor (fun s -> bases.TryFind s.Id)
+
+    let ctx () : RequestContext = { Connection = connection; NextId = RequestId nextId; MutationInFlightElsewhere = false; Now = now }
+
+    let text (s: string) = Causa.Domain.NonEmptyText.create s |> Option.get
+
+    let rec settle (s: InvestigationSession) (effects: SaveEffect list) : InvestigationSession =
+        let mutable session = s
+        for e in effects do
+            match e with
+            | ScheduleReconcileRead(_, ms) -> scheduled <- scheduled @ [ ms ]
+            | Announce(_, t) -> announced <- announced @ [ t ]
+            | ExportCommands _ -> ()
+            | Send request ->
+                nextId <- nextId + 1L
+                session <- answer session request
+        session
+
+    and answer (s: InvestigationSession) (request: HttpRequest) : InvestigationSession =
+        let outcome = execute request
+        match s.State with
+        | SaveState.Conflict(ReadingRemote rid) when rid = request.Id ->
+            match (machine ()).InterpretConflict (ctx ()) (ReadingRemote rid) outcome with
+            | ConflictEvent input ->
+                match (machine ()).StepConflict (ctx ()) (ReadingRemote rid) input with
+                | Ok(view, effects) -> settle { s with State = SaveState.Conflict view } effects
+                | Error _ -> s
+            | ConflictNextRequest(view, next) ->
+                nextId <- nextId + 1L
+                answer { s with State = SaveState.Conflict view } next
+        | _ ->
+            match (machine ()).Interpret (ctx ()) s outcome with
+            | MachineEvent input -> step s input
+            | NextRequest(s', next) ->
+                nextId <- nextId + 1L
+                answer s' next
+
+    and step (s: InvestigationSession) (input: SaveInput) : InvestigationSession =
+        match (machine ()).Step (ctx ()) s input with
+        | Ok(s', effects) -> settle s' effects
+        | Error f -> failwithf "Step refused %s/%s: %s" f.State f.Input f.Reason
+
+    member _.Address = address
+    member _.Writable = Writable.ofAddress address |> Option.get
+    member _.Actor = actor
+    member _.Machine = machine ()
+    member _.Scheduled = scheduled
+    member _.Announced = announced
+    member _.Now with get () = now and set v = now <- v
+    member _.Context() = ctx ()
+
+    /// A command envelope with a UUIDv7 id carrying the current time.
+    member _.Command (investigation: Causa.Domain.InvestigationId) (command: Causa.Domain.CoreCommand) : Causa.Domain.CommandEnvelope =
+        now <- now.AddMilliseconds 7.0
+        let bytes = Guid.NewGuid().ToByteArray()
+        { CommandId = Writes.commandIdAt now bytes; Investigation = investigation; ExpectedVersion = None; Command = Causa.Domain.Core command }
+
+    /// A new investigation's session at the fake's head, holding its StartInvestigation command.
+    member this.Create (title: string) (problem: string) : InvestigationSession =
+        let inv = Causa.Domain.InvestigationId(Guid.NewGuid())
+        let start = this.Command inv (Causa.Domain.StartInvestigation { Title = text title; ObservationId = Guid.NewGuid(); Original = text problem })
+        let head = (Provider.over execute connection).ReadHead() |> Result.defaultWith (fun e -> failwithf "head read failed: %A" e)
+        (machine ()).InitialNew this.Writable inv head start true
+
+    member this.Observe (s: InvestigationSession) (observation: string) : InvestigationSession =
+        let cmd = this.Command s.Id (Causa.Domain.RecordObservation { ObservationId = Guid.NewGuid(); Original = text observation; ObservedAt = None; Source = None })
+        step s (SaveInput.Edit cmd)
+
+    member _.Step (s: InvestigationSession) (input: SaveInput) = step s input
+
+    /// Step without settling the effects (to inject a fault before the request is sent).
+    member _.StepRaw (s: InvestigationSession) (input: SaveInput) = (machine ()).Step (ctx ()) s input
+
+    member _.Settle (s: InvestigationSession) (effects: SaveEffect list) = settle s effects
+
+    member _.Due(s: InvestigationSession) : InvestigationSession =
+        match (machine ()).ReconcileDue (ctx ()) s with
+        | Ok(s', effects) -> settle s' effects
+        | Error f -> failwithf "ReconcileDue refused: %s" f.Reason
+
+    /// Loads an investigation from the fake as a fresh tab would, and records it as the base its session rests on.
+    member _.Load(target: InvestigationRef) : Result<VerifiedInvestigation, LoadFailure> =
+        let m = machine ()
+        match m.StepLoad (ctx ()) NotLoaded (LoadInput.OpenRequested target) with
+        | Ok(loading, [ Send request ]) ->
+            nextId <- nextId + 1L
+            match m.InterpretLoad (ctx ()) loading (execute request) with
+            | LoadEvent(LoadInput.LoadVerified v) ->
+                bases <- Map.add v.Investigation.Id v bases
+                Ok v
+            | LoadEvent(LoadInput.LoadRejected f) -> Error f
+            | other -> failwithf "unexpected load answer %A" other
+        | other -> failwithf "unexpected load step %A" other
+
+    /// After a confirmed save, the engine rests the session on what GitHub holds: reload it as the base.
+    member this.Rebase(s: InvestigationSession) : VerifiedInvestigation =
+        match this.Load { Address = address; Id = s.Id } with
+        | Ok v -> v
+        | Error f -> failwithf "reload failed: %A" f
+
+    member _.Connection = connection
+
+/// The rig over the stateful fake, with the fake's record of every request.
+type SaveRig(fake: StatefulFake, run: string) =
+    inherit ProviderRig(fake.Execute, fake.WriteConnection, run)
+    member _.Fake = fake
+    /// The mutations the fake received (createCommitOnBranch), in order.
+    member _.Mutations = fake.State.Received |> List.filter (fun (m, _) -> m = "Mutation") |> List.length
+
+/// Records every request a live rig sends (PAT-02), and can lose the answer to the next mutation after GitHub
+/// applied it (a real commit whose answer the tab never sees).
+type LiveRecorder(live: LiveRun) =
+    let log = ResizeArray<HttpRequest>()
+    let outcomes = ResizeArray<HttpRequest * HttpOutcome>()
+    let mutable loseNextMutationAnswer = false
+    member _.Requests = List.ofSeq log
+    /// Every exchange as the tab saw it (a lost answer as NotAnswered).
+    member _.Exchanges = List.ofSeq outcomes
+    /// The branch heads the tab read (REST ref reads and GraphQL head-and-files reads).
+    member _.HeadsRead =
+        outcomes
+        |> Seq.choose (fun (r, o) ->
+            match o with
+            | Answered(_, 200, _, body) when r.Url.Contains "/git/ref/heads/" -> Json.parse body |> Json.path [ "object"; "sha" ] |> Json.text
+            | Answered(_, 200, _, body) when r.Url = GitHubRequests.GraphQlUrl ->
+                // a head-and-files read names the head; a read-back names the commit it re-read
+                let j = Json.parse body
+                Json.path [ "data"; "repository"; "ref"; "target"; "oid" ] j |> Json.text
+                |> Option.orElse (Json.path [ "data"; "repository"; "c"; "oid" ] j |> Json.text)
+            | _ -> None)
+        |> List.ofSeq
+    member _.Mutations = log |> Seq.filter GitHubRequests.isMutation |> List.ofSeq
+    member _.LoseNextMutationAnswer() = loseNextMutationAnswer <- true
+    member _.Execute : Execute =
+        fun request ->
+            log.Add request
+            let outcome = live.Execute request
+            let created (body: string) =
+                match Json.parse body |> Json.path [ "data"; "createCommitOnBranch"; "commit"; "oid" ] |> Json.text with
+                | Some oid -> live.Created(CommitOid oid)
+                | None -> ()
+            let seen =
+                match outcome with
+                | Answered(id, _, _, body) when GitHubRequests.isMutation request && loseNextMutationAnswer ->
+                    loseNextMutationAnswer <- false
+                    created body
+                    NotAnswered(id, TransportFailure.LostAfterSending)
+                | Answered(_, _, _, body) when GitHubRequests.isMutation request ->
+                    created body
+                    outcome
+                | _ -> outcome
+            outcomes.Add((request, seen))
+            seen
+
+/// The save rig over real GitHub on a live run's fresh branch (SU-DOTNET-LIVE).
+type LiveSaveRig(recorder: LiveRecorder, live: LiveRun, run: string) =
+    inherit ProviderRig(recorder.Execute, live.WriteConnection, run)
+    member _.Recorder = recorder
+    member _.Live = live
+    static member Create(live: LiveRun, name: string) =
+        let run = (name + "-" + live.RunId).ToLowerInvariant() |> fun r -> if r.Length > 50 then r.Substring(0, 50).TrimEnd('-') else r
+        LiveSaveRig(LiveRecorder live, live, run)
 // ---- T18 acceptance helpers: the repository checkout, the application's load path and the pinned catalog -------------
 
 /// The repository checkout the tests run from: the directory that holds Causa.slnx.
@@ -522,7 +726,8 @@ module AppLoad =
         { Connection = connection; NextId = RequestId 1L; MutationInFlightElsewhere = false; Now = DateTimeOffset.UtcNow }
 
     let load (execute: Execute) (connection: ConnectionContext) (target: InvestigationRef) : LoadState =
-        let m = SaveMachines.machine
+        // The application's causa-storage machine: loads verify with the IF41-STORAGE codec and replay the engine.
+        let m = SaveMachines.withStorage (Causa.Domain.Actor.Human(Causa.Domain.NonEmptyText.create "causa-test-reader" |> Option.get)) (fun _ -> None)
         let ctx = context connection
         match m.StepLoad ctx NotLoaded (LoadInput.OpenRequested target) with
         | Error f -> failwithf "SM-LOAD refused OpenRequested: %A" f
@@ -705,3 +910,23 @@ module Plan =
             match a.GetType().GetProperty "Skip" with
             | null -> None
             | p -> p.GetValue a |> Option.ofObj |> Option.map string |> Option.filter (String.IsNullOrEmpty >> not))
+
+/// What makes a browser spec depend on live GitHub or a credential (PF-005-O1, PF-011-O2): a credential it requires
+/// (read from the environment with no stand-in), or a request to api.github.com it does not answer itself.
+[<RequireQualifiedAccess>]
+module OfflineSpec =
+    let private requiredToken = RegularExpressions.Regex(@"process\.env\.CAUSA_(GITHUB|WRITE)_TOKEN(?!\s*(\|\||\?\?))")
+
+    let liveDependencies (text: string) : string list =
+        [ for m in requiredToken.Matches text -> sprintf "requires %s" m.Value
+          if text.Contains "api.github.com" && not (text.Contains ".route(") then yield "reaches api.github.com without answering it" ]
+
+    /// Every browser spec under a directory with its live dependencies, if any.
+    let scan (relativeDir: string) : (string * string list) list =
+        let dir = Repo.path relativeDir
+        if not (IO.Directory.Exists dir) then []
+        else
+            [ for spec in IO.Directory.EnumerateFiles(dir, "*.js", IO.SearchOption.AllDirectories) do
+                  match liveDependencies (IO.File.ReadAllText spec) with
+                  | [] -> ()
+                  | reasons -> yield spec, reasons ]

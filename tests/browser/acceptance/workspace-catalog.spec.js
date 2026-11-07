@@ -134,3 +134,37 @@ test('a working copy records an observation and a hypothesis, saves them and rea
   await fresh.context.close();
   await context.close();
 });
+
+// The causal graph (Causal Analysis): an SVG picture with role img and a summary, one line and one word per current
+// assessment, and the relationship index beside it with the same count.
+test('Apollo 11 causal graph draws every assessment and keeps its relationship index', async ({ browser }) => {
+  const { context, page, errors } = await connected(browser, { width: 1280, height: 900 });
+  await page.getByRole('link', { name: CASES[0].title }).first().click();
+  const nav = page.getByRole('navigation', { name: 'Investigation sections' });
+  await nav.getByRole('link', { name: 'Causal Analysis', exact: true }).click();
+  await expect(nav.getByRole('link', { name: 'Causal Analysis', exact: true })).toHaveAttribute('aria-current', 'page');
+  const picture = page.getByRole('img', { name: /^Causal graph:/ });
+  await expect(picture).toBeAttached({ timeout: 20000 });
+  const summary = await picture.getAttribute('aria-label');
+  const assessments = Number(summary.match(/by (\d+) assessments/)[1]);
+  expect(assessments).toBeGreaterThan(0);
+  const figure = page.locator('figure.causa-graph');
+  await expect(figure.locator('path.causa-graph__edge')).toHaveCount(assessments);
+  await expect(figure.locator('text.causa-graph__word')).toHaveCount(assessments);
+  const hypotheses = Number(summary.match(/to (\d+) hypotheses/)[1]);
+  await expect(figure.locator('rect.causa-graph__node--hypothesis')).toHaveCount(hypotheses);
+  // The textual equivalent: every assessment listed as text, the same number.
+  const index = page.locator('main section.causa-section').filter({ has: page.getByRole('heading', { name: 'Relationship index' }) }).locator('li');
+  await expect(index).toHaveCount(assessments);
+  // The words are on the picture, so colour is never the only cue.
+  const words = await figure.locator('text.causa-graph__word').allTextContents();
+  expect(words.every((w) => /^(Supports|Contradicts|Consistent with|Inconclusive|\w+)$/.test(w.trim()))).toBe(true);
+  // The graph scrolls inside its own box; the page never scrolls sideways.
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await figure.scrollIntoViewIfNeeded();
+  await figure.screenshot({ path: process.env.CAUSA_GRAPH_SHOT || test.info().outputPath('apollo-11-graph.png') });
+  expect(errors, 'page errors').toEqual([]);
+  await context.close();
+});

@@ -113,3 +113,42 @@
 .causa-editor__actions { gap: var(--ef-primitive-space-2); }
 .causa-editor .causa-item__note:empty { display: none; }
 .causa-list__entry { list-style: none; }
+
+/* ---- Causal graph (Causal Analysis). Forma --ef-* tokens only. The page never scrolls sideways: the graph scrolls
+   inside its own focusable box. Every layer is a full-canvas SVG in user units of 1 px, so the F# layout's
+   coordinates are drawn as computed. */
+.causa-graph { margin: 0; display: flex; flex-direction: column; gap: var(--ef-primitive-space-2); min-inline-size: 0; }
+.causa-graph__scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-inline-size: 100%;
+  border: 1px solid var(--ef-color-border-subtle);
+  background: var(--ef-color-surface-primary);
+}
+.causa-graph__scroll:focus-visible { outline: var(--ef-focus-ring-width) solid var(--ef-color-focus-ring); outline-offset: var(--ef-focus-ring-offset); }
+.causa-graph__canvas { position: relative; inline-size: max-content; }
+.causa-graph__sizer { display: block; }
+.causa-graph__layer { position: absolute; inset: 0; pointer-events: none; }
+.causa-graph__plane { display: block; width: 100%; height: 100%; overflow: visible; }
+.causa-graph__heading { fill: var(--ef-color-text-primary); font-weight: var(--ef-type-weight-strong, 600); font-size: 0.875rem; }
+.causa-graph__node { fill: var(--ef-color-surface-secondary); stroke: var(--ef-color-border-functional); stroke-width: 1.5; }
+.causa-graph__node--hypothesis { stroke: var(--ef-color-accent-secondary); stroke-width: 2; }
+.causa-graph__node--conclusion { stroke: var(--ef-color-status-success); stroke-width: 2.5; }
+.causa-graph__label { fill: var(--ef-color-text-primary); font-size: 0.8125rem; }
+.causa-graph__edge { fill: none; stroke-width: 2; }
+.causa-graph__edge--supports { stroke: var(--ef-color-status-success); }
+.causa-graph__edge--contradicts { stroke: var(--ef-color-status-warning); stroke-dasharray: 7 4; }
+.causa-graph__edge--other { stroke: var(--ef-color-text-secondary); stroke-dasharray: 2 4; }
+.causa-graph__word {
+  fill: var(--ef-color-text-primary);
+  font-size: 0.6875rem;
+  paint-order: stroke;
+  stroke: var(--ef-color-surface-primary);
+  stroke-width: 3px;
+}
+.causa-graph__caption { color: var(--ef-color-text-primary); max-inline-size: var(--ef-layout-measure); font-size: var(--ef-type-size-small); }
+@media (forced-colors: active) {
+  .causa-graph__edge { stroke: CanvasText; }
+  .causa-graph__node { stroke: CanvasText; fill: Canvas; }
+  .causa-graph__label, .causa-graph__word, .causa-graph__heading { fill: CanvasText; }
+}

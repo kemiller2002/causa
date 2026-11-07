@@ -115,3 +115,11 @@ html { color-scheme: light; }
   box-sizing: border-box;
   flex-shrink: 0;
 }
+
+/* The investigation context badge in the masthead: navy on ivory (13.47:1), not Forma's default badge colours on the
+   navy masthead, which failed colour contrast (axe) on every screen. */
+.causa-masthead .causa-context .ef-badge {
+  background: var(--causa-ivory);
+  color: var(--causa-navy);
+  border-color: var(--causa-ivory);
+}

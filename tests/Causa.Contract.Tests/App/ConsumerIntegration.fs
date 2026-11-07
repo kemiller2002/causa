@@ -33,7 +33,9 @@ module private Fixture =
           Now = fun () -> at
           Run = "session"
           SessionLocal = true
-          ValidateStart = Causa.App.Views.StartScreen.validate }
+          ValidateStart = Causa.App.Views.StartScreen.validate
+          InvestigationOf = Update.investigationOf backend
+          CanSave = false }
 
     let engine = Update.engine backend
     let ui = UiAdapter.backend config engine

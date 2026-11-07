@@ -40,7 +40,11 @@ type AdapterConfig =
       /// True while no persistence adapter is wired: Start stays offered and the screens say nothing is saved.
       SessionLocal: bool
       /// The Start form's validation (Views/Start.fs StartScreen.validate, which compiles after this file).
-      ValidateStart: StartForm -> ValidationError list }
+      ValidateStart: StartForm -> ValidationError list
+      /// A session's current investigation through the kernel (Update.investigationOf, which compiles after this file).
+      InvestigationOf: Model -> InvestigationRef -> Result<Investigation option, string>
+      /// Whether a save machine is wired (the persistence adapter, T19); without it Save is unavailable, with a reason.
+      CanSave: bool }
 
 /// UI-local state the frozen Model does not hold. The credential is the frozen opaque type and is never rendered.
 type Local =
@@ -223,10 +227,19 @@ module UiAdapter =
         | UiIntent.Activate(a, _) when a = Actions.disconnect -> step engine (Msg.Connection ConnectionInput.DisconnectConfirmed) s
         | UiIntent.Activate(a, _) when a = Actions.startInvestigation -> start config engine s
         | UiIntent.Activate(a, _) when a = Actions.cancelStart -> cancelStart config engine s
-        | UiIntent.Activate(a, _) when a = Actions.save ->
+        | UiIntent.Activate(a, _) when a = Actions.save || a = ActionId "UIA-SAVE-RETRY" ->
             match currentRef s with
             | Some ref -> step engine (Msg.SessionInput(ref, SaveInput.SaveRequested)) s
             | None -> s, []
+        | UiIntent.Activate(a, _) when a = ActionId "UIA-SAVE-CHECK-AGAIN" ->
+            match currentRef s with
+            | Some ref -> step engine (Msg.SessionInput(ref, SaveInput.CheckAgain)) s
+            | None -> s, []
+        | UiIntent.Activate(a, _) when a = ActionId "UIA-SAVE-RECONNECT" ->
+            // Reconnect is the Connect form again, on the list (EXT-DATA-004-O3: the key is entered again).
+            let s2, fx = step engine (Msg.Connection ConnectionInput.DisconnectConfirmed) s
+            let s3, fx2 = step engine (Msg.Navigate(Route(Navigation.format InvestigationsRoute))) s2
+            { s3 with Local = { s3.Local with Route = InvestigationsRoute; DeployConnected = false } }, fx @ fx2
         | UiIntent.Activate(a, _) when a = Actions.retryLoad ->
             match s.Model.Connection with
             | Connected _ -> step engine (Msg.ListRequested ActiveCatalog) s
@@ -320,6 +333,118 @@ module UiAdapter =
               NextStep = "Go to Investigations."
               Retry = false } }
 
+    /// The words and choices of a save state (PERSIST-031; the total mapping above).
+    let savePresentation (config: AdapterConfig) (s: AdapterState) (session: InvestigationSession) : SavePresentation =
+        let kind = saveKind session.State
+        let saveAvailability =
+            match session.State with
+            | SaveState.Unsaved when not config.CanSave -> Unavailable "Saving arrives with the data repository writer; this build keeps changes in this tab."
+            | SaveState.Unsaved -> Available
+            | SaveState.SaveFailed(Refused(RateLimited _))
+            | SaveState.SaveFailed(Refused(NetworkUnavailable _))
+            | SaveState.SaveFailed RepositoryKeptChanging when config.CanSave -> Available
+            | SaveState.SaveFailed _ -> Unavailable "This save cannot be retried as it is; your changes are kept in this tab."
+            | SaveState.Saving -> Unavailable "Saving now."
+            | _ -> NotOffered
+        let notSaved =
+            s.Model.Sessions
+            |> Map.toList
+            |> List.filter (fun (_, x) -> not x.Unsaved.IsEmpty || not x.AfterInFlight.IsEmpty)
+            |> List.map (fun (ref, _) ->
+                match config.InvestigationOf s.Model ref with
+                | Ok(Some i) -> NonEmptyText.value i.Title
+                | _ -> let (InvestigationId g) = ref.Id in g.ToString "D")
+        { Kind = kind
+          Indicator =
+            { InvestigationId = session.Id
+              Label = PresentationLanguage.saveState kind
+              Text = PresentationLanguage.saveState kind
+              Glyph = ""
+              Actions = SaveChoices.forKind kind
+              Politeness = (match kind with ConflictKind | SaveFailedKind | UnknownOutcomeKind -> Assertive | _ -> Polite)
+              LastSavedCommitTime =
+                (match session.State with
+                 | SaveState.Saved(Confirmed c) -> Some c.CommitTime
+                 | _ -> None) }
+          Save = saveAvailability
+          Conflict = None
+          NotSaved = notSaved }
+
+    let private lifecycleText (l: Lifecycle) =
+        match l with
+        | Lifecycle.Draft -> "Draft"
+        | Lifecycle.Active -> "Active"
+        | Lifecycle.AwaitingEvidence -> "Awaiting evidence"
+        | Lifecycle.AwaitingVerification -> "Awaiting verification"
+        | Lifecycle.Resolved -> "Resolved"
+        | Lifecycle.Closed -> "Closed"
+        | Lifecycle.Archived -> "Archived"
+
+    /// The frame of an investigation the kernel projected (UI-013: every value at one version).
+    let frameOf (target: RouteTarget) (section: Section) (ref: InvestigationRef) (i: Investigation) : WorkspaceFrame =
+        let at v = AsProjected(Understood.projected i.Version v)
+        let problem =
+            i.Timeline
+            |> List.tryPick (fun e ->
+                match e.Payload with
+                | CoreEvent(InvestigationStarted s) -> Some(NonEmptyText.value s.Original)
+                | _ -> None)
+            |> Option.defaultValue ""
+        // P19 = A: the primary question is the informational unknown recorded with the start.
+        let question =
+            i.Unknowns
+            |> Map.toList
+            |> List.map snd
+            |> List.filter (fun u -> u.Materiality = Materiality.Informational)
+            |> List.sortBy (fun u -> u.Provenance.RecordedAt)
+            |> List.tryHead
+            |> Option.map (fun u -> at (NonEmptyText.value u.Question))
+        let (InvestigationId g) = i.Id
+        { Ref = ref
+          Identifier = g.ToString "D"
+          Title = NonEmptyText.value i.Title
+          ProblemStatement = at problem
+          Question = question
+          CreatedAt = at i.CreatedAt
+          InvestigationState = at (lifecycleText i.Lifecycle)
+          Copy = (if ref.Address.Role = WorkspaceRole.WorkingCopy then WorkingCopy else FrozenDemonstration)
+          // Only the sections that exist: the Overview, for now.
+          Sections =
+            [ { Destination = Overview
+                Label = Navigation.sectionLabel Overview
+                Href = Navigation.format (WorkspaceRoute(target, Overview))
+                Current = (section = Overview) } ]
+          Version = Some i.Version }
+
+    let workspaceView (config: AdapterConfig) (s: AdapterState) (target: RouteTarget) (section: Section) : WorkspaceView =
+        let empty frame state save details =
+            { Frame = frame
+              Stored = NotRequested
+              Section = OverviewSection NotRequested
+              Drafts = { Values = Map.empty; Errors = []; OpenEditor = None }
+              Details = details
+              Save = save
+              State = state }
+        let closedDetails form = { Open = false; Form = form; Errors = []; Edit = NotOffered; SaveDetails = NotOffered; Cancel = NotOffered }
+        let blank = closedDetails { Title = ""; ProblemStatement = ""; Question = "" }
+        match s.Model.Sessions |> Map.tryFindKey (fun ref _ -> ref.Id = target.Id && ref.Address.Workspace = Workspace target.Workspace) with
+        | Some ref ->
+            match config.InvestigationOf s.Model ref with
+            | Ok(Some i) ->
+                let frame = frameOf target section ref i
+                let details =
+                    closedDetails
+                        { Title = frame.Title
+                          ProblemStatement = (match frame.ProblemStatement with AsProjected u -> Understood.value u | AsStored v -> Visible.value v)
+                          Question = frame.Question |> Option.map (function AsProjected u -> Understood.value u | AsStored v -> Visible.value v) |> Option.defaultValue "" }
+                empty (Ready frame) ScreenReady (Some(savePresentation config s s.Model.Sessions[ref])) details
+            | Ok None -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
+            | Error reason -> let f = UiFailure.InvalidData reason in empty (Failed f) (ScreenFailed f) None blank
+        | None ->
+            // Opening a stored investigation needs the verified reader (T19); until then it says so, never a guess.
+            let f = UiFailure.CapabilityAbsent(DataUnderstood, "Opening a saved investigation arrives with the repository reader; this build lists it only.")
+            empty (Failed f) (ScreenFailed f) None blank
+
     let private unknownFact label = { Label = label; Status = FactUnknown }
 
     let administrationView (s: AdapterState) : AdministrationView =
@@ -346,8 +471,7 @@ module UiAdapter =
             | AdministrationRoute -> AdministrationScreen(administrationView s)
             | SettingsRoute -> SettingsScreen(settingsView s)
             | NotFoundRoute requested -> NotFoundScreen(notFound requested)
-            // The workspace screens arrive with the ui-2/ui-3 slices; until then a workspace route shows the list.
-            | WorkspaceRoute _ -> ListScreen(listView config s)
+            | WorkspaceRoute(target, section) -> WorkspaceScreen(workspaceView config s target section)
         { Route = s.Local.Route
           Primary = Navigation.primary s.Local.Route
           Screen = screen

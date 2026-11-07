@@ -114,7 +114,9 @@ let config: AdapterConfig =
       Now = fun () -> DateTimeOffset.UtcNow
       Run = "session"
       SessionLocal = backend.Persistence.IsNone && backend.Provider.IsNone
-      ValidateStart = Causa.App.Views.StartScreen.validate }
+      ValidateStart = Causa.App.Views.StartScreen.validate
+      InvestigationOf = Update.investigationOf backend
+      CanSave = backend.Persistence.IsSome }
 
 let engine = Update.engine backend
 let ui = UiAdapter.backend config engine

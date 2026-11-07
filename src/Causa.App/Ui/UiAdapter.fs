@@ -62,9 +62,17 @@ type Local =
       /// The last listing that failed, as the list shows it (never the empty state); cleared by a listing that lands.
       ListFailure: UiFailure option
       /// Why the deployed test build's injected connection did not connect (UI-010: what happened and a next step).
-      DeployFailure: string option }
+      DeployFailure: string option
+      /// The content editors' fields as typed (observation INV-024/025, hypothesis INV-026/011), before submit.
+      Content: Map<FieldId, string>
+      ContentErrors: ValidationError list }
 
 type AdapterState = { Model: Model; Local: Local }
+
+/// Which content editor a record action submits.
+type ContentKind =
+    | Observation
+    | Hypothesis
 
 /// The analysis the workspace sections render, read from a replayed Investigation (Data Understood once the adapter
 /// wraps it with Understood.projected at the investigation's version). Pure; it invents nothing: a value the domain
@@ -178,7 +186,7 @@ module WorkspaceAnalysis =
         | Actor.System id -> text id
         | Actor.Agent(id, _, _) -> text id
 
-    let ofInvestigation (i: Investigation) : AnalysisProjection =
+    let ofInvestigation (actions: Map<ActionId, Availability>) (i: Investigation) : AnalysisProjection =
         let allLinks = links i
         let observations =
             i.Observations
@@ -242,16 +250,28 @@ module WorkspaceAnalysis =
           NextSteps = []
           UnresolvedContradictions = Known openContradictions
           CorrectiveActionsSupported = false
-          Actions = Map.empty }
+          Actions = actions }
+
+    /// The content actions an editable investigation offers, as the kernel's capabilities state them (UI-004): available,
+    /// or unavailable with the kernel's first blocker as the reason.
+    let contentActions (i: Investigation) : Map<ActionId, Availability> =
+        let caps = Capabilities.evaluate Policies.coreDefault i
+        let of' (command: string) =
+            match caps |> List.tryFind (fun c -> c.Id = command) with
+            | Some c when c.Blockers.IsEmpty -> Available
+            | Some c -> Unavailable(c.Blockers.Head.Message)
+            | None -> Available
+        Map.ofList [ Actions.recordObservation, of' "RecordObservation"; Actions.recordHypothesis, of' "RecordHypothesis" ]
 
     /// The sections that have something to show, in the fixed order (UI-029-O2); the Overview always.
-    let sections (target: RouteTarget) (current: Section) (i: Investigation) : NavLink<Section> list =
+    let sections (target: RouteTarget) (current: Section) (offered: bool) (i: Investigation) : NavLink<Section> list =
         let has s =
             match s with
             | Overview -> true
             | CausalAnalysis -> not i.Relationships.IsEmpty
             | EvidenceSection -> not i.Evidence.IsEmpty
-            | HypothesesSection -> not i.Hypotheses.IsEmpty
+            // Hypotheses also when one can be recorded here (an editable working copy).
+            | HypothesesSection -> not i.Hypotheses.IsEmpty || offered
             | TimelineSection -> not i.Timeline.IsEmpty
             | CorrectiveActions -> false
         Navigation.sections
@@ -460,6 +480,54 @@ module UiAdapter =
             WorkspaceAddress.workingCopy [] (target.Workspace.Substring prefix.Length) |> Option.map (fun a -> { Address = a; Id = target.Id })
         | WorkspaceRole.WorkingCopy -> None
 
+    let private sessionOfRoute (s: AdapterState) =
+        match s.Local.Route with
+        | WorkspaceRoute(target, _) -> s.Model.Sessions |> Map.tryFindKey (fun ref _ -> ref.Id = target.Id && ref.Address.Workspace = Workspace target.Workspace)
+        | _ -> None
+
+    /// INV-014 / INV-009: validate the editor, then send the kernel the command at the session's current version.
+    let private recordContent (config: AdapterConfig) (engine: Engine) (kind: ContentKind) (s: AdapterState) =
+        let spec, fields =
+            match kind with
+            | Observation -> ContentForms.observation, [ Fields.observationText; Fields.observationSource ]
+            | Hypothesis -> ContentForms.hypothesisOnRecord, [ Fields.hypothesisStatement; Fields.hypothesisExplanation ]
+        match sessionOfRoute s with
+        | None -> s, []
+        | Some ref ->
+            match Validation.checkAll spec s.Local.Content with
+            | _ :: _ as errors -> { s with Local = { s.Local with ContentErrors = errors } }, []
+            | [] ->
+                match config.InvestigationOf s.Model ref with
+                | Ok(Some i) ->
+                    let value f = s.Local.Content |> Map.tryFind f |> Option.defaultValue ""
+                    let cmdId = CommandIds.at (config.Now())
+                    let command =
+                        match kind with
+                        | Observation ->
+                            Core(
+                                RecordObservation
+                                    { ObservationId = derivedId cmdId "observation"
+                                      Original = (NonEmptyText.create (value Fields.observationText)).Value
+                                      ObservedAt = None
+                                      Source = NonEmptyText.create (value Fields.observationSource) }
+                            )
+                        | Hypothesis ->
+                            Core(
+                                RecordHypothesis
+                                    { HypothesisId = HypothesisId(derivedId cmdId "hypothesis")
+                                      Statement = (NonEmptyText.create (value Fields.hypothesisStatement)).Value
+                                      Mechanism = NonEmptyText.create (value Fields.hypothesisExplanation) }
+                            )
+                    let envelope = { CommandId = cmdId; Investigation = ref.Id; ExpectedVersion = Some i.Version; Command = command }
+                    let s2, fx = step engine (Msg.DomainCommand envelope) s
+                    { s2 with
+                        Local =
+                            { s2.Local with
+                                Content = fields |> List.fold (fun m f -> Map.remove f m) s2.Local.Content
+                                ContentErrors = [] } },
+                    fx
+                | _ -> s, []
+
     let private currentRef (s: AdapterState) =
         match s.Local.Route with
         | WorkspaceRoute(t, _) ->
@@ -494,12 +562,19 @@ module UiAdapter =
             { s with Local = { s.Local with Form = Connection.withField f v s.Local.Form } }, []
         | UiIntent.Input(f, v, _) when StartForm.fields |> List.exists (fun x -> x.Field = f) ->
             { s with Local = { s.Local with Start = StartForm.withField f v s.Local.Start; Submission = Submission.NotSubmitted } }, []
+        | UiIntent.Input(f, v, _) when ContentForms.observation @ ContentForms.hypothesis |> List.exists (fun x -> x.Field = f) ->
+            { s with Local = { s.Local with Content = s.Local.Content |> Map.add f v } }, []
         | UiIntent.Input _ -> s, []
         | UiIntent.Secret(_, c) ->
             { s with Local = { s.Local with Credential = Some c; Form = { s.Local.Form with CredentialEntered = true } } }, []
         | UiIntent.Activate(a, _) when a = Actions.connect -> connect engine s
         | UiIntent.Activate(a, _) when a = Actions.disconnect -> step engine (Msg.Connection ConnectionInput.DisconnectConfirmed) s
         | UiIntent.Activate(a, _) when a = Actions.startInvestigation -> start config engine s
+        | UiIntent.Activate(a, _) when a = Actions.recordObservation -> recordContent config engine Observation s
+        | UiIntent.Activate(a, _) when a = Actions.recordHypothesis -> recordContent config engine Hypothesis s
+        | UiIntent.Activate(a, _) when a = Actions.cancelEditor ->
+            let cleared = [ Fields.observationText; Fields.observationSource; Fields.hypothesisStatement; Fields.hypothesisExplanation ]
+            { s with Local = { s.Local with Content = cleared |> List.fold (fun m f -> Map.remove f m) s.Local.Content; ContentErrors = [] } }, []
         | UiIntent.Activate(a, _) when a = Actions.cancelStart -> cancelStart config engine s
         | UiIntent.Activate(a, _) when a = Actions.save || a = ActionId "UIA-SAVE-RETRY" ->
             match currentRef s with
@@ -692,7 +767,7 @@ module UiAdapter =
           InvestigationState = at (lifecycleText i.Lifecycle)
           Copy = (if ref.Address.Role = WorkspaceRole.WorkingCopy then WorkingCopy else FrozenDemonstration)
           // Only the sections that have content (WorkspaceAnalysis.sections).
-          Sections = WorkspaceAnalysis.sections target section i
+          Sections = WorkspaceAnalysis.sections target section (ref.Address.Role = WorkspaceRole.WorkingCopy) i
           Version = Some i.Version }
 
     let workspaceView (config: AdapterConfig) (s: AdapterState) (target: RouteTarget) (section: Section) : WorkspaceView =
@@ -704,7 +779,8 @@ module UiAdapter =
             | HypothesesSection -> HypothesesView r
             | TimelineSection -> TimelineView r
             | CorrectiveActions -> CorrectiveActionsView r
-        let analysisOf (i: Investigation) = sectionView (Ready(Understood.projected i.Version (WorkspaceAnalysis.ofInvestigation i)))
+        let analysisOf (actions: Map<ActionId, Availability>) (i: Investigation) =
+            sectionView (Ready(Understood.projected i.Version (WorkspaceAnalysis.ofInvestigation actions i)))
         let emptyWith analysis frame state save details =
             { Frame = frame
               Stored = NotRequested
@@ -726,7 +802,8 @@ module UiAdapter =
                         { Title = frame.Title
                           ProblemStatement = (match frame.ProblemStatement with AsProjected u -> Understood.value u | AsStored v -> Visible.value v)
                           Question = frame.Question |> Option.map (function AsProjected u -> Understood.value u | AsStored v -> Visible.value v) |> Option.defaultValue "" }
-                emptyWith (analysisOf i) (Ready frame) ScreenReady (Some(savePresentation config s s.Model.Sessions[ref])) details
+                let v = emptyWith (analysisOf (WorkspaceAnalysis.contentActions i) i) (Ready frame) ScreenReady (Some(savePresentation config s s.Model.Sessions[ref])) details
+                { v with Drafts = { Values = s.Local.Content; Errors = s.Local.ContentErrors; OpenEditor = None } }
             | Ok None -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
             | Error reason -> let f = UiFailure.InvalidData reason in empty (Failed f) (ScreenFailed f) None blank
         | None ->
@@ -758,7 +835,7 @@ module UiAdapter =
                             { Title = frame.Title
                               ProblemStatement = (match frame.ProblemStatement with AsProjected u -> Understood.value u | AsStored v -> Visible.value v)
                               Question = frame.Question |> Option.map (function AsProjected u -> Understood.value u | AsStored v -> Visible.value v) |> Option.defaultValue "" }
-                    emptyWith (analysisOf v.Investigation) (Ready frame) ScreenReady save details
+                    emptyWith (analysisOf Map.empty v.Investigation) (Ready frame) ScreenReady save details
                 | Some(LoadState.Loading _) -> empty (Waiting "Opening investigation") ScreenLoading None blank
                 | Some(LoadFailed(ProviderFailed(NotFound _))) -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
                 | Some(LoadFailed(ProviderFailed AuthenticationFailed)) -> let f = UiFailure.CredentialRefused in empty (Failed f) (ScreenFailed f) None blank
@@ -825,7 +902,9 @@ module UiAdapter =
               Announcements = []
               DeployConnected = false
               ListFailure = None
-              DeployFailure = None } },
+              DeployFailure = None
+              Content = Map.empty
+              ContentErrors = [] } },
         effects
 
     /// The frozen Engine as a UiBackend. Effects are the frozen HostEffect, performed by the browser host.

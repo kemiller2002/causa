@@ -1,7 +1,20 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <!-- Owner: integration (T10). The .NET WebAssembly host of the Causa engine: the single [JSExport] entry point
+       (F# does not run the JSExport generator, Rehearsal 7 finding KD-007). build.fsx publishes it and copies its
+       wwwroot/_framework into dist/. No wasm-tools workload is needed (no AOT, no native relink). -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- No trimming: FSharp.Core is not trim-safe (IL2040/IL2104 under warnings-as-errors) and F# formatting relies
+         on reflection. The engine ships whole rather than suppressing trim warnings. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <CompressionEnabled>false</CompressionEnabled>
   </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Causa.App/Causa.App.fsproj" />
   </ItemGroup>

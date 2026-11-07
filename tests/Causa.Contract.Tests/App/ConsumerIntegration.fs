@@ -145,6 +145,48 @@ type ConsumerIntegration() =
         Assert.False(retried.GetProperty("view").GetProperty("deploy.failed").GetBoolean())
         Program.reset ()
 
+    [<Fact>]
+    member _.``Recording an observation and a hypothesis goes through the kernel; Cancel records nothing``() =
+        let s = Fixture.started ()
+        let input f v st = Fixture.ui.Dispatch (UiIntent.Input(f, v, None)) st |> fst
+        let act a st = Fixture.ui.Dispatch (UiIntent.Activate(a, None)) st |> fst
+        // Validation first: an empty observation is refused with the catalog's message, nothing reaches the engine.
+        let refused = act Actions.recordObservation s
+        Assert.NotEmpty(refused.Local.ContentErrors)
+        let s =
+            s
+            |> input Fields.observationText "The export log stops at 02:10:04."
+            |> input Fields.observationSource "export.log"
+            |> act Actions.recordObservation
+            |> input Fields.hypothesisStatement "The disk filled up."
+            |> act Actions.recordHypothesis
+        Assert.Empty(s.Local.ContentErrors)
+        Assert.False(s.Local.Content.ContainsKey Fields.observationText, "the observation editor was not cleared")
+        let writable = UiAdapter.workingCopy Fixture.config |> Option.get
+        let ref = { Address = Writable.address writable; Id = InvestigationId Fixture.identifier }
+        match Update.investigationOf Fixture.backend s.Model ref with
+        | Ok(Some i) ->
+            Assert.True(i.Observations |> Map.exists (fun _ o -> NonEmptyText.value o.Original = "The export log stops at 02:10:04."))
+            Assert.True(i.Hypotheses |> Map.exists (fun _ h -> NonEmptyText.value h.Statement = "The disk filled up."))
+        | other -> Assert.Fail(sprintf "%A" other)
+        // The workspace offers both editors and shows Hypotheses.
+        match (Fixture.ui.Project s).Screen with
+        | WorkspaceScreen v ->
+            match v.Section with
+            | OverviewSection(Ready u) ->
+                Assert.Equal(Some Available, (Understood.value u).Actions.TryFind Actions.recordObservation)
+                Assert.Equal(Some Available, (Understood.value u).Actions.TryFind Actions.recordHypothesis)
+            | other -> Assert.Fail(sprintf "%A" other)
+            match v.Frame with
+            | Ready f -> Assert.Contains(f.Sections, fun l -> l.Destination = HypothesesSection)
+            | other -> Assert.Fail(sprintf "%A" other)
+        | other -> Assert.Fail(sprintf "%A" other)
+        // Cancel clears the editors and records nothing.
+        let before = s.Model.Sessions
+        let cancelled = s |> input Fields.hypothesisStatement "Not this one" |> act Actions.cancelEditor
+        Assert.True(cancelled.Local.Content.IsEmpty)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, cancelled.Model.Sessions)
+
 /// A listing that fails shows the list as unavailable with the reason and a Retry, never the empty state.
 type ListingFailure() =
     let backend =

@@ -313,7 +313,7 @@ module SaveSession =
                     | Ok p ->
                         let markerText = Writes.markerText (Writes.marker s)
                         let head = p.Commits |> List.tryLast |> Option.map (fun c -> c.Oid) |> Option.defaultValue s.BaseHead
-                        match p.Commits |> List.tryFind (fun c -> c.Message.Contains markerText) with
+                        match p.Commits |> List.tryFind (fun c -> c.Message.Split([| '\n' |]) |> Array.exists (fun l -> l.Trim() = markerText)) with
                         | Some marked -> next (ReconcileFilesAt marked.Oid) (Writes.filesAt ctx.NextId ctx.Connection marked.Oid prefix)
                         | None when p.TotalCommits > page * 100 -> next (ReconcileCommits(page + 1)) (compareRequest head (page + 1))
                         | None when Writes.touchesPrefix prefix (Writes.changedFiles answer) -> MachineEvent(SaveInput.StaleHeadSameInvestigation head)
@@ -379,3 +379,32 @@ module SaveMachines =
     /// from the session alone, because a session carries no base history or command times; the application uses
     /// withStorage, which writes causa-storage files. Loads and conflict re-reads verify with the real codec.
     let machine : SaveMachine = create Writes.provisionalEncoder StorageCodecs.codec.Verify
+
+/// INV-023 (UB-023): P19 decided by the owner in chat, not yet recorded (Indy-init#195). causa-storage 1.1.0 has no field for the primary
+/// investigative question: UI-FIELD-MAP UB-023 maps it to InvestigationDetailsRevised.question, which 1.1.0 defers
+/// to 1.2.0. Until then the question is stored as one UnknownIdentified (materiality informational, the least
+/// committal value), sent as the command right after StartInvestigation (two adjacent command groups in one commit),
+/// and the earliest-created unknown reads back
+/// as the primary question. It also appears among the open unknowns (the owner accepted this in P19).
+[<RequireQualifiedAccess>]
+module PrimaryQuestion =
+    open Causa.Domain
+
+    /// The commands that start an investigation: the start, then the question as an informational unknown.
+    let startCommands (start: CommandEnvelope) (question: string) (questionCommandId: Guid) (unknownId: Guid) : CommandEnvelope list =
+        match NonEmptyText.create question with
+        | None -> [ start ]
+        | Some q ->
+            [ start
+              { CommandId = questionCommandId
+                Investigation = start.Investigation
+                ExpectedVersion = Some(AggregateVersion 1L)
+                Command = Core(IdentifyUnknown { UnknownId = unknownId; Question = q; Materiality = Materiality.Informational }) } ]
+
+    /// The primary question on reload: the question of the earliest-created unknown in history order.
+    let ofInvestigation (investigation: Investigation) : string option =
+        investigation.Timeline
+        |> List.tryPick (fun e ->
+            match e.Payload with
+            | CoreEvent(UnknownIdentified u) -> Some u.Question.Value
+            | _ -> None)

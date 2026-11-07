@@ -33,9 +33,18 @@ module Writes =
 
     let investigationRef (s: InvestigationSession) : InvestigationRef = { Address = Writable.address s.Address; Id = s.Id }
 
-    /// The write marker of the session's current mutation: one per send, numbered by the session's mutation count
-    /// (PERSIST-015). It is carried in the commit message, never in the investigation's bytes.
-    let marker (s: InvestigationSession) : WriteMarker = { Session = guidOf s.Id; Sequence = int64 s.Mutations }
+    /// The tab's random session identifier, created in memory when the tab (this module) starts (PERSIST-014-O1).
+    let tabSession : Guid = Guid.NewGuid()
+
+    /// The write marker of the session's current mutation (PERSIST-014): the tab's session identifier and a sequence
+    /// that names the investigation, the base head and the mutation, so markers are unique across tabs, devices, page
+    /// loads, investigations and saves. Audit metadata in the commit message, never in the investigation's bytes.
+    let marker (s: InvestigationSession) : WriteMarker =
+        let (CommitOid head) = s.BaseHead
+        let basis = guidOf s.Id |> string |> fun g -> g + "/" + head
+        let h = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes basis)
+        let seq = (BitConverter.ToInt64(h, 0) &&& 0x0000FFFFFFFFFFFFL) * 16L + int64 (s.Mutations % 16)
+        { Session = tabSession; Sequence = seq }
 
     let markerText (m: WriteMarker) = sprintf "causa-write-marker: %s/%d" (m.Session.ToString()) m.Sequence
 

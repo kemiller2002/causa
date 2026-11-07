@@ -338,3 +338,36 @@ module SMSAVE =
                 Assert.Equal(WorkspaceRole.WorkingCopy, v.Address.Role)
             | other -> failwithf "the reload did not verify: %A" other
         | Error f -> failwithf "%A" f
+
+    /// INV-023 fallback (P19): the question saves as an informational unknown in the start's commands and reloads as
+    /// the primary question.
+    [<Fact>]
+    let PrimaryQuestionSavesAndReloads () =
+        let fake = StatefulFake()
+        let actor = Causa.Domain.Actor.Human(Causa.Domain.NonEmptyText.create "investigator-01" |> Option.get)
+        let storage = SaveMachines.withStorage actor (fun _ -> None)
+        let inv = Causa.Domain.InvestigationId(System.Guid "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d")
+        let wc = WorkspaceAddress.workingCopy [] "inv023" |> Option.get
+        let w = Writable.ofAddress wc |> Option.get
+        let start : Causa.Domain.CommandEnvelope =
+            { CommandId = Writes.commandIdAt t0 (Array.init 16 byte); Investigation = inv; ExpectedVersion = None
+              Command = Causa.Domain.Core(Causa.Domain.StartInvestigation { Title = Causa.Domain.NonEmptyText.create "T" |> Option.get; ObservationId = System.Guid.NewGuid(); Original = Causa.Domain.NonEmptyText.create "P" |> Option.get }) }
+        let commands = PrimaryQuestion.startCommands start "Why does the pump trip?" (Writes.commandIdAt (t0.AddSeconds 1.0) (Array.init 16 (fun i -> byte (i + 1)))) (System.Guid.NewGuid())
+        let s0 = { storage.InitialNew w inv (fake.Head()) start true with Unsaved = commands }
+        let c (id: int64) : RequestContext = { ctx with Connection = fake.WriteConnection; NextId = RequestId id }
+        let stepOk cx s input = match storage.Step cx s input with Ok r -> r | Error f -> failwithf "%A" f
+        let rec drive (s: InvestigationSession) (request: HttpRequest) (n: int64) =
+            match storage.Interpret (c n) s (fake.Execute request) with
+            | MachineEvent input -> fst (stepOk (c n) s input)
+            | NextRequest(s', next) -> drive s' next (n + 1L)
+        let s1, fx = stepOk (c 1L) s0 SaveInput.SaveRequested
+        Assert.Equal("Saved", name (drive s1 (List.exactlyOne (sends fx)) 2L))
+        match storage.StepLoad (c 10L) NotLoaded (LoadInput.OpenRequested { Address = wc; Id = inv }) with
+        | Ok(loading, fx) ->
+            match storage.InterpretLoad (c 10L) loading (fake.Execute (List.exactlyOne (sends fx))) with
+            | LoadEvent(LoadInput.LoadVerified v) ->
+                Assert.Equal(Some "Why does the pump trip?", PrimaryQuestion.ofInvestigation v.Investigation)
+                let u = v.Investigation.Unknowns |> Map.toList |> List.exactlyOne |> snd
+                Assert.Equal(Causa.Domain.Materiality.Informational, u.Materiality)
+            | other -> failwithf "%A" other
+        | Error f -> failwithf "%A" f

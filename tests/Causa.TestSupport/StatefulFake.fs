@@ -485,3 +485,120 @@ module Conformance =
           CreatedCommits: CommitOid list }
         member r.Passed = List.isEmpty (failures r.Probes)
         member r.IsLiveVerification = r.Mode = "live-github" && r.Passed && not (List.isEmpty r.CreatedCommits)
+
+/// A deterministic test rig for the causa-storage save machine over the stateful fake: it plays the engine's part
+/// (request identities, the base each session rests on, executing Sends and feeding answers back) so a test drives
+/// one save request end to end and inspects every request sent (PAT-02..PAT-10 against the fake).
+type SaveRig(fake: StatefulFake, run: string) =
+    let actor = Causa.Domain.Actor.Human(Causa.Domain.NonEmptyText.create "investigator-01" |> Option.get)
+    let mutable nextId = 1000L
+    let mutable bases : Map<Causa.Domain.InvestigationId, VerifiedInvestigation> = Map.empty
+    let mutable now = DateTimeOffset(2026, 11, 7, 18, 0, 0, TimeSpan.Zero)
+    let mutable scheduled : int list = []
+    let mutable announced : string list = []
+    let random = Random(18)
+    let address = WorkspaceAddress.workingCopy [] run |> Option.get
+
+    let machine () = SaveMachines.withStorage actor (fun s -> bases.TryFind s.Id)
+
+    let ctx () : RequestContext = { Connection = fake.WriteConnection; NextId = RequestId nextId; MutationInFlightElsewhere = false; Now = now }
+
+    let text (s: string) = Causa.Domain.NonEmptyText.create s |> Option.get
+
+    let rec settle (s: InvestigationSession) (effects: SaveEffect list) : InvestigationSession =
+        let mutable session = s
+        for e in effects do
+            match e with
+            | ScheduleReconcileRead(_, ms) -> scheduled <- scheduled @ [ ms ]
+            | Announce(_, t) -> announced <- announced @ [ t ]
+            | ExportCommands _ -> ()
+            | Send request ->
+                nextId <- nextId + 1L
+                session <- answer session request
+        session
+
+    and answer (s: InvestigationSession) (request: HttpRequest) : InvestigationSession =
+        let outcome = fake.Execute request
+        match s.State with
+        | SaveState.Conflict(ReadingRemote rid) when rid = request.Id ->
+            match (machine ()).InterpretConflict (ctx ()) (ReadingRemote rid) outcome with
+            | ConflictEvent input ->
+                match (machine ()).StepConflict (ctx ()) (ReadingRemote rid) input with
+                | Ok(view, effects) -> settle { s with State = SaveState.Conflict view } effects
+                | Error _ -> s
+            | ConflictNextRequest(view, next) ->
+                nextId <- nextId + 1L
+                answer { s with State = SaveState.Conflict view } next
+        | _ ->
+            match (machine ()).Interpret (ctx ()) s outcome with
+            | MachineEvent input -> step s input
+            | NextRequest(s', next) ->
+                nextId <- nextId + 1L
+                answer s' next
+
+    and step (s: InvestigationSession) (input: SaveInput) : InvestigationSession =
+        match (machine ()).Step (ctx ()) s input with
+        | Ok(s', effects) -> settle s' effects
+        | Error f -> failwithf "Step refused %s/%s: %s" f.State f.Input f.Reason
+
+    member _.Fake = fake
+    member _.Address = address
+    member _.Writable = Writable.ofAddress address |> Option.get
+    member _.Actor = actor
+    member _.Machine = machine ()
+    member _.Scheduled = scheduled
+    member _.Announced = announced
+    member _.Now with get () = now and set v = now <- v
+    member _.Context() = ctx ()
+
+    /// A command envelope with a UUIDv7 id carrying the current time.
+    member _.Command (investigation: Causa.Domain.InvestigationId) (command: Causa.Domain.CoreCommand) : Causa.Domain.CommandEnvelope =
+        now <- now.AddMilliseconds 7.0
+        let bytes = Array.zeroCreate<byte> 16
+        random.NextBytes bytes
+        { CommandId = Writes.commandIdAt now bytes; Investigation = investigation; ExpectedVersion = None; Command = Causa.Domain.Core command }
+
+    /// A new investigation's session at the fake's head, holding its StartInvestigation command.
+    member this.Create (title: string) (problem: string) : InvestigationSession =
+        let inv = Causa.Domain.InvestigationId(Guid(Array.init 16 (fun _ -> byte (random.Next 256))))
+        let start = this.Command inv (Causa.Domain.StartInvestigation { Title = text title; ObservationId = Guid.NewGuid(); Original = text problem })
+        (machine ()).InitialNew this.Writable inv (fake.Head()) start true
+
+    member this.Observe (s: InvestigationSession) (observation: string) : InvestigationSession =
+        let cmd = this.Command s.Id (Causa.Domain.RecordObservation { ObservationId = Guid.NewGuid(); Original = text observation; ObservedAt = None; Source = None })
+        step s (SaveInput.Edit cmd)
+
+    member _.Step (s: InvestigationSession) (input: SaveInput) = step s input
+
+    /// Step without settling the effects (to inject a fault before the request is sent).
+    member _.StepRaw (s: InvestigationSession) (input: SaveInput) = (machine ()).Step (ctx ()) s input
+
+    member _.Settle (s: InvestigationSession) (effects: SaveEffect list) = settle s effects
+
+    member _.Due(s: InvestigationSession) : InvestigationSession =
+        match (machine ()).ReconcileDue (ctx ()) s with
+        | Ok(s', effects) -> settle s' effects
+        | Error f -> failwithf "ReconcileDue refused: %s" f.Reason
+
+    /// Loads an investigation from the fake as a fresh tab would, and records it as the base its session rests on.
+    member _.Load(target: InvestigationRef) : Result<VerifiedInvestigation, LoadFailure> =
+        let m = machine ()
+        match m.StepLoad (ctx ()) NotLoaded (LoadInput.OpenRequested target) with
+        | Ok(loading, [ Send request ]) ->
+            nextId <- nextId + 1L
+            match m.InterpretLoad (ctx ()) loading (fake.Execute request) with
+            | LoadEvent(LoadInput.LoadVerified v) ->
+                bases <- Map.add v.Investigation.Id v bases
+                Ok v
+            | LoadEvent(LoadInput.LoadRejected f) -> Error f
+            | other -> failwithf "unexpected load answer %A" other
+        | other -> failwithf "unexpected load step %A" other
+
+    /// After a confirmed save, the engine rests the session on what GitHub holds: reload it as the base.
+    member this.Rebase(s: InvestigationSession) : VerifiedInvestigation =
+        match this.Load { Address = address; Id = s.Id } with
+        | Ok v -> v
+        | Error f -> failwithf "reload failed: %A" f
+
+    /// The mutations the fake received (createCommitOnBranch), in order.
+    member _.Mutations = fake.State.Received |> List.filter (fun (m, u) -> m = "Post" && u = GitHubRequests.GraphQlUrl) |> List.length

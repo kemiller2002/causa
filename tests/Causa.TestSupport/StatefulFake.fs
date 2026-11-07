@@ -460,15 +460,17 @@ module Conformance =
           MissingBranch = Provider.over fake.Execute (on fake.ReadConnection "causa-t18-no-such-branch")
           Prefix = prefix }
 
-    /// The adapter over a live run (real GitHub on the run's fresh branch).
+    /// The adapter over a live run (real GitHub on the run's fresh branch). Each adapter writes under a fresh
+    /// directory of the run's prefix, so several probe runs in one test class never repeat a commit's content.
     let overLive (live: LiveRun) : Adapter =
         let on (c: ConnectionContext) branch = { c with Repository = { c.Repository with Branch = branch } }
+        let (RepoPath runPrefix) = live.Prefix
         { Mode = "live-github"
           Writer = live.Writer
           Reader = live.Reader
           BadCredential = Provider.over live.Execute { live.ReadConnection with Credential = Credential.create "causa-t18-not-a-token" }
           MissingBranch = Provider.over live.Execute (on live.ReadConnection (live.Branch + "-no-such-branch"))
-          Prefix = live.Prefix }
+          Prefix = RepoPath(sprintf "%s/probe-%s" runPrefix (Guid.NewGuid().ToString("N").Substring(0, 8))) }
 
     /// Every probe whose result differs between the two transcripts (fake/real divergence, PF-013-O2).
     let divergence (fake: Probe list) (real: Probe list) : (string * string * string) list =

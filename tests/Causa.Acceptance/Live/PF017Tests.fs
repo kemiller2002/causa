@@ -65,7 +65,8 @@ type PF017Tests(fixture: LiveFixture<PF017Tests>) =
         Assert.Empty(Conformance.failures offline)
         let ci = Repo.read ".github/workflows/ci.yml"
         let commands = ci.Split('\n') |> Array.filter (fun l -> l.Contains "dotnet test")
-        Assert.All(commands, fun c -> Assert.True(c.Contains "!~Causa.Acceptance.Live" && c.Contains "!~Causa.Invariants.Live", sprintf "the offline CI job runs the live suites, so a provider outage fails it: %s" (c.Trim())))
+        let runsLive = commands |> Seq.filter (fun c -> not (c.Contains "!~Causa.Acceptance.Live" && c.Contains "!~Causa.Invariants.Live")) |> Seq.map (fun c -> c.Trim()) |> List.ofSeq
+        Assert.True(List.isEmpty runsLive, sprintf "the offline CI job (.github/workflows/ci.yml) runs the live suites with no secret, so a missing credential or a provider outage fails it: %A" runsLive)
         let live = fixture.Run
         let real = Conformance.run (Conformance.overLive live) live.Created
         Assert.True(({ Mode = "live-github"; Probes = real; CreatedCommits = live.CreatedCommits } : Conformance.Report).IsLiveVerification)

@@ -42,7 +42,8 @@ type PF012Tests(fixture: LiveFixture<PF012Tests>) =
             Assert.False(ci.Contains marker, sprintf "ci.yml uses %s" marker)
         let commands = ciTestCommands ()
         Assert.NotEmpty(commands)
-        Assert.All(commands, fun c -> Assert.True(c.Contains "!~Causa.Acceptance.Live" && c.Contains "!~Causa.Invariants.Live", sprintf "ci.yml runs the live suites offline: %s" (c.Trim())))
+        let runsLive = commands |> Seq.filter (fun c -> not (c.Contains "!~Causa.Acceptance.Live" && c.Contains "!~Causa.Invariants.Live")) |> Seq.map (fun c -> c.Trim()) |> List.ofSeq
+        Assert.True(List.isEmpty runsLive, sprintf "the offline CI job (.github/workflows/ci.yml) runs the live suites with no secret, so a missing credential or a provider outage fails it: %A" runsLive)
         let live = fixture.Run
         Assert.Equal("ok", Conformance.kind (live.Reader.ReadHead()))
 

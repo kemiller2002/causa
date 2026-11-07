@@ -52,13 +52,3 @@ module SaveIndicator =
                   Bind.text "save.conflict" (s.Conflict |> Option.map (fun c -> c.Explanation) |> Option.defaultValue "")
                   Bind.flag "save.not-saved-present" (not s.NotSaved.IsEmpty)
                   Bind.items "save.not-saved" [ for n in s.NotSaved -> [ Bind.cellText "key" n; Bind.cellText "title" n ] ] ]
-
-/// investigation-workspace (`#/investigations/{id}`): the frame, the stored record when no projection is available,
-/// the details editor and the save state. View.fs (integration) maps WorkspaceScreen to this.
-module InvestigationWorkspace =
-    let bindings (view: WorkspaceView) : Bindings =
-        Bind.merge
-            [ WorkspaceFrame.bindings view
-              StoredRecord.bindings view
-              DetailsEditor.bindings view
-              SaveIndicator.bindings view.Save ]

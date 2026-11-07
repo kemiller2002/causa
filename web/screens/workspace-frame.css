@@ -42,3 +42,48 @@
 /* A failure reads as one block of sentences: Forma's alert grid gets a single body (Limen also renders one root). */
 .causa-workspace__failure { display: block; }
 .causa-workspace__failure-body p { margin: 0; color: var(--ef-color-text-primary); max-inline-size: var(--ef-layout-measure); }
+
+/* ---- Sections (T22): read-only cards and lists from the engine's projection. Forma tokens and the Causa theme only. */
+.causa-section { margin-block-start: var(--ef-layout-block-space); }
+.causa-section__title {
+  margin: 0;
+  font-size: var(--ef-type-size-h3);
+  line-height: var(--ef-type-leading-heading);
+  max-inline-size: none;
+  padding-block-end: var(--ef-primitive-space-2);
+  border-block-end: 2px solid var(--causa-navy, var(--ef-color-border-functional));
+}
+.causa-section__subtitle { margin: 0; font-size: var(--ef-type-size-h4); max-inline-size: none; }
+.causa-section__lead { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); }
+.causa-list { list-style: none; padding: 0; margin: 0; }
+.causa-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ef-primitive-space-2);
+  padding: var(--ef-layout-stack-space);
+  background: var(--ef-color-surface-primary);
+  border: 1px solid var(--ef-color-border-subtle);
+  border-inline-start: var(--ef-primitive-space-1) solid var(--causa-navy-soft, var(--ef-color-border-functional));
+  overflow-wrap: anywhere;
+}
+.causa-item[data-tone="positive"] { border-inline-start-color: var(--causa-teal, var(--ef-color-status-success)); }
+.causa-item[data-tone="critical"] { border-inline-start-color: var(--causa-coral, var(--ef-color-status-danger)); }
+.causa-item[data-tone="attention"] { border-inline-start-color: var(--ef-color-status-warning); }
+.causa-item--conclusion { border-inline-start-color: var(--causa-teal, var(--ef-color-status-success)); }
+.causa-item__title { margin: 0; font-size: var(--ef-type-size-h4); max-inline-size: none; }
+.causa-item__text { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); white-space: pre-wrap; }
+.causa-item__text--lead { font-weight: var(--ef-type-weight-strong, 600); }
+.causa-item__note { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); }
+.causa-item__meta { margin: 0; color: var(--ef-color-text-primary); }
+.causa-item__facts { margin: 0; }
+.causa-item__link { margin-inline-start: var(--ef-primitive-space-2); }
+/* Tags carry the word; the colour only repeats it (UI-016-O13). Text colours are the measured strong shades. */
+.causa-tag { color: var(--ef-color-text-primary); }
+.causa-tag[data-tone="positive"] { color: var(--causa-teal-strong, var(--ef-color-status-success)); }
+.causa-tag[data-tone="critical"] { color: var(--causa-coral-strong, var(--ef-color-status-danger)); }
+.causa-tag[data-tone="attention"] { color: var(--ef-color-status-warning); }
+.causa-tally { margin: 0; }
+.causa-relationship__evidence { font-style: italic; }
+.causa-timeline { margin-block-start: var(--ef-primitive-space-2); }
+.causa-timeline .ef-timeline__content { background: var(--ef-color-surface-primary); }
+.causa-timeline .ef-timeline__meta { color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }

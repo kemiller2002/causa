@@ -83,6 +83,141 @@
           <p class="causa-verbatim" data-requirement-id="INV-023" data-text="workspace.question"></p>
         </section>
       </template>
+
+      <!-- The section the route names (T22): read-only content from the domain engine's projection. -->
+      <template data-if="section.loading">
+        <p class="causa-loading" role="status"><span class="ef-spinner" aria-hidden="true"></span> <span data-text="section.loading-text"></span></p>
+      </template>
+      <template data-if="section.failed">
+        <div class="ef-alert ef-fault-inline causa-workspace__failure" role="alert">
+          <div class="ef-stack causa-workspace__failure-body">
+            <p class="ef-alert__title" data-text="section.failure-what"></p>
+            <p data-text="section.failure-preserved"></p>
+            <p data-text="section.failure-next"></p>
+          </div>
+        </div>
+      </template>
+
+      <template data-if="section.overview">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-overview">
+          <h2 id="causa-sec-overview" class="causa-section__title">Overview</h2>
+          <dl class="ef-facts causa-tally">
+            <div class="ef-facts__item"><dt>Hypotheses</dt><dd data-text="overview.hypotheses"></dd></div>
+            <div class="ef-facts__item"><dt>Evidence</dt><dd data-text="overview.evidence"></dd></div>
+            <div class="ef-facts__item"><dt>Assessments</dt><dd data-text="overview.relationships"></dd></div>
+            <div class="ef-facts__item"><dt>Conclusions</dt><dd data-text="overview.conclusions"></dd></div>
+            <div class="ef-facts__item"><dt>Unresolved contradictions</dt><dd data-text="overview.contradictions"></dd></div>
+          </dl>
+          <template data-if="conclusions.present">
+            <section class="ef-stack" aria-labelledby="causa-sec-conclusions">
+              <h3 id="causa-sec-conclusions" class="causa-section__subtitle">Conclusions</h3>
+              <ul class="ef-stack causa-list">
+                <template data-each="conclusions.items" data-key="key">
+                  <li class="ef-card causa-item causa-item--conclusion">
+                    <p class="causa-item__meta"><span class="ef-badge causa-tag" data-tone="positive" data-text="strength"></span></p>
+                    <p class="causa-item__text" data-text="statement"></p>
+                    <template data-if="hasResidual">
+                      <p class="causa-item__note"><strong>Residual uncertainty:</strong> <span data-text="residual"></span></p>
+                    </template>
+                  </li>
+                </template>
+              </ul>
+            </section>
+          </template>
+          <template data-if="overview.observations-present">
+            <section class="ef-stack" aria-labelledby="causa-sec-observations">
+              <h3 id="causa-sec-observations" class="causa-section__subtitle">Observations</h3>
+              <ul class="ef-stack causa-list">
+                <template data-each="overview.observations" data-key="key">
+                  <li class="ef-card causa-item">
+                    <p class="causa-item__text" data-text="text"></p>
+                    <template data-if="hasSource"><p class="causa-item__note">Source: <span data-text="source"></span></p></template>
+                  </li>
+                </template>
+              </ul>
+            </section>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.hypotheses">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-hypotheses">
+          <h2 id="causa-sec-hypotheses" class="causa-section__title">Hypotheses</h2>
+          <template data-if="hypotheses.present">
+            <ul class="ef-stack causa-list">
+              <template data-each="hypotheses.items" data-key="key">
+                <li class="ef-card causa-item" data-bind-data-tone="tone">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
+                  <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
+                  <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
+                  <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
+                </li>
+              </template>
+            </ul>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.evidence">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-evidence">
+          <h2 id="causa-sec-evidence" class="causa-section__title">Evidence</h2>
+          <template data-if="evidence.present">
+            <ul class="ef-stack causa-list">
+              <template data-each="evidence.items" data-key="key">
+                <li class="ef-card causa-item">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-text="category"></span></p>
+                  <h3 class="causa-item__title" data-text="label"></h3>
+                  <p class="causa-item__text" data-text="content"></p>
+                  <dl class="ef-key-value-list causa-item__facts">
+                    <div><dt>Source</dt><dd><span data-text="source"></span>
+                      <template data-if="hasUrl"><a class="causa-item__link" data-bind-href="url" rel="noopener noreferrer" target="_blank">Open source</a></template></dd></div>
+                    <div><dt>Captured</dt><dd data-text="captured"></dd></div>
+                    <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
+                  </dl>
+                </li>
+              </template>
+            </ul>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.causal-analysis">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-causal">
+          <h2 id="causa-sec-causal" class="causa-section__title">Causal Analysis</h2>
+          <p class="causa-section__lead">How each piece of evidence bears on each hypothesis (the current assessment of every pair).</p>
+          <template data-if="relationships.present">
+            <ul class="ef-stack causa-list">
+              <template data-each="relationships.items" data-key="key">
+                <li class="ef-card causa-item causa-relationship" data-bind-data-tone="tone">
+                  <p class="causa-item__text"><span class="causa-relationship__evidence" data-text="evidence"></span></p>
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="kind"></span></p>
+                  <p class="causa-item__text causa-item__text--lead" data-text="hypothesis"></p>
+                  <template data-if="hasRationale"><p class="causa-item__note"><strong>Rationale:</strong> <span data-text="rationale"></span></p></template>
+                </li>
+              </template>
+            </ul>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.timeline">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-timeline">
+          <h2 id="causa-sec-timeline" class="causa-section__title">Timeline</h2>
+          <template data-if="timeline.present">
+            <ol class="ef-timeline causa-timeline" aria-label="Recorded changes, oldest first">
+              <template data-each="timeline.items" data-key="key">
+                <li class="ef-timeline__item">
+                  <span class="ef-timeline__marker" aria-hidden="true"></span>
+                  <div class="ef-timeline__content">
+                    <p class="ef-timeline__meta"><time data-bind-datetime="datetime" data-text="when"></time> <span data-text="actor"></span></p>
+                    <p class="causa-item__text" data-text="summary"></p>
+                  </div>
+                </li>
+              </template>
+            </ol>
+          </template>
+        </section>
+      </template>
       </div>
     </template>
 

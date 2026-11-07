@@ -57,7 +57,7 @@ type PF003Tests(fixture: LiveFixture<PF003Tests>) =
     member _.``PF-003-O3``() =
         let fixtures = typeof<StatefulFake>.Assembly.GetName().Name
         for shipped in [ typeof<Model>.Assembly; typeof<ProviderPort>.Assembly ] do
-            let refs = shipped.GetReferencedAssemblies() |> Array.map (fun a -> a.Name)
+            let refs = shipped.GetReferencedAssemblies() |> Array.map (fun a -> string a.Name)
             Assert.DoesNotContain(fixtures, refs)
         let live = fixture.Run
         live.Reader.ReadHead() |> PinnedCatalog.ok "production read" |> ignore

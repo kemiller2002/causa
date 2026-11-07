@@ -623,3 +623,33 @@ module PinnedCatalog =
         match r with
         | Ok v -> v
         | Error e -> failwithf "%s failed: %A" what e
+
+/// Listing a workspace exactly as the application does (IF41-SAVE WorkspaceLister: catalog discovery from
+/// catalog/active.json, EXT-DATA-013). The lister is found where persistence publishes it; until it is published a
+/// test that needs it fails closed with BLOCKED.
+[<RequireQualifiedAccess>]
+module AppList =
+    let require () : WorkspaceLister =
+        typeof<ProviderPort>.Assembly.GetTypes()
+        |> Seq.collect (fun t -> t.GetProperties(Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static))
+        |> Seq.tryFind (fun p -> p.PropertyType = typeof<WorkspaceLister>)
+        |> function
+            | Some p ->
+                match p.GetValue(null) with
+                | :? WorkspaceLister as l -> l
+                | _ -> raise (InvalidOperationException(sprintf "BLOCKED: workspace lister %s holds no value" p.Name))
+            | None -> raise (InvalidOperationException "BLOCKED: workspace lister not wired (IF41-SAVE WorkspaceLister, EXT-DATA-013 catalog discovery): Causa.Persistence publishes no WorkspaceLister value")
+
+    /// Every read of one listing, each with the next request identity, until it completes or fails.
+    let list (execute: Execute) (connection: ConnectionContext) (target: ListingTarget) : Result<Listing, LoadFailure> =
+        let lister = require ()
+        let ctx n = { AppLoad.context connection with NextId = RequestId n }
+        let first, request = lister.List (ctx 1L) target
+        let rec go n step request =
+            if n > 50L then failwith "a listing took more than 50 reads"
+            else
+                match lister.InterpretList (ctx (n + 1L)) target step (execute request) with
+                | ListingComplete listing -> Ok listing
+                | ListingNextRequest(next, r) -> go (n + 1L) next r
+                | ListingFailed f -> Error f
+        go 1L first request

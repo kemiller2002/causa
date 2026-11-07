@@ -354,10 +354,6 @@ module SaveSession =
 [<RequireQualifiedAccess>]
 module SaveMachines =
 
-    /// Until the IF41-STORAGE codec is wired, no file set verifies: a load or a conflict re-read fails truthfully.
-    let private noCodec : WorkspaceAddress.T -> CommitOid -> FileSet -> Result<VerifiedInvestigation, VerificationFailure list> =
-        fun _ _ _ -> Error [ ReaderStage("CODEC-NOT-WIRED", "manifest.json", None, "the IF41-STORAGE codec is not wired into the save machine yet") ]
-
     /// The machine over an encoder and a verifier (the IF41-STORAGE codec's Encode and Verify).
     let create
         (encode: SessionEncoder)
@@ -373,5 +369,13 @@ module SaveMachines =
           InterpretLoad = LoadMachine.interpret verify
           StepLoad = LoadMachine.step }
 
-    /// The machine the application uses: the provisional encoder and no codec yet (see Writes.provisionalEncoder).
-    let machine : SaveMachine = create Writes.provisionalEncoder noCodec
+    /// The machine over causa-storage: saves write the base history plus the engine-decided unsaved commands
+    /// (Writes.storageEncoder), loads and conflict re-reads verify with the IF41-STORAGE codec. The engine builds it
+    /// with the base each session rests on (its Loaded VerifiedInvestigation; None for a new investigation).
+    let withStorage (actor: Actor) (baseOf: InvestigationSession -> VerifiedInvestigation option) : SaveMachine =
+        create (Writes.storageEncoder actor baseOf) StorageCodecs.codec.Verify
+
+    /// The machine value the contract tests find by reflection. Its encoder writes a deterministic placeholder file set
+    /// from the session alone, because a session carries no base history or command times; the application uses
+    /// withStorage, which writes causa-storage files. Loads and conflict re-reads verify with the real codec.
+    let machine : SaveMachine = create Writes.provisionalEncoder StorageCodecs.codec.Verify

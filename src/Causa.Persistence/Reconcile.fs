@@ -57,6 +57,74 @@ module Writes =
                   Events = Encoding.UTF8.GetBytes events
                   Snapshot = Encoding.UTF8.GetBytes(Json.serialize snapshot + "\n") }
 
+    /// The instant a UUIDv7 command id carries (RFC 9562: the first 48 bits are unix milliseconds). The command boundary
+    /// creates each command id as a UUIDv7 at the command's RequestedAt, so the encoder needs no clock and the same session
+    /// always encodes to the same bytes (resends and read-back compare exactly what was sent).
+    let requestedAt (commandId: Guid) : DateTimeOffset option =
+        let b = commandId.ToByteArray(true)
+        if (b[6] >>> 4) <> 7uy then None
+        else
+            let ms = b |> Array.take 6 |> Array.fold (fun acc x -> (acc <<< 8) ||| int64 x) 0L
+            Some(DateTimeOffset.FromUnixTimeMilliseconds ms)
+
+    /// A UUIDv7 command id for a command requested at `at` (ms precision), with `random` filling the rest.
+    let commandIdAt (at: DateTimeOffset) (random: byte[]) : Guid =
+        let ms = at.ToUnixTimeMilliseconds()
+        let b = Array.init 16 (fun i -> if i < random.Length then random[i] else 0uy)
+        for i in 0..5 do
+            b[i] <- byte ((ms >>> (8 * (5 - i))) &&& 0xFFL)
+        b[6] <- (b[6] &&& 0x0Fuy) ||| 0x70uy
+        b[8] <- (b[8] &&& 0x3Fuy) ||| 0x80uy
+        Guid(ReadOnlySpan<byte>(b), true)
+
+    /// The events the session's unsaved commands produce, decided in order by the engine against the base (or from
+    /// nothing, for a new investigation), each group stamped with its command's RequestedAt and the actor.
+    let decideUnsaved (actor: Actor) (basis: VerifiedInvestigation option) (s: InvestigationSession) : Result<EventEnvelope list, string> =
+        let start =
+            match basis with
+            | Some b -> Kernel.kernel.Replay b.History |> Result.map Some |> Result.mapError (sprintf "the base history does not replay: %A")
+            | None -> Ok None
+        let version = match basis with Some b -> (match b.History with e :: _ -> e.Provenance.FormatVersion | [] -> "1.1.0") | None -> "1.1.0"
+        let actorId = match actor with Actor.Human a | Actor.System a | Actor.Agent(a, _, _) -> a.Value
+        start
+        |> Result.bind (fun state0 ->
+            s.Unsaved
+            |> List.fold
+                (fun acc cmd ->
+                    acc
+                    |> Result.bind (fun (state: Investigation option, events: EventEnvelope list) ->
+                        match requestedAt cmd.CommandId with
+                        | None -> Error "a command id is not a UUIDv7 carrying its RequestedAt"
+                        | Some at ->
+                            match Kernel.kernel.Decide Policies.coreDefault { ActorId = actorId } state cmd with
+                            | Allowed payloads ->
+                                let first = match state with Some i -> (let (AggregateVersion v) = i.Version in v) | None -> 0L
+                                let envs =
+                                    payloads
+                                    |> List.mapi (fun k p ->
+                                        let v = first + int64 k + 1L
+                                        let (InvestigationId g) = s.Id
+                                        { EventId = EventId(Guid(Canonical.eventId (Canonical.guidText g) v (Canonical.guidText cmd.CommandId)))
+                                          Investigation = s.Id
+                                          Version = AggregateVersion v
+                                          Provenance = { OccurredAt = at; Actor = actor; CorrelationId = cmd.CommandId; FormatVersion = version; SemanticVersion = version }
+                                          Payload = p })
+                                envs
+                                |> List.fold (fun st e -> st |> Result.bind (fun st -> Kernel.kernel.Evolve st e |> Result.map Some |> Result.mapError (fun pe -> pe.Reason))) (Ok state)
+                                |> Result.map (fun st -> st, events @ envs)
+                            | other -> Error(sprintf "the engine refused an unsaved command: %A" other)))
+                (Ok(state0, []))
+            |> Result.map snd)
+
+    /// The causa-storage encoder of the save path: the base history and the decided unsaved commands as one file set.
+    let storageEncoder (actor: Actor) (baseOf: InvestigationSession -> VerifiedInvestigation option) : SessionEncoder =
+        fun s ->
+            let basis = baseOf s
+            decideUnsaved actor basis s
+            |> Result.bind (fun added ->
+                let history = (basis |> Option.map (fun b -> b.History) |> Option.defaultValue []) @ added
+                StorageCodecs.encodeHistory s.Id history)
+
     /// The one conditional commit of a save: the three files under the prefix, conditional on `expected`.
     let commitRequest (ctx: RequestContext) (encode: SessionEncoder) (s: InvestigationSession) (expected: CommitOid) : Result<HttpRequest, string> =
         match encode s with

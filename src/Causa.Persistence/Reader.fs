@@ -614,3 +614,366 @@ module Wire =
     /// A successor file set must extend the accepted events byte for byte (section 9.3).
     let isSuccessor (accepted: FileSet) (candidate: FileSet) =
         candidate.Events.Length >= accepted.Events.Length && Array.sub candidate.Events 0 accepted.Events.Length = accepted.Events
+
+// ---- domain <-> wire (IF41-STORAGE over the IF41-DOMAIN types) ----------------------------------------------------
+
+/// The bidirectional engine<->wire mapping of CONTRACT section 6 and FIELD-MAPPING.md, total in both directions over
+/// the events causa-storage stores. A value with no wire form is CAUSA.UNREPRESENTABLE, never stripped.
+[<RequireQualifiedAccess>]
+module DomainWire =
+    open Causa.Domain
+
+    let private pairs (xs: ('a * string) list) = (fun (v: 'a) -> xs |> List.find (fun (a, _) -> a = v) |> snd), (fun (s: string) -> xs |> List.tryFind (fun (_, w) -> w = s) |> Option.map fst)
+
+    let lifecycleW, lifecycleD =
+        pairs [ Lifecycle.Draft, "draft"; Lifecycle.Active, "active"; Lifecycle.AwaitingEvidence, "awaitingEvidence"; Lifecycle.AwaitingVerification, "awaitingVerification"
+                Lifecycle.Resolved, "resolved"; Lifecycle.Closed, "closed"; Lifecycle.Archived, "archived" ]
+    let hypW, hypD =
+        pairs [ HypothesisState.Proposed, "proposed"; HypothesisState.Plausible, "plausible"; HypothesisState.Supported, "supported"; HypothesisState.Weakened, "weakened"
+                HypothesisState.Falsified, "falsified"; HypothesisState.Superseded, "superseded" ]
+    let unknownW, unknownD =
+        pairs [ UnknownState.Identified, "identified"; UnknownState.Investigating, "investigating"; UnknownState.UnknownResolved, "resolved"
+                UnknownState.UnknownAcceptedResidual, "acceptedResidual"; UnknownState.UnknownSuperseded, "superseded" ]
+    let materialityW, materialityD =
+        pairs [ Materiality.Blocking, "blocking"; Materiality.Material, "material"; Materiality.NonMaterial, "nonMaterial"; Materiality.Informational, "informational" ]
+    let assumptionW, assumptionD =
+        pairs [ AssumptionState.ExplicitUnverified, "explicitUnverified"; AssumptionState.ProvisionallyAccepted, "provisionallyAccepted"; AssumptionState.AssumptionVerified, "verified"
+                AssumptionState.AssumptionRejected, "rejected"; AssumptionState.AssumptionExpired, "expired" ]
+    let contradictionW, contradictionD =
+        pairs [ ContradictionState.Detected, "detected"; ContradictionState.Triaged, "triaged"; ContradictionState.ContradictionInvestigating, "investigating"
+                ContradictionState.ContradictionResolved, "resolved"; ContradictionState.ContradictionAcceptedResidual, "acceptedResidual"; ContradictionState.ContradictionSuperseded, "superseded" ]
+    let actionStateW, actionStateD =
+        pairs [ ActionState.ActionProposed, "proposed"; ActionState.ActionApproved, "approved"; ActionState.ActionInProgress, "inProgress"; ActionState.ActionCompleted, "completed"
+                ActionState.ActionInterpreted, "interpreted"; ActionState.ActionRejected, "rejected"; ActionState.ActionCancelled, "cancelled" ]
+    let actionKindW, actionKindD =
+        pairs [ ActionKind.Test, "test"; ActionKind.Inspection, "inspection"; ActionKind.Query, "query"; ActionKind.Comparison, "comparison"; ActionKind.Experiment, "experiment" ]
+    let roleW, roleD =
+        pairs [ CauseRole.RootCause, "rootCause"; CauseRole.ContributingFactor, "contributingFactor"; CauseRole.Trigger, "trigger"; CauseRole.EnablingCondition, "enablingCondition" ]
+    let correctiveKindW, correctiveKindD =
+        pairs [ CorrectiveActionKind.Mitigation, "mitigation"; CorrectiveActionKind.Workaround, "workaround"; CorrectiveActionKind.Correction, "correction"; CorrectiveActionKind.Prevention, "prevention" ]
+    let categoryW, categoryD =
+        pairs [ EvidenceCategory.DirectObservation, "directObservation"; EvidenceCategory.Measurement, "measurement"; EvidenceCategory.Log, "log"; EvidenceCategory.Document, "document"
+                EvidenceCategory.ExperimentResult, "experimentResult"; EvidenceCategory.Testimony, "testimony"; EvidenceCategory.ExternalReference, "externalReference" ]
+    let verificationW, verificationD =
+        pairs [ VerificationStatus.Unverified, "unverified"; VerificationStatus.PartiallyVerified, "partiallyVerified"; VerificationStatus.Verified, "verified"; VerificationStatus.Invalidated, "invalidated" ]
+    let kindW, kindD =
+        pairs [ RelationshipKind.Supports, "supports"; RelationshipKind.Contradicts, "contradicts"; RelationshipKind.Discriminates, "discriminates"; RelationshipKind.Insufficient, "insufficient"
+                RelationshipKind.ConsistentWith, "consistentWith"; RelationshipKind.Inconclusive, "inconclusive" ]
+    let strengthW, strengthD =
+        pairs [ PredictionStrength.Necessary, "necessary"; PredictionStrength.Expected, "expected"; PredictionStrength.DiscriminatingPrediction, "discriminating"; PredictionStrength.NonDiscriminating, "nonDiscriminating" ]
+    let timingW, timingD = pairs [ PredictionTiming.Prospective, "prospective"; PredictionTiming.Retrospective, "retrospective" ]
+    let outcomeW, outcomeD = pairs [ VerificationOutcome.Satisfied, "satisfied"; VerificationOutcome.Failed, "failed"; VerificationOutcome.Inconclusive, "inconclusive" ]
+    let conclusionW, conclusionD =
+        pairs [ ConclusionStrength.PlausibleExplanation, "plausibleExplanation"; ConclusionStrength.LeadingExplanation, "leadingExplanation"; ConclusionStrength.SupportedCause, "supportedCause"
+                ConclusionStrength.ConfirmedCause, "confirmedCause"; ConclusionStrength.AcceptedWithResidualUncertainty, "acceptedWithResidualUncertainty" ]
+    let proposalKindW, proposalKindD = pairs [ ProposalKind.ProposedHypothesis, "hypothesis"; ProposalKind.ProposedUnknown, "unknown"; ProposalKind.ProposedAction, "action" ]
+    let contentW, contentD = pairs [ ContentKind.Text, "text"; ContentKind.Artifact, "artifact" ]
+
+    let private s (t: NonEmptyText) = Json.String t.Value
+    let private so (t: NonEmptyText option) = match t with Some t -> Json.String t.Value | None -> Json.Null
+    let private g (x: Guid) = Json.String(Canonical.guidText x)
+    let private gl (xs: Guid list) = Json.Array(xs |> List.map g)
+    let private str (x: string) = Json.String x
+    let private stro (x: string option) = match x with Some v -> Json.String v | None -> Json.Null
+    let private ts (t: DateTimeOffset) = match Canonical.timestamp t with Some v -> Ok(Json.String v) | None -> Error "a sub-millisecond instant has no wire form"
+    let private tso (t: DateTimeOffset option) = match t with Some t -> ts t | None -> Ok Json.Null
+    let private hid (HypothesisId x) = x
+    let private cid (CausalAssertionId x) = x
+    let private caid (CorrectiveActionId x) = x
+    let private pid (ProposalId x) = x
+
+    let private transition (t: HypothesisTransition) target command =
+        [ "hypothesisId", g (hid t.HypothesisId); "from", str (hypW t.From); "to", str target; "command", str command; "reason", s t.Reason; "evidenceIds", gl t.EvidenceIds ]
+
+    let private lifecycleChanged from target command reason =
+        "LifecycleChanged", [ "from", str (lifecycleW from); "to", str target; "command", str command; "reason", so reason ]
+
+    let private corrective id state = "CorrectiveActionTransitioned", [ "correctiveActionId", g (caid id); "state", str state ]
+
+    /// One domain event as its wire type and payload.
+    let encodeEvent (event: CoreEvent) : Result<string * Json, string> =
+        let ok (t, fields) = Ok(t, Json.Object fields)
+        match event with
+        | InvestigationStarted p -> ok ("InvestigationStarted", [ "title", s p.Title; "observationId", g p.ObservationId; "original", s p.Original ])
+        | InvestigationActivated from -> ok (lifecycleChanged from "active" "activateInvestigation" None)
+        | InvestigationMarkedAwaitingEvidence(from, reason) -> ok (lifecycleChanged from "awaitingEvidence" "markAwaitingEvidence" (Some reason))
+        | InvestigationMarkedAwaitingVerification from -> ok (lifecycleChanged from "awaitingVerification" "markAwaitingVerification" None)
+        | InvestigationResolved from -> ok (lifecycleChanged from "resolved" "resolveInvestigation" None)
+        | InvestigationClosed from -> ok (lifecycleChanged from "closed" "closeInvestigation" None)
+        | InvestigationReopened(from, reason) -> ok (lifecycleChanged from "active" "reopenInvestigation" (Some reason))
+        | InvestigationVerificationFailed reason -> ok (lifecycleChanged Lifecycle.AwaitingVerification "active" "verificationFailed" (Some reason))
+        | ObservationRecorded p -> tso p.ObservedAt |> Result.map (fun at -> "ObservationRecorded", Json.Object [ "observationId", g p.ObservationId; "original", s p.Original; "observedAt", at ])
+        | ObservationRevised p -> ok ("ObservationRevised", [ "observationId", g p.ObservationId; "original", s p.Original; "source", so p.Source ])
+        | HypothesisRecorded p -> ok ("HypothesisRecorded", [ "hypothesisId", g (hid p.HypothesisId); "statement", s p.Statement; "mechanism", so p.Mechanism ])
+        | HypothesisMarkedPlausible t -> ok ("HypothesisTransitioned", transition t "plausible" "markPlausible")
+        | HypothesisMarkedSupported t -> ok ("HypothesisTransitioned", transition t "supported" "markSupported")
+        | HypothesisWeakened t -> ok ("HypothesisTransitioned", transition t "weakened" "markWeakened")
+        | HypothesisFalsified t -> ok ("HypothesisTransitioned", transition t "falsified" "falsify")
+        | HypothesisSuperseded t -> ok ("HypothesisTransitioned", transition t "superseded" "supersede")
+        | HypothesisReopened t -> ok ("HypothesisTransitioned", transition t "plausible" "reopen")
+        | EvidenceAdmitted p ->
+            tso p.CapturedAt
+            |> Result.map (fun at ->
+                "EvidenceAdmitted",
+                Json.Object [ "evidenceId", g p.EvidenceId; "contentKind", str (contentW p.ContentKind); "content", s p.Content; "category", str (categoryW p.Category)
+                              "source", s p.Source; "capturedAt", at ])
+        | EvidenceSuperseded p -> ok ("EvidenceSuperseded", [ "evidenceId", g p.EvidenceId; "replacementEvidenceId", g p.ReplacementEvidenceId; "reason", s p.Reason ])
+        | EvidenceVerificationAssessed p -> ok ("EvidenceVerificationAssessed", [ "evidenceId", g p.EvidenceId; "verification", str (verificationW p.Verification) ])
+        | EvidenceRevised p -> ok ("EvidenceRevised", [ "evidenceId", g p.EvidenceId; "label", s p.Label; "source", s p.Source; "sourceUrl", stro p.SourceUrl ])
+        | EvidenceRelationshipRecorded p ->
+            ok ("EvidenceRelated", [ "relationshipId", g p.RelationshipId; "evidenceId", g p.EvidenceId; "hypothesisId", g (hid p.HypothesisId); "kind", str (kindW p.Kind); "rationale", so p.Rationale ])
+        | UnknownIdentified p -> ok ("UnknownIdentified", [ "unknownId", g p.UnknownId; "question", s p.Question; "materiality", str (materialityW p.Materiality) ])
+        | UnknownTransitioned p -> ok ("UnknownTransitioned", [ "unknownId", g p.UnknownId; "state", str (unknownW p.State); "basis", s p.Basis ])
+        | AssumptionRecorded p -> ok ("AssumptionRecorded", [ "assumptionId", g p.AssumptionId; "proposition", s p.Proposition; "materiality", str (materialityW p.Materiality) ])
+        | AssumptionTransitioned p -> ok ("AssumptionTransitioned", [ "assumptionId", g p.AssumptionId; "state", str (assumptionW p.State) ])
+        | ContradictionRecorded p ->
+            ok ("ContradictionRecorded", [ "contradictionId", g p.ContradictionId; "statement", s p.Statement; "evidenceIds", gl p.EvidenceIds; "materiality", str (materialityW p.Materiality) ])
+        | ContradictionTransitioned p -> ok ("ContradictionTransitioned", [ "contradictionId", g p.ContradictionId; "state", str (contradictionW p.State); "basis", s p.Basis ])
+        | PredictionRecorded p ->
+            ok ("PredictionRecorded", [ "predictionId", g p.PredictionId; "hypothesisId", g (hid p.HypothesisId); "statement", s p.Statement; "strength", str (strengthW p.Strength); "timing", str (timingW p.Timing) ])
+        | InvestigationActionRecorded p ->
+            ok ("ActionRecorded", [ "actionId", g p.ActionId; "kind", str (actionKindW p.Kind); "purpose", s p.Purpose; "targetHypothesisIds", gl (p.TargetHypothesisIds |> List.map hid) ])
+        | InvestigationActionTransitioned p -> ok ("ActionTransitioned", [ "actionId", g p.ActionId; "state", str (actionStateW p.State) ])
+        | FindingRecorded p -> ok ("FindingRecorded", [ "findingId", g p.FindingId; "actionId", g p.ActionId; "originalResult", s p.OriginalResult; "interpretation", so p.Interpretation ])
+        | NegativeKnowledgeEstablished p ->
+            ok ("NegativeKnowledgeEstablished", [ "negativeKnowledgeId", g p.NegativeKnowledgeId; "statement", s p.Statement; "scope", s p.Scope; "basisEvidenceIds", gl p.BasisEvidenceIds ])
+        | CausalAssertionRecorded p ->
+            ok ("CausalAssertionRecorded",
+                [ "causeId", g (cid p.CauseId); "outcome", s p.Outcome
+                  "members", Json.Array(p.Members |> List.map (fun m -> Json.Object [ "hypothesisId", g (hid m.HypothesisId); "role", str (roleW m.Role) ]))
+                  "mechanism", so p.Mechanism ])
+        | CauseConfirmed p -> ok ("CausalAssertionConfirmed", [ "causeId", g (cid p.CauseId); "policy", s p.Policy ])
+        | ConfirmedCauseReopened(id, reason) -> ok ("CausalAssertionReopened", [ "causeId", g (cid id); "reason", s reason ])
+        | CorrectiveActionRecorded p ->
+            ok ("CorrectiveActionRecorded",
+                [ "correctiveActionId", g (caid p.CorrectiveActionId); "kind", str (correctiveKindW p.Kind); "description", s p.Description; "targetCauseIds", gl (p.TargetCauseIds |> List.map cid) ])
+        | CorrectiveActionApproved id -> ok (corrective id "approved")
+        | CorrectiveActionStarted id -> ok (corrective id "inProgress")
+        | CorrectiveActionImplemented id -> ok (corrective id "implemented")
+        | CorrectiveActionAwaitingVerificationOfEffect id -> ok (corrective id "awaitingVerificationOfEffect")
+        | CorrectiveActionVerifiedEffective id -> ok (corrective id "verifiedEffective")
+        | CorrectiveActionVerificationFailed id -> ok (corrective id "verificationFailed")
+        | CorrectiveActionReworkRequired id -> ok (corrective id "reworkRequired")
+        | CorrectiveActionCancelled id -> ok (corrective id "cancelled")
+        | VerificationCriterionRecorded p ->
+            ok ("CriterionRecorded", [ "criterionId", g p.CriterionId; "correctiveActionId", g (caid p.CorrectiveActionId); "expectedOutcome", s p.ExpectedOutcome; "method", so p.Method ])
+        | VerificationRecorded p -> ok ("VerificationRecorded", [ "verificationId", g p.VerificationId; "criterionId", g p.CriterionId; "outcome", str (outcomeW p.Outcome); "evidenceIds", gl p.EvidenceIds ])
+        | ConclusionRecorded p ->
+            ok ("ConclusionRecorded",
+                [ "conclusionId", g p.ConclusionId; "statement", s p.Statement; "strength", str (conclusionW p.Strength); "causeIds", gl (p.CauseIds |> List.map cid); "residualUncertainty", so p.ResidualUncertainty ])
+        | ProposalRecorded p -> ok ("ProposalRecorded", [ "proposalId", g (pid p.ProposalId); "kind", str (proposalKindW p.Kind); "text", s p.Text; "rationale", so p.Rationale ])
+        | ProposalAccepted(id, target) -> ok ("ProposalWasAccepted", [ "proposalId", g (pid id); "targetId", g target ])
+        | ProposalRejected(id, reason) -> ok ("ProposalWasRejected", [ "proposalId", g (pid id); "reason", s reason ])
+        | ExtensionAttached _ -> Error "an extension has no causa-storage v1 wire form"
+
+    // decoding: a verified wire record always decodes (stage 7 checked every field)
+    let private fld name (p: Json) = Json.field name (Some p)
+    let private txt name p = fld name p |> Json.text |> Option.defaultValue ""
+    let private net name p = NonEmptyText.create (txt name p) |> Option.get
+    let private neto name p = fld name p |> Json.text |> Option.bind NonEmptyText.create
+    let private gid name p = Guid(txt name p)
+    let private gids name p = Json.items (fld name p) |> List.choose (function Json.String v -> Some(Guid v) | _ -> None)
+    let private tim name p = fld name p |> Json.text |> Option.bind Canonical.parseTimestamp
+    let private en (decode: string -> 'a option) name p = decode (txt name p) |> Option.get
+
+    let private transitionOf p : HypothesisTransition =
+        { HypothesisId = HypothesisId(gid "hypothesisId" p); From = en hypD "from" p; Reason = net "reason" p; EvidenceIds = gids "evidenceIds" p }
+
+    /// One wire record as its domain event.
+    let decodeEvent (eventType: string) (p: Json) : Result<CoreEvent, string> =
+        try
+            Ok(
+                match eventType with
+                | "InvestigationStarted" -> InvestigationStarted { Title = net "title" p; ObservationId = gid "observationId" p; Original = net "original" p }
+                | "LifecycleChanged" ->
+                    let from = en lifecycleD "from" p
+                    match txt "command" p with
+                    | "activateInvestigation" -> InvestigationActivated from
+                    | "markAwaitingEvidence" -> InvestigationMarkedAwaitingEvidence(from, net "reason" p)
+                    | "markAwaitingVerification" -> InvestigationMarkedAwaitingVerification from
+                    | "resolveInvestigation" -> InvestigationResolved from
+                    | "closeInvestigation" -> InvestigationClosed from
+                    | "reopenInvestigation" -> InvestigationReopened(from, net "reason" p)
+                    | "verificationFailed" -> InvestigationVerificationFailed(net "reason" p)
+                    | c -> failwithf "lifecycle command %s" c
+                | "ObservationRecorded" -> ObservationRecorded { ObservationId = gid "observationId" p; Original = net "original" p; ObservedAt = tim "observedAt" p }
+                | "ObservationRevised" -> ObservationRevised { ObservationId = gid "observationId" p; Original = net "original" p; Source = neto "source" p }
+                | "HypothesisRecorded" -> HypothesisRecorded { HypothesisId = HypothesisId(gid "hypothesisId" p); Statement = net "statement" p; Mechanism = neto "mechanism" p }
+                | "HypothesisTransitioned" ->
+                    let t = transitionOf p
+                    match txt "command" p with
+                    | "markPlausible" -> HypothesisMarkedPlausible t
+                    | "markSupported" -> HypothesisMarkedSupported t
+                    | "markWeakened" -> HypothesisWeakened t
+                    | "falsify" -> HypothesisFalsified t
+                    | "supersede" -> HypothesisSuperseded t
+                    | "reopen" -> HypothesisReopened t
+                    | c -> failwithf "hypothesis command %s" c
+                | "EvidenceAdmitted" ->
+                    EvidenceAdmitted { EvidenceId = gid "evidenceId" p; ContentKind = en contentD "contentKind" p; Content = net "content" p; Category = en categoryD "category" p
+                                       Source = net "source" p; CapturedAt = tim "capturedAt" p }
+                | "EvidenceSuperseded" -> EvidenceSuperseded { EvidenceId = gid "evidenceId" p; ReplacementEvidenceId = gid "replacementEvidenceId" p; Reason = net "reason" p }
+                | "EvidenceVerificationAssessed" -> EvidenceVerificationAssessed { EvidenceId = gid "evidenceId" p; Verification = en verificationD "verification" p }
+                | "EvidenceRevised" -> EvidenceRevised { EvidenceId = gid "evidenceId" p; Label = net "label" p; Source = net "source" p; SourceUrl = fld "sourceUrl" p |> Json.text }
+                | "EvidenceRelated" ->
+                    EvidenceRelationshipRecorded { RelationshipId = gid "relationshipId" p; EvidenceId = gid "evidenceId" p; HypothesisId = HypothesisId(gid "hypothesisId" p)
+                                                   Kind = en kindD "kind" p; Rationale = neto "rationale" p }
+                | "UnknownIdentified" -> UnknownIdentified { UnknownId = gid "unknownId" p; Question = net "question" p; Materiality = en materialityD "materiality" p }
+                | "UnknownTransitioned" -> UnknownTransitioned { UnknownId = gid "unknownId" p; State = en unknownD "state" p; Basis = net "basis" p }
+                | "AssumptionRecorded" -> AssumptionRecorded { AssumptionId = gid "assumptionId" p; Proposition = net "proposition" p; Materiality = en materialityD "materiality" p }
+                | "AssumptionTransitioned" -> AssumptionTransitioned { AssumptionId = gid "assumptionId" p; State = en assumptionD "state" p }
+                | "ContradictionRecorded" ->
+                    ContradictionRecorded { ContradictionId = gid "contradictionId" p; Statement = net "statement" p; EvidenceIds = gids "evidenceIds" p; Materiality = en materialityD "materiality" p }
+                | "ContradictionTransitioned" -> ContradictionTransitioned { ContradictionId = gid "contradictionId" p; State = en contradictionD "state" p; Basis = net "basis" p }
+                | "PredictionRecorded" ->
+                    PredictionRecorded { PredictionId = gid "predictionId" p; HypothesisId = HypothesisId(gid "hypothesisId" p); Statement = net "statement" p
+                                         Strength = en strengthD "strength" p; Timing = en timingD "timing" p }
+                | "ActionRecorded" ->
+                    InvestigationActionRecorded { ActionId = gid "actionId" p; Kind = en actionKindD "kind" p; Purpose = net "purpose" p
+                                                  TargetHypothesisIds = gids "targetHypothesisIds" p |> List.map HypothesisId }
+                | "ActionTransitioned" -> InvestigationActionTransitioned { ActionId = gid "actionId" p; State = en actionStateD "state" p }
+                | "FindingRecorded" -> FindingRecorded { FindingId = gid "findingId" p; ActionId = gid "actionId" p; OriginalResult = net "originalResult" p; Interpretation = neto "interpretation" p }
+                | "NegativeKnowledgeEstablished" ->
+                    NegativeKnowledgeEstablished { NegativeKnowledgeId = gid "negativeKnowledgeId" p; Statement = net "statement" p; Scope = net "scope" p; BasisEvidenceIds = gids "basisEvidenceIds" p }
+                | "CausalAssertionRecorded" ->
+                    let members =
+                        Json.items (fld "members" p)
+                        |> List.map (fun m -> { HypothesisId = HypothesisId(gid "hypothesisId" m); Role = en roleD "role" m } : CausalMember)
+                    CausalAssertionRecorded { CauseId = CausalAssertionId(gid "causeId" p); Outcome = net "outcome" p; Members = members; Mechanism = neto "mechanism" p }
+                | "CausalAssertionConfirmed" -> CauseConfirmed { CauseId = CausalAssertionId(gid "causeId" p); Policy = net "policy" p }
+                | "CausalAssertionReopened" -> ConfirmedCauseReopened(CausalAssertionId(gid "causeId" p), net "reason" p)
+                | "CorrectiveActionRecorded" ->
+                    CorrectiveActionRecorded { CorrectiveActionId = CorrectiveActionId(gid "correctiveActionId" p); Kind = en correctiveKindD "kind" p; Description = net "description" p
+                                               TargetCauseIds = gids "targetCauseIds" p |> List.map CausalAssertionId }
+                | "CorrectiveActionTransitioned" ->
+                    let id = CorrectiveActionId(gid "correctiveActionId" p)
+                    match txt "state" p with
+                    | "approved" -> CorrectiveActionApproved id
+                    | "inProgress" -> CorrectiveActionStarted id
+                    | "implemented" -> CorrectiveActionImplemented id
+                    | "awaitingVerificationOfEffect" -> CorrectiveActionAwaitingVerificationOfEffect id
+                    | "verifiedEffective" -> CorrectiveActionVerifiedEffective id
+                    | "verificationFailed" -> CorrectiveActionVerificationFailed id
+                    | "reworkRequired" -> CorrectiveActionReworkRequired id
+                    | "cancelled" -> CorrectiveActionCancelled id
+                    | st -> failwithf "corrective state %s" st
+                | "CriterionRecorded" ->
+                    VerificationCriterionRecorded { CriterionId = gid "criterionId" p; CorrectiveActionId = CorrectiveActionId(gid "correctiveActionId" p); ExpectedOutcome = net "expectedOutcome" p; Method = neto "method" p }
+                | "VerificationRecorded" -> VerificationRecorded { VerificationId = gid "verificationId" p; CriterionId = gid "criterionId" p; Outcome = en outcomeD "outcome" p; EvidenceIds = gids "evidenceIds" p }
+                | "ConclusionRecorded" ->
+                    ConclusionRecorded { ConclusionId = gid "conclusionId" p; Statement = net "statement" p; Strength = en conclusionD "strength" p
+                                         CauseIds = gids "causeIds" p |> List.map CausalAssertionId; ResidualUncertainty = neto "residualUncertainty" p }
+                | "ProposalRecorded" -> ProposalRecorded { ProposalId = ProposalId(gid "proposalId" p); Kind = en proposalKindD "kind" p; Text = net "text" p; Rationale = neto "rationale" p }
+                | "ProposalWasAccepted" -> ProposalAccepted(ProposalId(gid "proposalId" p), gid "targetId" p)
+                | "ProposalWasRejected" -> ProposalRejected(ProposalId(gid "proposalId" p), net "reason" p)
+                | t -> failwithf "event type %s" t
+            )
+        with e ->
+            Error e.Message
+
+    let actorJson (a: Actor) : Json =
+        match a with
+        | Actor.Human id -> Json.Object [ "actorId", s id; "kind", str "human" ]
+        | Actor.System id -> Json.Object [ "actorId", s id; "kind", str "system" ]
+        | Actor.Agent(id, provider, model) -> Json.Object [ "actorId", s id; "kind", str "agent"; "provider", s provider; "model", s model ]
+
+    let actorOf (j: Json) : Actor option =
+        let t n = Json.field n (Some j) |> Json.text |> Option.bind NonEmptyText.create
+        match Json.field "kind" (Some j) |> Json.text, t "actorId" with
+        | Some "human", Some id -> Some(Actor.Human id)
+        | Some "system", Some id -> Some(Actor.System id)
+        | Some "agent", Some id -> Option.map2 (fun p m -> Actor.Agent(id, p, m)) (t "provider") (t "model")
+        | _ -> None
+
+    /// A domain envelope as its stored line.
+    let toWire (env: EventEnvelope) : Result<WireEvent, string> =
+        let (InvestigationId inv) = env.Investigation
+        let (AggregateVersion v) = env.Version
+        match env.Payload with
+        | ExtensionEvent _ -> Error "an extension event has no causa-storage v1 wire form"
+        | CoreEvent event ->
+            match encodeEvent event, Canonical.timestamp env.Provenance.OccurredAt with
+            | Error e, _ -> Error e
+            | _, None -> Error "a sub-millisecond occurredAt has no wire form"
+            | Ok(eventType, payload), Some at ->
+                let invText = Canonical.guidText inv
+                let corr = Canonical.guidText env.Provenance.CorrelationId
+                Ok { FormatVersion = env.Provenance.FormatVersion; EventId = Canonical.eventId invText v corr; InvestigationId = invText; AggregateVersion = v
+                     EventType = eventType; OccurredAt = at; Actor = actorJson env.Provenance.Actor; SemanticVersion = env.Provenance.SemanticVersion
+                     CorrelationId = corr; Payload = payload }
+
+    /// A stored line as its domain envelope.
+    let ofWire (w: WireEvent) : Result<EventEnvelope, string> =
+        match decodeEvent w.EventType w.Payload, actorOf w.Actor, Canonical.parseTimestamp w.OccurredAt with
+        | Ok event, Some actor, Some at ->
+            Ok { EventId = EventId(Guid w.EventId); Investigation = InvestigationId(Guid w.InvestigationId); Version = AggregateVersion w.AggregateVersion
+                 Provenance = { OccurredAt = at; Actor = actor; CorrelationId = Guid w.CorrelationId; FormatVersion = w.FormatVersion; SemanticVersion = w.SemanticVersion }
+                 Payload = CoreEvent event }
+        | Error e, _, _ -> Error e
+        | _ -> Error "the actor or occurredAt does not decode"
+
+/// IF41-STORAGE: causa-storage file sets for the domain's histories.
+[<RequireQualifiedAccess>]
+module StorageCodecs =
+    open Causa.Domain
+
+    let private all (rs: Result<'a, string> list) : Result<'a list, string> =
+        rs |> List.fold (fun acc r -> match acc, r with Ok xs, Ok x -> Ok(x :: xs) | Error e, _ -> Error e | _, Error e -> Error e) (Ok []) |> Result.map List.rev
+
+    let private failure (r: StageRefusal) = ReaderStage(r.Code, r.File, r.Line, r.Detail)
+
+    let pathOf (Workspace w) (InvestigationId id) = RepoPath(sprintf "%s/investigations/%s" w (Canonical.guidText id))
+
+    /// Verifies the bytes (reader stages), decodes the history and replays it through the engine.
+    let verify (address: WorkspaceAddress.T) (at: CommitOid) (files: FileSet) (id: InvestigationId) : Result<VerifiedInvestigation, VerificationFailure list> =
+        let (InvestigationId g) = id
+        match Wire.verify (Canonical.guidText g) files with
+        | Error r -> Error [ failure r ]
+        | Ok w ->
+            match all (w.Events |> List.map DomainWire.ofWire) with
+            | Error e -> Error [ ReaderStage("CAUSA.SCHEMA_VIOLATION", "events.ndjson", None, e) ]
+            | Ok history ->
+                match Kernel.kernel.Replay history with
+                | Error e -> Error [ ReplayRejected e ]
+                | Ok investigation -> Ok { Investigation = investigation; History = history; ReadAt = at; Address = address; Bytes = files }
+
+    /// The id a file set names (its manifest), for a verifier that is given only the bytes.
+    let manifestId (files: FileSet) : InvestigationId option =
+        Canonical.decodeUtf8 files.Manifest
+        |> Option.bind (fun t -> Json.parse t)
+        |> Json.field "investigationId"
+        |> Json.text
+        |> Option.bind (fun s -> match Guid.TryParse s with | true, g -> Some(InvestigationId g) | _ -> None)
+
+    let private versionOf (history: EventEnvelope list) = match history with e :: _ -> e.Provenance.FormatVersion | [] -> "1.1.0"
+
+    /// The file set of a whole history; Error when an event has no wire form in the investigation's version.
+    let encodeHistory (id: InvestigationId) (history: EventEnvelope list) : Result<FileSet, string> =
+        let (InvestigationId g) = id
+        let version = versionOf history
+        match all (history |> List.map DomainWire.toWire) with
+        | Error e -> Error e
+        | Ok events ->
+            match events |> List.tryFind (fun e -> e.FormatVersion <> version || e.SemanticVersion <> version || (Wire.payloadFields version e.EventType).IsNone) with
+            | Some e -> Error(sprintf "CAUSA.UNREPRESENTABLE: %s has no causa-storage %s wire form" e.EventType version)
+            | None -> Ok(Wire.fileSet version (Canonical.guidText g) events)
+
+    let codec : StorageCodec =
+        { PathOf = pathOf
+          Encode =
+            fun basis added ->
+                match encodeHistory basis.Investigation.Id (basis.History @ added) with
+                | Ok files -> files
+                | Error e -> invalidOp e
+          EncodeNew =
+            fun id history ->
+                match encodeHistory id history with
+                | Error e -> Error [ ReaderStage("CAUSA.UNREPRESENTABLE", "events.ndjson", None, e) ]
+                | Ok files ->
+                    let address = WorkspaceAddress.catalog (Workspace "workspaces/demo/causa-app-new")
+                    verify address (CommitOid "") files id |> Result.map (fun _ -> files)
+          Verify =
+            fun address at files ->
+                match manifestId files with
+                | Some id -> verify address at files id
+                | None -> Error [ ReaderStage("CAUSA.SCHEMA_VIOLATION", "manifest.json", None, "the manifest names no investigation") ] }

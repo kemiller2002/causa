@@ -282,3 +282,59 @@ module SMSAVE =
                         Assert.Equal(snd pair, f.Input)
                     | Ok(s', _) -> failwithf "illegal %A reached %s" pair (SaveSession.stateName s'.State)
         Assert.Equal(139, illegal)
+
+    /// J1 over the stateful fake with the causa-storage machine: start an investigation, Save; Saved only after the
+    /// commit exists and its re-read equals the bytes written; GitHub holds the title and the problem statement in
+    /// causa-storage files; a fresh load verifies and reopens them.
+    [<Fact>]
+    let J1StartSaveReloadOverTheFake () =
+        let fake = StatefulFake()
+        let actor = Causa.Domain.Actor.Human(Causa.Domain.NonEmptyText.create "investigator-01" |> Option.get)
+        let storage = SaveMachines.withStorage actor (fun _ -> None)
+        let inv = Causa.Domain.InvestigationId(System.Guid "9b2f1c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d")
+        let wc = WorkspaceAddress.workingCopy [] "j1-round-trip" |> Option.get
+        let w = Writable.ofAddress wc |> Option.get
+        let title, problem = "Pump trips at noon", "The cooling pump trips at noon every day since Monday."
+        let start : Causa.Domain.CommandEnvelope =
+            { CommandId = Writes.commandIdAt (t0.AddMilliseconds 123.0) (Array.init 16 byte)
+              Investigation = inv
+              ExpectedVersion = None
+              Command =
+                Causa.Domain.Core(
+                    Causa.Domain.StartInvestigation
+                        { Title = Causa.Domain.NonEmptyText.create title |> Option.get
+                          ObservationId = System.Guid "0c1d2e3f-4a5b-4c6d-8e7f-8091a2b3c4d5"
+                          Original = Causa.Domain.NonEmptyText.create problem |> Option.get }
+                ) }
+        let c (id: int64) : RequestContext = { ctx with Connection = fake.WriteConnection; NextId = RequestId id }
+        let stepOk cx s input = match storage.Step cx s input with Ok r -> r | Error f -> failwithf "%A" f
+        let rec drive (s: InvestigationSession) (request: HttpRequest) (n: int64) =
+            match storage.Interpret (c n) s (fake.Execute request) with
+            | MachineEvent input -> fst (stepOk (c n) s input)
+            | NextRequest(s', next) -> drive s' next (n + 1L)
+        let head0 = fake.Head()
+        let s0 = storage.InitialNew w inv head0 start true
+        let s1, effects = stepOk (c 1L) s0 SaveInput.SaveRequested
+        Assert.Equal("Saving", name s1)
+        Assert.Equal(head0, fake.Head())
+        let saved = drive s1 (List.exactlyOne (sends effects)) 2L
+        Assert.True((name saved = "Saved"), sprintf "%A" saved.State)
+        Assert.NotEqual(head0, fake.Head())
+        Assert.Equal(fake.Head(), saved.BaseHead)
+        let (RepoPath prefix) = Writes.sessionPrefix saved
+        let events = fake.FileAt(fake.Head(), RepoPath(prefix + "/events.ndjson")) |> Option.map System.Text.Encoding.UTF8.GetString |> Option.get
+        Assert.Contains(title, events)
+        Assert.Contains(problem, events)
+        Assert.Contains("\"formatVersion\":\"1.1.0\"", events)
+        // A fresh load reads and verifies what GitHub holds.
+        let target : InvestigationRef = { Address = wc; Id = inv }
+        match storage.StepLoad (c 10L) NotLoaded (LoadInput.OpenRequested target) with
+        | Ok(loading, fx) ->
+            match storage.InterpretLoad (c 10L) loading (fake.Execute (List.exactlyOne (sends fx))) with
+            | LoadEvent(LoadInput.LoadVerified v) ->
+                Assert.Equal(title, v.Investigation.Title.Value)
+                Assert.Contains(v.Investigation.Observations |> Map.toList |> List.map (fun (_, o) -> o.Original.Value), fun o -> o = problem)
+                Assert.Equal(fake.Head(), v.ReadAt)
+                Assert.Equal(WorkspaceRole.WorkingCopy, v.Address.Role)
+            | other -> failwithf "the reload did not verify: %A" other
+        | Error f -> failwithf "%A" f

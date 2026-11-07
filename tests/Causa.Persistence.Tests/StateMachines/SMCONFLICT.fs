@@ -19,8 +19,23 @@ module MachineFixtures =
     let files (tag: string) : FileSet =
         { Manifest = Text.Encoding.UTF8.GetBytes("m" + tag); Events = Text.Encoding.UTF8.GetBytes("e" + tag); Snapshot = Text.Encoding.UTF8.GetBytes("s" + tag) }
 
+    let startEvent : EventEnvelope =
+        { EventId = EventId(Guid "11111111-2222-5333-8444-555555555555")
+          Investigation = investigation
+          Version = AggregateVersion 1L
+          Provenance =
+            { OccurredAt = t0; Actor = Actor.Human(NonEmptyText.create "investigator-01" |> Option.get); CorrelationId = Guid "22222222-3333-5444-8555-666666666666"
+              FormatVersion = "1.1.0"; SemanticVersion = "1.1.0" }
+          Payload =
+            CoreEvent(
+                InvestigationStarted
+                    { Title = NonEmptyText.create "Pump trips" |> Option.get; ObservationId = Guid "33333333-4444-5555-8666-777777777777"
+                      Original = NonEmptyText.create "The pump trips at noon." |> Option.get }
+            ) }
+
     let verified (at: CommitOid) : VerifiedInvestigation =
-        { Investigation = { Id = investigation; Version = AggregateVersion 1L }; History = []; ReadAt = at; Address = address; Bytes = files "v" }
+        let investigationAt = Kernel.kernel.Replay [ startEvent ] |> Result.defaultWith (failwithf "%A")
+        { Investigation = investigationAt; History = [ startEvent ]; ReadAt = at; Address = address; Bytes = files "v" }
 
     let confirmation (at: CommitOid) = Confirmation.ofReadBack investigation at t0 (files "w") (files "w") |> Option.get
 

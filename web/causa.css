@@ -123,3 +123,18 @@ html { color-scheme: light; }
   color: var(--causa-navy);
   border-color: var(--causa-ivory);
 }
+
+/* The skip link shows only for keyboard focus: focus moved by script or a pointer keeps it visually hidden. */
+.causa-site .ef-skip-link:focus:not(:focus-visible) {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 390 px audit: field descriptions and the character counters inside them at Forma's small size (14 px, not 13 px). */
+.causa-site .ef-field__description { font-size: var(--ef-type-size-small); }
+/* The masthead's current-investigation link is a full tap target. */
+.causa-context a { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); }

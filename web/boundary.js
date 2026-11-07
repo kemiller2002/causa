@@ -117,6 +117,14 @@ window.addEventListener("scroll", () => {
     history.replaceState({ ...(history.state ?? {}), causaScrollY: window.scrollY }, "");
   }, 100);
 }, { passive: true });
+// After a route change, focus goes to the main region (tabindex=-1), never to the skip link left focused by the
+// re-render, so the skip link stays hidden and screen readers land on the new content.
+const focusMain = () => {
+  const active = document.activeElement;
+  if (active && active !== document.body && !active.classList.contains("ef-skip-link") && shell.main.contains(active) && active.isConnected) return;
+  shell.main.focus({ preventScroll: true });
+};
+window.addEventListener("hashchange", () => requestAnimationFrame(() => requestAnimationFrame(focusMain)));
 window.addEventListener("popstate", (event) => {
   const y = event.state?.causaScrollY;
   if (typeof y !== "number") return;

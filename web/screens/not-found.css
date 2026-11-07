@@ -1,2 +1,3 @@
 /* Owner: ui (T16). not-found. Forma tokens only. */
 .causa-not-found .ef-empty-state { max-inline-size: var(--ef-layout-measure); }
+.causa-not-found a[href] { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); min-inline-size: var(--ef-layout-target-min); }

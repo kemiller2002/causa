@@ -228,7 +228,7 @@ test.describe('UI-016', () => {
         expect(stray, `${href}: colour literals outside custom-property definitions`).toEqual([]);
         continue;
       }
-      const literal = css.replace(/var\(\s*--[\w-]+/g, 'var(').match(/(#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|\b(red|blue|green|orange|navy|teal|white|black|gray|grey)\b)/gi) || [];
+      const literal = css.replace(/var\(\s*--[\w-]+/g, 'var(').match(/(#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|(?<![\w-])(red|blue|green|orange|navy|teal|white|black|gray|grey)(?![\w-]))/gi) || [];
       expect(literal, `${href}: hard-coded colours`).toEqual([]);
     }
     // The inventory is the vendored Forma stylesheet's own custom properties.

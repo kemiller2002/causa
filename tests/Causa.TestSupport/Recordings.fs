@@ -382,3 +382,23 @@ type LiveFixture<'TestClass>() =
     interface IDisposable with
         member _.Dispose() =
             if run.IsValueCreated then (run.Value :> IDisposable).Dispose()
+
+/// Test values of the domain's types that must compile against both the bootstrap stub and the full IF41-DOMAIN
+/// record (T13): an Investigation built field by field through F# reflection, with its id and version and every other
+/// field at its default. It is only ever compared or carried, never read: a test that needs a real investigation
+/// replays a history through Kernel.kernel.
+[<RequireQualifiedAccess>]
+module TestValues =
+    open Microsoft.FSharp.Reflection
+
+    let investigation (id: Causa.Domain.InvestigationId) (version: Causa.Domain.AggregateVersion) : Causa.Domain.Investigation =
+        let t = typeof<Causa.Domain.Investigation>
+        let values =
+            FSharpType.GetRecordFields(t)
+            |> Array.map (fun f ->
+                match f.Name with
+                | "Id" -> box id
+                | "Version" -> box version
+                | _ when f.PropertyType.IsValueType -> Activator.CreateInstance f.PropertyType
+                | _ -> null)
+        FSharpValue.MakeRecord(t, values) :?> Causa.Domain.Investigation

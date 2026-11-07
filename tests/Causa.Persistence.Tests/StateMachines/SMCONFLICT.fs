@@ -20,7 +20,7 @@ module MachineFixtures =
         { Manifest = Text.Encoding.UTF8.GetBytes("m" + tag); Events = Text.Encoding.UTF8.GetBytes("e" + tag); Snapshot = Text.Encoding.UTF8.GetBytes("s" + tag) }
 
     let verified (at: CommitOid) : VerifiedInvestigation =
-        { Investigation = { Id = investigation; Version = AggregateVersion 1L }; History = []; ReadAt = at; Address = address; Bytes = files "v" }
+        { Investigation = Causa.TestSupport.TestValues.investigation investigation (AggregateVersion 1L); History = []; ReadAt = at; Address = address; Bytes = files "v" }
 
     let confirmation (at: CommitOid) = Confirmation.ofReadBack investigation at t0 (files "w") (files "w") |> Option.get
 

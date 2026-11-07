@@ -72,7 +72,7 @@ type VER006Tests() =
             Directory.GetFiles(Repo.path "node_modules/@echelon-foundry/design-system/dist/patterns", "*.html")
             |> Array.map File.ReadAllText
             |> String.concat "\n"
-        Gate.noDefects
+        Gate.assertNoDefects
             "Forma"
             [ for c in formaClasses (Repo.text "web/index.html") do
                   let inCss = Regex.IsMatch(css, @"\." + Regex.Escape c + @"(?![A-Za-z0-9_-])")
@@ -83,7 +83,7 @@ type VER006Tests() =
                   if not (css.Contains(t + ":")) then yield sprintf "web/causa.css reads %s, which Forma %s does not define" t (version "forma")
               for f in [ "web/causa.css"; "web/causa-theme.css" ] do
                   if Regex.IsMatch(Repo.text f, @"(^|[;{\s])--ef-[a-z0-9-]+\s*:") then yield sprintf "%s declares a Forma token of its own" f ]
-        Gate.noDefects
+        Gate.assertNoDefects
             "installed Echelon packages"
             [ for id in [ "forma"; "forma-workflow"; "limen"; "folio" ] do
                   match locked |> List.tryFind (fun s -> s.Id = id) with
@@ -104,7 +104,7 @@ type VER006Tests() =
                           if not (Repo.exists (Path.Combine("node_modules", s.NpmPackage, entry))) then
                               yield sprintf "%s %s declares entry %s, which is not installed" id s.Version entry
                   | None -> yield sprintf "%s is not locked" id ]
-        Gate.noDefects
+        Gate.assertNoDefects
             "Praxis, Ordo and Percepta records"
             [ let toolchain = Repo.json ".echelon/toolchain.json"
               for id in [ "praxis"; "ordo" ] do
@@ -123,23 +123,22 @@ type VER006Tests() =
         let hashes = [ ""; "#/"; "#/administration"; "#/settings"; "#/investigations/new"; "#/no-such-page" ]
         let inbound = [ initialize ""; yield! hashes |> List.map locationChanged ]
         // What the test sends is a message Limen itself would send.
-        Gate.noDefects
+        Gate.assertNoDefects
             "browser-to-engine messages"
             (List.zip inbound (limenDecode "decodeBrowserToEngineMessage" inbound) |> List.filter (snd >> (<>) "ok") |> List.map (fun (m, v) -> m + ": " + v))
         let answers = inbound |> List.map Causa.App.Program.dispatch
-        Gate.noDefects
+        Gate.assertNoDefects
             "engine-to-browser answers"
             (List.zip answers (limenDecode "decodeEngineToBrowserMessage" answers) |> List.filter (snd >> (<>) "ok") |> List.map (fun (m, v) -> m + ": " + v))
         // Not vacuous: Limen's codec rejects an answer that breaks the protocol.
-        match limenDecode "decodeEngineToBrowserMessage" [ "{\"view\":{\"nested\":{\"a\":1}},\"effects\":[]}" ] with
-        | [ v ] when v.StartsWith "rejected" -> ()
-        | other -> failwithf "Limen's codec accepted a malformed answer: %A" other
+        let malformed = limenDecode "decodeEngineToBrowserMessage" [ "{\"view\":{\"nested\":{\"a\":1}},\"effects\":[]}" ]
+        Assert.True((match malformed with [ v ] -> v.StartsWith "rejected" | _ -> false), sprintf "Limen's codec accepted a malformed answer: %A" malformed)
         // The kernel the boundary starts is the one the lock names.
         let exported =
             Tooling.node (
                 sprintf "import * as limen from \"%s\"; console.log(typeof limen.BrowserKernel);" (Uri(Repo.path "node_modules/@echelon-foundry/limen/dist/index.js").AbsoluteUri)
             )
-        if exported <> "function" then failwithf "Limen %s exports no BrowserKernel (%s)" (version "limen") exported
+        Assert.Equal("function", exported)
 
     /// The local bootstrap and build path runs, and the deploy path builds the site the browser loads.
     [<Fact>]
@@ -148,7 +147,7 @@ type VER006Tests() =
         try
             Tooling.build [ "--skip-engine"; "--out"; out ] |> ignore
             let index = File.ReadAllText(Path.Combine(out, "index.html"))
-            Gate.noDefects
+            Gate.assertNoDefects
                 "the built site"
                 [ if index.Contains "<!-- causa:screens -->" || index.Contains "<!-- causa:screen-styles -->" then yield "index.html still holds a build marker"
                   for m in Regex.Matches(index, "\\s(?:href|src)=\"([^\"#:]+)\"") do
@@ -163,7 +162,7 @@ type VER006Tests() =
             let reproducible = provenance |> Json.prop "reproducible"
             let inputs = reproducible |> Option.bind (Json.prop "inputs") |> Option.map Json.entries |> Option.defaultValue []
             let dependencies = reproducible |> Option.bind (Json.prop "dependencies") |> Option.map Json.entries |> Option.defaultValue []
-            Gate.noDefects
+            Gate.assertNoDefects
                 "the build provenance"
                 [ let commit = reproducible |> Option.map (Json.strOr "commit") |> Option.defaultValue ""
                   if not (isSha commit) then yield sprintf "the provenance names no commit (%s)" commit
@@ -187,13 +186,13 @@ type VER006Tests() =
                     let o = Tooling.build [ "--compare"; x; y ]
                     let line = o.Out.Split('\n') |> Array.find (fun l -> l.StartsWith "{\"verdict\"")
                     (Repo.json (Path.GetRelativePath(Repo.root, (let f = Path.Combine(again, "v.json") in File.WriteAllText(f, line); f)))) |> Json.strOr "verdict"
-                if verdict a b <> "identical" then failwith "two builds of the same tree are not reproducible"
+                Assert.Equal("identical", verdict a b)
                 let drifted = Path.Combine(again, "drifted.json")
                 File.WriteAllText(drifted, File.ReadAllText(b).Replace("\"runId\": \"", "\"runId\": \"other-"))
-                if verdict a drifted <> "environment-drift" then failwith "a different CI run is not classified as environment drift"
+                Assert.Equal("environment-drift", verdict a drifted)
                 let changed = Path.Combine(again, "changed.json")
                 File.WriteAllText(changed, File.ReadAllText(b).Replace(Repo.sha256 "global.json", String('0', 64)))
-                if verdict a changed <> "reproducible-difference" then failwith "a changed input is not classified as a reproducible difference"
+                Assert.Equal("reproducible-difference", verdict a changed)
             finally
                 Directory.Delete(again, true)
         finally
@@ -201,7 +200,7 @@ type VER006Tests() =
         let packageJson = Repo.json "package.json"
         let deploy = Repo.text ".github/workflows/deploy-pages.yml"
         let playwright = Repo.text "playwright.config.ts"
-        Gate.noDefects
+        Gate.assertNoDefects
             "the deploy and browser paths"
             [ if packageJson |> Json.prop "scripts" |> Option.bind (Json.str "build") <> Some "dotnet fsi build.fsx" then yield "npm run build is not build.fsx"
               if not (deploy.Contains "run: npm run build") then yield "the Pages workflow does not build with npm run build"

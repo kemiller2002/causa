@@ -87,7 +87,7 @@ type VER004Tests() =
                   Json.strOr "sha256" s ])
             |> Option.defaultValue []
             |> List.filter (fun d -> Regex.IsMatch(d, "^[0-9a-f]{64}$"))
-        Gate.noDefects
+        Gate.assertNoDefects
             "the dependency manifest"
             [ for s in locked do
                   match s.Kind with
@@ -105,7 +105,7 @@ type VER004Tests() =
                       let rollForward = Repo.json "global.json" |> Json.prop "sdk" |> Option.bind (Json.str "rollForward")
                       if rollForward <> Some "disable" then yield "global.json lets the SDK roll forward"
                   | _ -> () ]
-        Gate.noDefects
+        Gate.assertNoDefects
             "installed-tree pins"
             [ for name, (version, resolved, integrity) in packageLockEntries () do
                   if not (isExactRelease version) then yield sprintf "package-lock.json %s version '%s'" name version
@@ -130,7 +130,7 @@ type VER004Tests() =
             |> List.filter (fun f -> Json.strOr "system" f = system && Json.strOr "check" f = check && Json.strOr "status" f = "PASS")
             |> List.map (Json.strOr "expected")
         let pinned = record |> Json.prop "lock" |> Option.map (Json.strOr "sha256") |> Option.defaultValue ""
-        Gate.noDefects
+        Gate.assertNoDefects
             "the run lock"
             [ if Repo.sha256 lockPath <> pinned then yield sprintf "%s changed after it was pinned (%s, pinned %s)" lockPath (Repo.sha256 lockPath) pinned
               if run |> Option.map (Json.strOr "frozenAt") <> Some t0 then yield sprintf "the run is not frozen at T0 %s" t0
@@ -155,7 +155,7 @@ type VER004Tests() =
         let previous = record |> Json.prop "previousRun"
         let changes = previous |> Option.map (Json.items "changes") |> Option.defaultValue []
         let lockedAt = DateTimeOffset.Parse(Json.strOr "baselineLockedAt" record)
-        Gate.noDefects
+        Gate.assertNoDefects
             "re-resolution for this run"
             [ if String.IsNullOrWhiteSpace(Json.strOr "refreshPolicy" record) then yield "no refresh policy"
               match previous with

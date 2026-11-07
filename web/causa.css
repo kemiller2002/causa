@@ -133,3 +133,8 @@ html { color-scheme: light; }
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* 390 px audit: field descriptions and the character counters inside them at Forma's small size (14 px, not 13 px). */
+.causa-site .ef-field__description { font-size: var(--ef-type-size-small); }
+/* The masthead's current-investigation link is a full tap target. */
+.causa-context a { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); }

@@ -16,11 +16,10 @@ module HypothesesSectionView =
 
     let bindings (view: WorkspaceView) : Bindings =
         let hs = SectionData.analysis view.Section |> Option.map (fun a -> a.Hypotheses) |> Option.defaultValue []
-        Bind.ofList
+        Bind.ofList(
             [ Bind.flag "hypotheses.present" (not hs.IsEmpty)
-              Bind.text "hypotheses.count" (string hs.Length)
-              Bind.items
-                  "hypotheses.items"
+              Bind.text "hypotheses.count" (string hs.Length) ]
+            @ SectionData.paged "hypotheses" "hypotheses"
                   [ for h in hs ->
                         [ Bind.cellText "key" h.Id
                           Bind.cellText "statement" h.Statement
@@ -30,4 +29,4 @@ module HypothesesSectionView =
                           Bind.cellFlag "hasExplanation" h.Explanation.IsSome
                           Bind.cellText "evidence" (SectionData.linkSummary h.Links)
                           Bind.cellText "assessments" (SectionData.assessmentLines (fun l -> l.EvidenceLabel) h.Links)
-                          Bind.cellFlag "hasAssessments" (h.Links |> List.exists (fun l -> l.Current)) ] ] ]
+                          Bind.cellFlag "hasAssessments" (h.Links |> List.exists (fun l -> l.Current)) ] ])

@@ -96,3 +96,14 @@
 }
 .causa-item__more > summary { min-block-size: var(--ef-layout-target-min); display: flex; align-items: center; cursor: pointer; }
 .causa-item__assessments { display: flex; flex-direction: column; gap: var(--ef-primitive-space-1); }
+/* Long sections show their first records and fold the rest behind the browser's own disclosure. */
+.causa-more { margin-block-start: var(--ef-primitive-space-2); }
+.causa-more > .causa-list, .causa-more > .causa-timeline { margin-block-start: var(--ef-layout-stack-space); }
+.causa-more__toggle {
+  min-block-size: var(--ef-layout-target-min);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: var(--ef-type-weight-strong, 600);
+  color: var(--causa-teal-strong, var(--ef-color-accent-primary));
+}

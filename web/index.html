@@ -30,13 +30,23 @@
         <div class="ef-site-header__identity">
           <a class="ef-site-header__brand" href="#/"><span class="ef-site-header__mark" aria-hidden="true">C</span><span class="ef-site-header__name">Causa</span></a>
         </div>
-        <nav class="ef-site-nav causa-primary" aria-label="Primary" data-requirement-id="INV-041">
-          <ul class="ef-site-nav__list">
-            <li><a class="ef-site-nav__link" href="#/" data-bind-aria-current="nav.investigations.current">Investigations</a></li>
-            <li><a class="ef-site-nav__link" href="#/administration" data-bind-aria-current="nav.administration.current">Administration</a></li>
-            <li><a class="ef-site-nav__link" href="#/settings" data-bind-aria-current="nav.settings.current">Settings</a></li>
-          </ul>
-        </nav>
+        <!-- Forma navigation shell (FL-09, CR-4 from T16): below 48rem the compact disclosure shows and the persistent
+             list hides; above 48rem the reverse. Both carry the same three links and bindings. -->
+        <div class="ef-navigation-shell causa-primary-shell">
+          <details class="ef-navigation-shell__compact">
+            <summary>Menu</summary>
+            <nav class="causa-primary" aria-label="Primary" data-requirement-id="INV-041">
+            <a href="#/" data-bind-aria-current="nav.investigations.current">Investigations</a>
+            <a href="#/administration" data-bind-aria-current="nav.administration.current">Administration</a>
+            <a href="#/settings" data-bind-aria-current="nav.settings.current">Settings</a>
+            </nav>
+          </details>
+          <nav class="ef-navigation-shell__persistent causa-primary" aria-label="Primary">
+            <a href="#/" data-bind-aria-current="nav.investigations.current">Investigations</a>
+            <a href="#/administration" data-bind-aria-current="nav.administration.current">Administration</a>
+            <a href="#/settings" data-bind-aria-current="nav.settings.current">Settings</a>
+          </nav>
+        </div>
       </div>
       <template data-if="context.present">
         <p class="causa-context" aria-label="Current investigation"><a data-bind-href="context.href" data-text="context.title"></a> <span class="ef-badge" data-text="context.tag"></span> <span data-text="context.copy"></span></p>

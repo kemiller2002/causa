@@ -1,0 +1,473 @@
+{
+  "schema": "indy-init.v4-dependency-lock/1",
+  "description": "PROPOSED successor, for the 7 November competition, of docs/optimization/echelon-stack-upgrade/lock/dependency-lock.source.json (the echelon-current 1.37.0 lock ODR-ESU-01 proposes). It differs from that source only in what Conditor v0.10.21 changes: conditor is v0.10.21 at 528ef4576fc79540953226b7dcfd3957654e3a29, the release the competition toolchain lock pins (ODR-COMP-P14 A; its eight artifact digests, those of the release checksums.txt, are in kickoff/competition/toolchain.lock.proposed.json conditor.artifacts), and forma-workflow 1.2.0, which its indy-init preset installs (ODR-COMP-P14 A: an owner exemption, not an echelon-current 1.37.0 selection), is locked by its npm version and tarball digest. Generated into dependency-lock.json beside it by tools/stack-drift/stack-drift.fsx lock against echelon-registry 5752402. Not adopted: adoption is owner decision ODR-COMP-P15 (docs/v416-competition-decisions/proposals/owner-decision-requests.json).",
+  "releaseSet": {
+    "channel": "echelon-current",
+    "version": "1.37.0",
+    "registry": "kemiller2002/echelon-registry",
+    "registryCommit": "575240233d1fc32b57cfa827ea1031b68609fc58",
+    "path": "sets/echelon-current/1.37.0.json",
+    "sha256": "bc7d163d7ff4bda0eeafe741b3bc0aedf93427526184fe347862ac69f9abe22f",
+    "status": "approved",
+    "decision": "OD-INDY-8 (echelon-registry#109, merged 5752402); proposed for the application by ODR-ESU-01"
+  },
+  "approvedStack": [
+    "F#",
+    ".NET",
+    "Limen",
+    "Forma",
+    "Folio",
+    "GitHub-backed persistence"
+  ],
+  "forbiddenFrameworks": [
+    "Bolero",
+    "React",
+    "Angular",
+    "Vue",
+    "Blazor"
+  ],
+  "interopBoundaries": [
+    {
+      "language": "C#",
+      "scope": "a single [JSExport] host entry point, because F# does not run the JSExport source generator",
+      "source": "Rehearsal 7 KD-007 (finding, not code)"
+    },
+    {
+      "language": "JavaScript",
+      "scope": "a browser-boundary script relaying connectivity, timers and the leave warning that Limen 0.9.1 does not expose; holds no application state",
+      "source": "Rehearsal 7 KD-010 (finding, not code)"
+    }
+  ],
+  "systems": [
+    {
+      "id": "limen",
+      "systemId": "limen",
+      "version": "0.9.1",
+      "kind": "registry-component",
+      "use": "runtime",
+      "repository": "kemiller2002/limen",
+      "tag": "v0.9.1",
+      "commit": "743cdb9be8971c0a3a250906a6e2e112170dfae0",
+      "releaseStage": "stable",
+      "distributionClass": "web-package",
+      "distributions": [
+        {
+          "mechanism": "npm",
+          "package": "@echelon-foundry/limen",
+          "url": "https://registry.npmjs.org/@echelon-foundry/limen/-/limen-0.9.1.tgz"
+        }
+      ],
+      "packageDigest": {
+        "artifact": "echelon-foundry-limen-0.9.1.tgz",
+        "sha256": "a7dd300577a145ff56bfa2d8ebae21e864c00b1409e701ebb3704cc367d4ddc8"
+      },
+      "releaseManifest": {
+        "path": "releases/limen/0.9.1.release.json",
+        "sha256": "54f088e76880308b2db1f7d447ad946d95d1a7f384893f0da2ae63937f6a1655"
+      },
+      "runtimeCompatibility": ".NET 10 WebAssembly; browsers Chromium and WebKit (iPad Safari)",
+      "availability": "released-stable-in-approved-set",
+      "classification": "runtime",
+      "required": true,
+      "npmPackage": "@echelon-foundry/limen"
+    },
+    {
+      "id": "limen-fsharp",
+      "systemId": "limen-fsharp",
+      "version": "0.9.0",
+      "kind": "registry-component",
+      "use": "runtime",
+      "repository": "kemiller2002/limen",
+      "tag": "v0.9.0",
+      "commit": "96eb75fb5c5aeea41f59e7476d76e143dc35a759",
+      "releaseStage": "stable",
+      "distributionClass": "nuget-library",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "url": "https://github.com/kemiller2002/limen/releases/tag/v0.9.0"
+        }
+      ],
+      "packageDigest": {
+        "artifact": "EchelonFoundry.Limen.Contract.0.9.0.nupkg",
+        "sha256": "1db1ec2c19f45331b31fc0d13a876259e12efa4de7509f6ee4939567984c2817"
+      },
+      "releaseManifest": {
+        "path": "releases/limen-fsharp/0.9.0.release.json",
+        "sha256": "d8aec120fdaff6bb2a9dcd6e4d79b8a92d69f8cc0227de1c6b7166c6c3b8ce3a"
+      },
+      "runtimeCompatibility": ".NET 10, F#",
+      "availability": "released-stable-in-approved-set",
+      "classification": "runtime",
+      "required": true,
+      "nugetPackage": "EchelonFoundry.Limen.Contract"
+    },
+    {
+      "id": "forma",
+      "systemId": "forma",
+      "version": "0.13.0",
+      "kind": "registry-component",
+      "use": "runtime",
+      "repository": "kemiller2002/forma",
+      "tag": "v0.13.0",
+      "commit": "2fcd10739189a0eef03f74ea306b3761d3dffbe0",
+      "releaseStage": "stable",
+      "distributionClass": "web-package",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "package": "@echelon-foundry/design-system",
+          "url": "https://github.com/kemiller2002/forma/releases/tag/v0.13.0"
+        }
+      ],
+      "packageDigest": {
+        "artifact": "echelon-foundry-design-system-0.13.0.tgz",
+        "sha256": "2f9ceeb6ea99a54f6cf4ffa03e3a69fd609dd60a89ddbd99680811cca2d43725"
+      },
+      "releaseManifest": {
+        "path": "releases/forma/0.13.0.release.json",
+        "sha256": "cc096c903785434ac4f664e709819a2599765c16b66ebd9825db87930b0fc2d5"
+      },
+      "runtimeCompatibility": "evergreen browsers; CSS custom properties",
+      "availability": "released-stable-in-approved-set",
+      "classification": "runtime",
+      "required": true,
+      "npmPackage": "@echelon-foundry/design-system"
+    },
+    {
+      "id": "folio",
+      "systemId": "folio",
+      "version": "0.4.1",
+      "kind": "registry-component",
+      "use": "runtime",
+      "repository": "kemiller2002/folio",
+      "tag": "v0.4.1",
+      "commit": "a94cea73dd4b4c5409fb0d4399ba65f7dbc51f5e",
+      "releaseStage": "stable",
+      "distributionClass": "web-package",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "package": "@echelon-foundry/print-components",
+          "url": "https://github.com/kemiller2002/folio/releases/tag/v0.4.1"
+        }
+      ],
+      "packageDigest": {
+        "artifact": "echelon-foundry-print-components-0.4.1.tgz",
+        "sha256": "57c6a0eccad41e6acef7c0b91a6e072276b0ebaddda27fbb3b36abd956aeea1b"
+      },
+      "releaseManifest": {
+        "path": "releases/folio/0.4.1.release.json",
+        "sha256": "d453d980ce7f81e3c5bd227e34bd8d287417ea79ca09aa97ae9fdc56a28c6880"
+      },
+      "runtimeCompatibility": "evergreen browsers; print CSS",
+      "availability": "released-stable-in-approved-set",
+      "classification": "runtime",
+      "required": true,
+      "npmPackage": "@echelon-foundry/print-components"
+    },
+    {
+      "id": "forma-workflow",
+      "kind": "npm-pinned",
+      "version": "1.2.0",
+      "use": "runtime (the causal graph of T23/T24 and WDL-013)",
+      "runtimeCompatibility": "evergreen browsers",
+      "source": "https://registry.npmjs.org/@echelon-foundry/forma-workflow/-/forma-workflow-1.2.0.tgz (npm integrity sha512-6xopcnEOFN/3n9ItU6V+YLFdWzekDGlKjDxFdyGe4mJz15ZId3G505zNWY2gv+MwAuixZZRUHVQW13mvSAUERw==); installed by the Conditor v0.10.21 indy-init preset (embedded component descriptor 77f1fafc24d0b5708a48a0e8ad87111f2847e6f2e0e50375292dc46ac6519a77)",
+      "repo": "forma",
+      "path": "packages/workflow",
+      "sha256": "211f4f41af9b696e57e4cede2f6439449819c507e6fcf2105042236713440bd1",
+      "availability": "pinned by exact npm version (declared and installed versions checked); tarball sha256 recorded",
+      "classification": "runtime",
+      "required": true,
+      "npmPackage": "@echelon-foundry/forma-workflow"
+    },
+    {
+      "id": "praxis",
+      "systemId": "praxis",
+      "version": "3.25.0",
+      "kind": "registry-component",
+      "use": "process",
+      "repository": "kemiller2002/praxis",
+      "tag": "v3.25.0",
+      "commit": "12bf9951253fc15e6973c2d3f5b88076f4556245",
+      "releaseStage": "stable",
+      "distributionClass": "self-contained-native-cli",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "url": "https://github.com/kemiller2002/praxis/releases/tag/v3.25.0"
+        }
+      ],
+      "packageDigest": null,
+      "releaseManifest": {
+        "path": "releases/praxis/3.25.0.release.json",
+        "sha256": "b42b9cf7cf2b3a436f7419c03fccc32d123abe0594839889fe8b6372cfb46a41"
+      },
+      "runtimeCompatibility": "linux-x64 CI",
+      "availability": "released-stable-in-approved-set",
+      "classification": "development-tool",
+      "required": true,
+      "executable": "praxis"
+    },
+    {
+      "id": "dokimos",
+      "systemId": "dokimos",
+      "version": "0.11.1",
+      "kind": "registry-component",
+      "use": "process",
+      "repository": "kemiller2002/dokimos",
+      "tag": "dokimos-v0.11.1",
+      "commit": "fecbe0c51dda4d87a78e43a034c38c00e6045c7b",
+      "releaseStage": "stable",
+      "distributionClass": "self-contained-native-cli",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "package": null,
+          "url": "https://github.com/kemiller2002/dokimos/releases/tag/dokimos-v0.11.1"
+        }
+      ],
+      "packageDigest": {
+        "artifact": "EchelonFoundry.Dokimos.Cli.0.11.1.nupkg",
+        "sha256": "bbc9ce6d70347923807a4e5a51ff738ba2e6be81905ab036975be8eab6becb71"
+      },
+      "releaseManifest": {
+        "path": "releases/dokimos/0.11.1.release.json",
+        "sha256": "c5bf0df99823aaf1f3d2fc0f11f56cc92f266952df4733e32f18719a56f9b285"
+      },
+      "runtimeCompatibility": "linux-x64 CI",
+      "availability": "released-stable-in-approved-set",
+      "classification": "verification-tool",
+      "required": true,
+      "executable": "dokimos"
+    },
+    {
+      "id": "ordo",
+      "systemId": "ordo",
+      "version": "1.20.0",
+      "kind": "registry-component",
+      "use": "process",
+      "repository": "kemiller2002/ordo",
+      "tag": "v1.20.0",
+      "commit": "05933dfa442a5d8a998bc09c1941588f9bdf12a6",
+      "releaseStage": "stable",
+      "distributionClass": "self-contained-native-cli",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "url": "https://github.com/kemiller2002/ordo/releases/tag/v1.20.0"
+        }
+      ],
+      "packageDigest": {
+        "artifact": "ordo-construction.nupkg",
+        "sha256": "bb17b2da3d006a9bd4e3275a8b1660102090a758891d4babc6ffbab8d64a805f"
+      },
+      "releaseManifest": {
+        "path": "releases/ordo/1.20.0.release.json",
+        "sha256": "ac58cf8b42542ad3ad3cb3d5e9e95abaf660e3dcef5b84f85a6b52b7255563c0"
+      },
+      "runtimeCompatibility": "linux-x64 CI",
+      "availability": "released-stable-in-approved-set",
+      "classification": "development-tool",
+      "required": true,
+      "executable": "ordo"
+    },
+    {
+      "id": "percepta-semantic",
+      "systemId": "percepta-semantic",
+      "version": "0.4.0",
+      "kind": "registry-component",
+      "use": "verification",
+      "repository": "kemiller2002/percepta",
+      "tag": "percepta-semantic-v0.4.0",
+      "commit": "4a53688238f205fdde474cc340378a89ddea0c09",
+      "releaseStage": "stable",
+      "distributionClass": "self-contained-native-cli",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "package": null,
+          "url": "https://github.com/kemiller2002/percepta/releases/tag/percepta-semantic-v0.4.0"
+        }
+      ],
+      "packageDigest": null,
+      "releaseManifest": {
+        "path": "releases/percepta-semantic/0.4.0.release.json",
+        "sha256": "07e4e640816e480b456ad3ce6e3562cc7aae8717a75db5683a2addcac02b1ee8"
+      },
+      "runtimeCompatibility": "linux-x64 CI",
+      "availability": "released-stable-in-approved-set",
+      "classification": "verification-tool",
+      "required": true,
+      "executable": "percepta"
+    },
+    {
+      "id": "percepta",
+      "systemId": "percepta",
+      "version": "0.1.0",
+      "kind": "registry-component",
+      "use": "verification",
+      "repository": "kemiller2002/percepta",
+      "tag": "percepta-repo-v0.1.0",
+      "commit": "3027983f20b91d6856a27c1cf8ee2582108ef6be",
+      "releaseStage": "stable",
+      "distributionClass": "self-contained-native-cli",
+      "distributions": [
+        {
+          "mechanism": "github-release",
+          "package": null,
+          "url": "https://github.com/kemiller2002/percepta/releases/tag/percepta-repo-v0.1.0"
+        }
+      ],
+      "packageDigest": null,
+      "releaseManifest": {
+        "path": "releases/percepta/0.1.0.release.json",
+        "sha256": "07b6291c63ff25e6b669edb8c845e48ba76831b6a6133efa4ad3a390439b1b2b"
+      },
+      "runtimeCompatibility": "linux-x64 CI",
+      "availability": "released-stable-in-approved-set",
+      "classification": "verification-tool",
+      "required": true,
+      "executable": "percepta-repo"
+    },
+    {
+      "id": "aegis",
+      "systemId": "aegis",
+      "version": "1.0.0",
+      "kind": "registry-component",
+      "use": "runtime",
+      "repository": "kemiller2002/aegis",
+      "tag": "nuget:EchelonFoundry.Aegis.Core@1.0.0",
+      "commit": "56935c889b4f5cbf0b8046d3c2078f205cdb20c7",
+      "releaseStage": "stable",
+      "distributionClass": "nuget-library",
+      "distributions": [
+        {
+          "mechanism": "nuget",
+          "package": "EchelonFoundry.Aegis.Core",
+          "url": "https://api.nuget.org/v3-flatcontainer/echelonfoundry.aegis.core/1.0.0/echelonfoundry.aegis.core.1.0.0.nupkg"
+        }
+      ],
+      "packageDigest": {
+        "artifact": "EchelonFoundry.Aegis.Core.1.0.0.nupkg",
+        "sha256": "24255d245463f1ce819ce98f10bc5f6a062f8b3342d0bf4eee00fef9a45a835d"
+      },
+      "releaseManifest": {
+        "path": "releases/aegis/1.0.0.release.json",
+        "sha256": "4530cfa3396c1e57d3e1a6500c661cd2d520236e852d1d9e88aa44c385d0bd6b"
+      },
+      "runtimeCompatibility": ".NET 10",
+      "availability": "released-stable-in-approved-set",
+      "classification": "runtime",
+      "required": true,
+      "nugetPackage": "EchelonFoundry.Aegis.Core"
+    },
+    {
+      "id": "dotnet-sdk",
+      "kind": "sdk",
+      "version": "10.0.402",
+      "use": "toolchain",
+      "runtimeCompatibility": "wasm-tools workload from the same SDK feed",
+      "source": "global.json (rollForward disable)",
+      "availability": "pinned by global.json",
+      "classification": "build",
+      "required": true
+    },
+    {
+      "id": "conditor",
+      "kind": "tag-pinned",
+      "version": "0.10.21",
+      "use": "bootstrap and CI policy",
+      "runtimeCompatibility": ".NET 10",
+      "repo": "conditor",
+      "tag": "v0.10.21",
+      "commit": "528ef4576fc79540953226b7dcfd3957654e3a29",
+      "availability": "pinned by tag or commit; identity checked where a checkout is supplied",
+      "classification": "build",
+      "required": true
+    },
+    {
+      "id": "causa-storage",
+      "kind": "tag-pinned",
+      "version": "1.0.0",
+      "use": "wire contract",
+      "runtimeCompatibility": "any reader implementing section 11",
+      "repo": "causa-data",
+      "tag": "causa-storage-v1.0.0",
+      "commit": "c947c7e354be80766573a782546c8186336774cc",
+      "availability": "pinned by tag or commit; identity checked where a checkout is supplied",
+      "classification": "runtime",
+      "required": true
+    },
+    {
+      "id": "causa-data-catalog",
+      "kind": "data",
+      "version": "demonstration-v1 (catalogVersion 1.0.0)",
+      "use": "demonstration data, read at runtime",
+      "runtimeCompatibility": "causa-storage 1.0.0",
+      "repo": "causa-data",
+      "commit": "e8259df74add723765c57a5b1a5888d9c3f707af",
+      "path": "catalog/demonstration-v1/manifest.json",
+      "sha256": "32badb6df8ce8b9ada765bf3d62ab3d107075c3f139361917a91f094e87af4fd",
+      "availability": "pinned by tag or commit; identity checked where a checkout is supplied",
+      "classification": "runtime",
+      "required": true
+    },
+    {
+      "id": "github-api",
+      "kind": "external-api",
+      "version": "GraphQL API and REST API version 2022-11-28",
+      "use": "persistence provider",
+      "runtimeCompatibility": "HTTPS from the browser with a fine-grained token (CT-017)",
+      "availability": "external service; verified live by the provider-conformance task",
+      "classification": "optional-integration",
+      "required": true
+    }
+  ],
+  "excluded": [
+    {
+      "id": "strata",
+      "reason": "installed by Conditor's workstation profile (optional in the set) but never invoked by Indy Init, its bootstrap or CI"
+    },
+    {
+      "id": "arca",
+      "reason": "R7-AMD-01 (Arca queue) withdrawn by ADR-R7-001; no project, bootstrap or workflow references it"
+    },
+    {
+      "id": "fides",
+      "reason": "no reference in the package, the bootstrap, the scaffold or CI"
+    },
+    {
+      "id": "summa-contracts",
+      "reason": "no reference"
+    },
+    {
+      "id": "visual-engineering",
+      "reason": "required repository-lifecycle component of the set, but neither Conditor 0.10.21's indy-init preset nor Indy Init installs or invokes it"
+    },
+    {
+      "id": "communication-engineering",
+      "reason": "as visual-engineering"
+    },
+    {
+      "id": "tutela",
+      "reason": "as visual-engineering"
+    },
+    {
+      "id": "vigila",
+      "reason": "not in echelon-current; mentioned only in scaffold documentation"
+    },
+    {
+      "id": "iter",
+      "reason": "not in echelon-current; no tags or releases; no reference"
+    },
+    {
+      "id": "vitium",
+      "reason": "not in the registry; no tags or releases; no reference"
+    },
+    {
+      "id": "tutors",
+      "reason": "no repository kemiller2002/tutors is reachable and the registry names no such system"
+    }
+  ]
+}

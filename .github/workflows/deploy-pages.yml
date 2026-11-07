@@ -87,7 +87,7 @@ jobs:
               echo "::error file=$f::the deploy key is outside $config"; status=1
             done
             if [ -f "$config" ]; then
-              others=$(grep -oaE "$pattern" "$config" | grep -vxF -- "$DATA_ACCESS_KEY_CAUSA" | wc -l)
+              others=$( { grep -oaE "$pattern" "$config" || true; } | { grep -vxF -- "$DATA_ACCESS_KEY_CAUSA" || true; } | wc -l)
               if [ "$others" -ne 0 ]; then echo "::error file=$config::a credential other than the deploy key"; status=1; fi
             fi
           elif [ -f "$config" ] && grep -q '"connection"' "$config"; then

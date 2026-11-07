@@ -1,0 +1,20 @@
+/* Owner: ui-2 (WI-INV-START, reassigned). investigation-start. Reads published Forma --ef-* tokens (and the Causa theme
+   variables with a Forma fallback, as the other screens do) and declares none of its own (UI-016-O8). */
+.causa-start__form { max-inline-size: var(--ef-layout-measure); }
+.causa-start__form textarea,
+.causa-start__form input {
+  inline-size: 100%;
+  min-block-size: var(--ef-layout-target-min);
+  box-sizing: border-box;
+  font: inherit;
+}
+.causa-start__form textarea { resize: vertical; overflow-wrap: anywhere; }
+.causa-start__destination,
+.causa-start__profile { margin: 0; overflow-wrap: anywhere; color: var(--ef-color-text-primary); }
+.causa-start__destination-label { font-weight: 600; }
+/* A field in error carries a text message as well as the border, never colour alone (UI-016-O13). */
+.causa-start__form [aria-invalid="true"] { border-color: var(--causa-coral-strong, var(--ef-color-status-danger)); }
+.causa-field-error { margin: 0; color: var(--causa-coral-strong, var(--ef-color-status-danger)); }
+.causa-field-error:empty { display: none; }
+.causa-start__actions { flex-wrap: wrap; }
+.causa-start__actions .ef-button { min-block-size: var(--ef-layout-target-min); }

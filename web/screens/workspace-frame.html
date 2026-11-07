@@ -6,16 +6,22 @@
 <template data-if="screen.investigation-workspace">
   <div class="ef-container ef-stack causa-screen causa-workspace" data-screen="investigation-workspace">
 
+    <template data-if="workspace.frame-absent">
+      <h1 class="causa-screen__title" data-text="shell.heading"></h1>
+    </template>
+
     <template data-if="workspace.loading">
       <p class="causa-loading" role="status"><span class="ef-spinner" aria-hidden="true"></span> <span data-text="workspace.loading-text"></span></p>
     </template>
 
     <template data-if="workspace.failed">
-      <div class="ef-alert ef-fault-inline causa-failure" role="alert">
-        <p class="ef-alert__title" data-text="workspace.failure-what"></p>
-        <p data-text="workspace.failure-preserved"></p>
-        <p data-text="workspace.failure-next"></p>
-        <template data-if="workspace.retry-offered"><button class="ef-button" type="button" data-event="UIA-RETRY-LOAD">Try again</button></template>
+      <div class="ef-alert ef-fault-inline causa-failure causa-workspace__failure" role="alert">
+        <div class="ef-stack causa-workspace__failure-body">
+          <p class="ef-alert__title" data-text="workspace.failure-what"></p>
+          <p data-text="workspace.failure-preserved"></p>
+          <p data-text="workspace.failure-next"></p>
+          <template data-if="workspace.retry-offered"><button class="ef-button" type="button" data-event="UIA-RETRY-LOAD">Try again</button></template>
+        </div>
       </div>
     </template>
 
@@ -82,8 +88,8 @@
 
     <template data-if="stored.present">
       <section class="ef-section causa-panel" aria-labelledby="causa-ws-stored">
-        <h1 class="causa-screen__title" data-text="stored.title"></h1>
-        <h2 id="causa-ws-stored">As stored in the data repository</h2>
+        <h2 id="causa-ws-stored" data-text="stored.title"></h2>
+        <p><strong>As stored in the data repository.</strong></p>
         <p>Causa could not interpret this investigation, so it is shown exactly as stored. Nothing was changed.</p>
         <dl class="ef-key-value-list">
           <div><dt>Created</dt><dd data-text="stored.created"></dd></div>

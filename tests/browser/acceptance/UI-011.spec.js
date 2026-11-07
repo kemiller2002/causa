@@ -206,7 +206,7 @@ test.describe('UI-011', () => {
     // Scroll context: returning to a screen with Back restores where the user was, not an unrelated position.
     await page.setViewportSize({ width: 390, height: 500 });
     await open(page, '#/administration');
-    await page.evaluate(() => window.scrollTo(0, Math.max(0, document.scrollingElement.scrollHeight - innerHeight)));
+    await page.evaluate(() => window.scrollTo({ top: Math.max(0, document.scrollingElement.scrollHeight - innerHeight), behavior: 'instant' }));
     const y = await page.evaluate(() => scrollY);
     expect(y, 'the Administration screen does not scroll at 390x500, so nothing is being checked').toBeGreaterThan(0);
     // A user reads where they scrolled to before choosing the next destination.

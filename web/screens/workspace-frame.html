@@ -111,6 +111,32 @@
             <div class="ef-facts__item"><dt>Conclusions</dt><dd data-text="overview.conclusions"></dd></div>
             <div class="ef-facts__item"><dt>Unresolved contradictions</dt><dd data-text="overview.contradictions"></dd></div>
           </dl>
+          <template data-if="editor.observation.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="INV-014" novalidate aria-labelledby="causa-ed-observation">
+            <h3 id="causa-ed-observation" class="causa-section__subtitle">Add an observation</h3>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-observation-text">Observation text</label>
+              <textarea id="causa-observation-text" rows="3" aria-required="true" data-on="input" data-event="INV-024" data-bind-value="editor.observation.text"></textarea>
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-observation-source">Observation source reference</label>
+              <p class="ef-field__description" id="causa-observation-source-help">Optional.</p>
+              <input id="causa-observation-source" autocomplete="off" aria-describedby="causa-observation-source-help" data-on="input" data-event="INV-025" data-bind-value="editor.observation.source">
+            </div>
+            <template data-if="editor.observation.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.observation.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.observation.unavailable"></p>
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.observation.disabled">Record an observation</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+          </form>
+          </template>
           <template data-if="conclusions.present">
             <section class="ef-stack" aria-labelledby="causa-sec-conclusions">
               <h3 id="causa-sec-conclusions" class="causa-section__subtitle">Conclusions</h3>
@@ -159,17 +185,43 @@
       <template data-if="section.hypotheses">
         <section class="ef-stack causa-section" aria-labelledby="causa-sec-hypotheses">
           <h2 id="causa-sec-hypotheses" class="causa-section__title">Hypotheses</h2>
+          <template data-if="editor.hypothesis.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="INV-009" novalidate aria-labelledby="causa-ed-hypothesis">
+            <h3 id="causa-ed-hypothesis" class="causa-section__subtitle">Add a hypothesis</h3>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-hypothesis-statement">Hypothesis statement</label>
+              <textarea id="causa-hypothesis-statement" rows="3" aria-required="true" data-on="input" data-event="INV-026" data-bind-value="editor.hypothesis.statement"></textarea>
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-hypothesis-explanation">Hypothesis explanation</label>
+              <p class="ef-field__description" id="causa-hypothesis-explanation-help">Optional.</p>
+              <textarea id="causa-hypothesis-explanation" rows="3" aria-describedby="causa-hypothesis-explanation-help" data-on="input" data-event="INV-011" data-bind-value="editor.hypothesis.explanation"></textarea>
+            </div>
+            <template data-if="editor.hypothesis.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.hypothesis.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.hypothesis.unavailable"></p>
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.hypothesis.disabled">Record a hypothesis</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+          </form>
+          </template>
           <template data-if="hypotheses.present">
             <div class="ef-stack causa-section__body">
             <ul class="ef-stack causa-list">
               <template data-each="hypotheses.items" data-key="key">
-                <li class="ef-card causa-item" data-bind-data-tone="tone">
+                <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
                   <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
                   <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
-                </li>
+                </article></li>
               </template>
             </ul>
             <template data-if="hypotheses.more-present">
@@ -177,13 +229,13 @@
                 <summary class="causa-more__toggle" data-text="hypotheses.more-label"></summary>
                 <ul class="ef-stack causa-list">
               <template data-each="hypotheses.more" data-key="key">
-                <li class="ef-card causa-item" data-bind-data-tone="tone">
+                <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
                   <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
                   <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
-                </li>
+                </article></li>
               </template>
             </ul>
               </details>
@@ -200,7 +252,7 @@
             <div class="ef-stack causa-section__body">
             <ul class="ef-stack causa-list">
               <template data-each="evidence.items" data-key="key">
-                <li class="ef-card causa-item">
+                <li class="causa-list__entry"><article class="ef-card causa-item">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-text="category"></span></p>
                   <h3 class="causa-item__title" data-text="label"></h3>
                   <p class="causa-item__text" data-text="content"></p>
@@ -211,7 +263,7 @@
                     <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
                   </dl>
                   <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><p class="causa-item__text" data-text="assessments"></p></div></template>
-                </li>
+                </article></li>
               </template>
             </ul>
             <template data-if="evidence.more-present">
@@ -219,7 +271,7 @@
                 <summary class="causa-more__toggle" data-text="evidence.more-label"></summary>
                 <ul class="ef-stack causa-list">
               <template data-each="evidence.more" data-key="key">
-                <li class="ef-card causa-item">
+                <li class="causa-list__entry"><article class="ef-card causa-item">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-text="category"></span></p>
                   <h3 class="causa-item__title" data-text="label"></h3>
                   <p class="causa-item__text" data-text="content"></p>
@@ -230,7 +282,7 @@
                     <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
                   </dl>
                   <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><p class="causa-item__text" data-text="assessments"></p></div></template>
-                </li>
+                </article></li>
               </template>
             </ul>
               </details>

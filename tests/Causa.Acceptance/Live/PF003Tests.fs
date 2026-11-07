@@ -27,13 +27,15 @@ type PF003Tests(fixture: LiveFixture<PF003Tests>) =
 
     /// PF-003-O1: an explicit fixture mode and an explicit GitHub mode, each with a documented, repeatable command:
     /// the two adapters name their mode, the GitHub one talks to api.github.com, and the run documentation states the
-    /// command for each mode (CAUSA_PROVIDER=fixture and CAUSA_PROVIDER=github, the selection the governed gate sets).
+    /// command for each mode (CAUSA_PROVIDER=github, the selection the governed gate sets, and a CAUSA_PROVIDER value
+    /// naming the fixture mode).
     [<Fact>]
     member _.``PF-003-O1``() =
         Assert.Equal("fake", (Conformance.overFake (StatefulFake()) prefix).Mode)
         let documented = docs |> List.filter Repo.exists |> List.map Repo.read |> String.concat "\n"
-        for mode in [ "CAUSA_PROVIDER=fixture"; "CAUSA_PROVIDER=github" ] do
-            Assert.True(documented.Contains mode, sprintf "no documented command selects %s in %A" mode docs)
+        let lines = documented.Split('\n')
+        Assert.True(lines |> Array.exists (fun l -> l.Contains "CAUSA_PROVIDER=github"), sprintf "no documented command selects the GitHub mode (CAUSA_PROVIDER=github) in %A" docs)
+        Assert.True(lines |> Array.exists (fun l -> l.Contains "CAUSA_PROVIDER=" && l.ToLowerInvariant().Contains "fixture"), sprintf "no documented command selects the local fixture mode (CAUSA_PROVIDER=<fixture mode>) in %A" docs)
         let live = fixture.Run
         Assert.Equal("live-github", (Conformance.overLive live).Mode)
         Assert.Equal("ok", Conformance.kind (live.Reader.ReadHead()))

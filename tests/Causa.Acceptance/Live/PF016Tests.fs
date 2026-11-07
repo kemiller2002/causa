@@ -31,8 +31,8 @@ type PF016Tests(fixture: LiveFixture<PF016Tests>) =
     /// PF-016-O1: the scenarios exercise navy, teal, amber, coral and ivory with textual state labels and contrast
     /// checks: the label colours meet WCAG AA on the ivory surface (navy text 4.5:1; teal and coral indicators 3:1;
     /// amber only with a text label, DEC-R7-002); the populated case read from real GitHub holds the states those
-    /// colours stand for (contradictions, unresolved unknowns, active hypotheses); and the application stylesheet maps
-    /// all five to named Forma tokens.
+    /// colours stand for (contradictions, unresolved unknowns, active hypotheses); and the application stylesheets map
+    /// all five to named tokens they use.
     [<Fact>]
     member _.``PF-016-O1``() =
         Assert.True(contrast (hex "navy") (hex "ivory") >= 4.5, "navy text on ivory is below 4.5:1")
@@ -46,11 +46,17 @@ type PF016Tests(fixture: LiveFixture<PF016Tests>) =
         let has kind = events |> List.exists (fun e -> e |> Json.field "eventType" |> Json.text = Some kind)
         for kind, colour in [ "ContradictionRecorded", "coral"; "UnknownIdentified", "amber"; "HypothesisRecorded", "teal" ] do
             Assert.True(has kind, sprintf "the populated case has no %s state for %s" kind colour)
-        let stylesheet = "web/causa.css"
-        if not (Repo.exists stylesheet) then blocked (sprintf "the application stylesheet %s does not exist yet (ui role), so the five tokens cannot be checked" stylesheet)
-        let css = (Repo.read stylesheet).ToLowerInvariant()
+        let stylesheets = [ "web/causa-theme.css"; "web/causa.css" ] |> List.filter Repo.exists
+        if List.isEmpty stylesheets then blocked "the application stylesheets (web/causa-theme.css, web/causa.css; ui role) do not exist on this branch yet, so the identity tokens cannot be checked"
+        let css = stylesheets |> List.map Repo.read |> String.concat "\n" |> fun t -> t.ToLowerInvariant()
+        // Each identity colour is a named token (amber is Forma's status-warning token, ODR-V41-05) that the stylesheet uses.
         for (name, value) in palette do
-            Assert.True(css.Contains(value.ToLowerInvariant()) || css.Contains name, sprintf "%s does not map %s %s to a Forma token" stylesheet name value)
+            let declared =
+                if name = "amber" then css.Contains "--ef-color-status-warning" || css.Contains(value.ToLowerInvariant())
+                else css.Contains(sprintf "--causa-%s: %s" name (value.ToLowerInvariant()))
+            Assert.True(declared, sprintf "%A do not map %s %s to a named token" stylesheets name value)
+        for name in [ "navy"; "teal"; "coral"; "ivory" ] do
+            Assert.True(css.Contains(sprintf "var(--causa-%s" name), sprintf "the %s token is declared but never used" name)
 
     /// PF-016-O2: final acceptance captures deployed exact-SHA screenshots at desktop, iPad portrait and landscape and
     /// mobile sizes, in Chromium and WebKit; local fixture screenshots do not count.

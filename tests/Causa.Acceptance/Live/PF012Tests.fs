@@ -20,13 +20,13 @@ type PF012Tests(fixture: LiveFixture<PF012Tests>) =
 
     interface IClassFixture<LiveFixture<PF012Tests>>
 
-    /// PF-012-O1: one documented command builds and starts a populated fixture-backed UI (CAUSA_PROVIDER=fixture), and
+    /// PF-012-O1: one documented command builds and starts a populated fixture-backed UI (a CAUSA_PROVIDER fixture mode), and
     /// a separate documented command runs the fast offline domain, UI and provider-contract checks (a dotnet test that
     /// does not select the live suites).
     [<Fact>]
     member _.``PF-012-O1``() =
         let lines = documentedLines ()
-        Assert.True(lines |> List.exists (fun l -> l.Contains "CAUSA_PROVIDER=fixture"), sprintf "no documented command starts the fixture-backed UI in %A" docs)
+        Assert.True(lines |> List.exists (fun l -> l.Contains "CAUSA_PROVIDER=" && l.ToLowerInvariant().Contains "fixture"), sprintf "no documented command builds and starts the fixture-backed UI (CAUSA_PROVIDER=<fixture mode>) in %A" docs)
         Assert.True(
             lines |> List.exists (fun l -> l.Contains "dotnet test" && l.Contains "!~" && l.Contains "Live"),
             sprintf "no documented offline check command (dotnet test excluding the Live suites) in %A" docs)

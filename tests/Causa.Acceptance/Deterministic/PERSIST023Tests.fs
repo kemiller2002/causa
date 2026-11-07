@@ -120,8 +120,18 @@ module Fixtures =
           Events = Text.Encoding.UTF8.GetBytes("{\"events\":\"" + tag + "\"}\n")
           Snapshot = Text.Encoding.UTF8.GetBytes("{\"snapshot\":\"" + tag + "\"}\n") }
 
+    let private text s = NonEmptyText.create s |> Option.get
+
+    /// The kernel's state after InvestigationStarted at version 1.
+    let startedInvestigation =
+        Investigation.started
+            investigation
+            (AggregateVersion 1L)
+            { Actor = Actor.Human(text "t12-fixture"); RecordedAt = t0 }
+            { Title = text "Fixture investigation"; ObservationId = Guid "0f0e0d0c-0b0a-4908-8706-050403020100"; Original = text "Observed." }
+
     let verified (at: CommitOid) : VerifiedInvestigation =
-        { Investigation = { Id = investigation; Version = AggregateVersion 1L }
+        { Investigation = startedInvestigation
           History = []
           ReadAt = at
           Address = address

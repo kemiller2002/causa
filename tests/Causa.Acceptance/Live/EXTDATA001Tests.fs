@@ -25,7 +25,7 @@ module AppDrive =
           Now = fun () -> DateTimeOffset.UtcNow
           StorageVersion = "1.1.0"
           Persistence = None
-          Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister }
+          Provider = Some { Connector = GitHubConnect.connector; Lister = GitHubLister.lister }
           WorkingCopy = None }
 
     let engine = Update.engine backend
@@ -60,6 +60,41 @@ module AppDrive =
     let catalogListing (run: Run) =
         run.Model.Listings |> Map.toList |> List.map snd |> List.tryFind (fun l -> l.Address.Role = WorkspaceRole.Catalog)
 
+    /// The application's full backend (as Program.fs builds it) over a working copy of its own run.
+    let persistent (run: string) : Backend =
+        { backend with
+            Persistence =
+                Some
+                    { Connector = GitHubConnect.connector
+                      Machine = SaveMachines.withStorage backend.Author
+                      Lister = GitHubLister.lister
+                      Codec = StorageCodecs.codec }
+            WorkingCopy = WorkspaceAddress.workingCopy [] run }
+
+    /// Like `settle` for another engine.
+    let rec settleWith (engine: Engine) (execute: Execute) (run: Run) (effects: HostEffect list) : Run =
+        match effects with
+        | [] -> run
+        | Http request :: rest ->
+            let model, more = engine.Update (Msg.Browser(HttpCompleted(execute request))) run.Model
+            settleWith engine execute { run with Model = model; Requests = run.Requests @ [ request ] } (rest @ more)
+        | LiveAnnounce(_, text) :: rest -> settleWith engine execute { run with Announcements = run.Announcements @ [ text ] } rest
+        | _ :: rest -> settleWith engine execute run rest
+
+    let sendWith (engine: Engine) (execute: Execute) (msg: Msg) (run: Run) : Run =
+        let model, effects = engine.Update msg run.Model
+        settleWith engine execute { run with Model = model } effects
+
+    /// A StartInvestigation envelope (and the P19 question), with UUIDv7 command ids.
+    let startCommands (title: string) (problem: string) (question: string) : CommandEnvelope list =
+        let id = InvestigationId(Guid.NewGuid())
+        let start =
+            { CommandId = Writes.commandIdAt DateTimeOffset.UtcNow (System.Security.Cryptography.RandomNumberGenerator.GetBytes 16)
+              Investigation = id
+              ExpectedVersion = None
+              Command = Core(StartInvestigation { Title = (NonEmptyText.create title).Value; ObservationId = Guid.NewGuid(); Original = (NonEmptyText.create problem).Value }) }
+        PrimaryQuestion.startCommands start question (Writes.commandIdAt DateTimeOffset.UtcNow (System.Security.Cryptography.RandomNumberGenerator.GetBytes 16)) (Guid.NewGuid())
+
     /// The application's UI adapter over the same engine, with its own state (no shared tab).
     let config: Causa.App.Ui.AdapterConfig =
         { NewIdentifier = Guid.NewGuid
@@ -68,7 +103,8 @@ module AppDrive =
           SessionLocal = false
           ValidateStart = Causa.App.Views.StartScreen.validate
           InvestigationOf = Update.investigationOf backend
-          CanSave = false }
+          CanSave = false
+          WorkingCopy = None }
 
     let ui = Causa.App.Ui.UiAdapter.backend config engine
 

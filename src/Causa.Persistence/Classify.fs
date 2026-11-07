@@ -161,7 +161,15 @@ module Classify =
     /// "Expected branch to point to "<oid>" but it did not" (STALE_DATA).
     let private expectedBranch = Regex(@"Expected branch to point to ""?([0-9a-fA-F]{7,64})?", RegexOptions.Compiled ||| RegexOptions.IgnoreCase)
 
-    let private isPrimary (e: AnswerEvidence) = (e.Status = 403 || e.Status = 429) && e.RateRemaining = Some "0"
+    /// GH-RATE-PRIMARY: x-ratelimit-remaining 0, or (when a browser host does not pass the rate-limit headers on) the
+    /// primary-limit message "API rate limit exceeded", which GitHub also sends to an anonymous request. Never a
+    /// permission or authentication failure (INV-22).
+    let private isPrimary (e: AnswerEvidence) =
+        (e.Status = 403 || e.Status = 429)
+        && (e.RateRemaining = Some "0"
+            || (e.RateRemaining.IsNone && e.RetryAfter.IsNone
+                && mentions [ "API rate limit exceeded" ] e.Messages
+                && not (mentions [ "secondary rate limit"; "too quickly"; "abuse" ] e.Messages)))
 
     let private isSecondary (e: AnswerEvidence) =
         e.RateRemaining <> Some "0"
@@ -385,13 +393,21 @@ module Decode =
                     |> Option.map (fun sha -> { ComparedCommit.Oid = CommitOid sha; Message = text (path [ "commit"; "message" ] (Some c)) |> Option.defaultValue "" }))
             Ok { Status = status; TotalCommits = Json.int (path [ "total_commits" ] json) |> Option.defaultValue (List.length commits); Commits = commits }
 
-    /// Write access only from the permissions GitHub states (EXT-DATA-005, DEC-R7-001): push, maintain or admin.
+    /// Write access from the permissions GitHub states (EXT-DATA-005, DEC-R7-001): push, maintain or admin. GitHub
+    /// states no `permissions` for a fine-grained token (observed live, recorded as rest-repo-fine-grained-no-permissions):
+    /// then write is not refused here and GitHub decides it at the first conditional commit, whose refusal is the
+    /// matrix's GH-PERMISSION (Save failed, changes kept). A stated `permissions` object is honoured exactly.
     let canWrite (answer: ProviderAnswer) : Result<bool, ProviderError> =
-        match path [ "permissions" ] (node answer) with
-        | Some(Json.Object _) as permissions ->
-            let flag name = Json.bool (path [ name ] permissions) |> Option.defaultValue false
-            Ok(flag "push" || flag "maintain" || flag "admin")
-        | _ -> Error(Malformed "required field permissions is missing")
+        match node answer with
+        | None -> Error(Malformed "the repository answer is not JSON")
+        | Some json ->
+            match path [ "permissions" ] (Some json) with
+            | Some(Json.Object _) as permissions ->
+                let flag name = Json.bool (path [ name ] permissions) |> Option.defaultValue false
+                Ok(flag "push" || flag "maintain" || flag "admin")
+            | Some _ -> Error(Malformed "permissions is not an object")
+            | None when (path [ "full_name" ] (Some json)).IsSome -> Ok true
+            | None -> Error(Malformed "required field full_name is missing")
 
 /// IF41-ERRORS Connector: Connect reads the repository and its stated permissions.
 [<RequireQualifiedAccess>]

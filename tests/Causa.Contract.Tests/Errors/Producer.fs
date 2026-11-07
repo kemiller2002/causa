@@ -49,6 +49,17 @@ module Producer =
             Assert.Equal("9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b", expected)
             Assert.Equal("4f1c7e0d2a9b8c6e5f3a1b0c9d8e7f6a5b4c3d2e", actual)
         | other -> failwithf "%A" other
+        // An anonymous request's primary-limit 403, with or without the rate-limit headers, is a rate limit: never an
+        // authentication or permission failure (observed live).
+        for form in [ "graphql-403-anonymous-primary-rate-limit"; "rest-403-anonymous-primary-rate-limit-headers-hidden" ] do
+            let r = Recordings.form form
+            match Classify.classify r.Operation (Recordings.outcome (RequestId 1L) r) with
+            | Error(RateLimited(Primary _)) -> ()
+            | other -> failwithf "%s was %A" form other
+        Assert.DoesNotContain("credential", Classify.message (RateLimited(Primary(Some 1794070800L))))
+        match Connect.connector.InterpretConnect (RequestId 1L) (Recordings.outcome (RequestId 1L) (Recordings.form "rest-403-anonymous-primary-rate-limit-headers-hidden")) with
+        | ConnectRejected(RateLimited(Primary _)) -> ()
+        | other -> failwithf "Connect under a primary rate limit was %A" other
         // No class retries beyond its bound.
         Assert.Equal(3, MatrixClass.maxAttempts GhStaleHead)
         Assert.Equal(0, MatrixClass.maxAttempts GhRateSecondary)
@@ -60,10 +71,20 @@ module Producer =
         let connect body = Connect.connector.InterpretConnect (RequestId 3L) (Answered(RequestId 3L, 200, [], body))
         Assert.Equal(ConnectAccepted true, connect """{"permissions":{"admin":false,"push":true,"pull":true}}""")
         Assert.Equal(ConnectAccepted false, connect """{"permissions":{"admin":false,"push":false,"pull":true}}""")
-        match connect """{"full_name":"o/r"}""" with
+        // a fine-grained token: GitHub states no permissions; write is decided by GitHub at the first commit
+        Assert.Equal(ConnectAccepted true, connect (Recordings.form "rest-repo-fine-grained-no-permissions").Body)
+        match connect """{"id":1}""" with
         | ConnectRejected(Malformed _) -> ()
-        | other -> failwithf "a read without stated permissions granted %A" other
+        | other -> failwithf "an answer that names no repository was %A" other
         Assert.Equal(ConnectSuperseded, Connect.connector.InterpretConnect (RequestId 4L) (Answered(RequestId 3L, 200, [], "{}")))
         let fake = StatefulFake()
         Assert.Equal(ConnectAccepted false, (Provider.over fake.Execute fake.ReadConnection).Connect())
         Assert.Equal(ConnectAccepted true, (Provider.over fake.Execute fake.WriteConnection).Connect())
+        // a fine-grained read-only token connects, and GitHub refuses its first commit as a permission failure
+        let fine = StatefulFake()
+        fine.AnswerAsFineGrained()
+        let reader = Provider.over fine.Execute fine.ReadConnection
+        Assert.Equal(ConnectAccepted true, reader.Connect())
+        match reader.Commit (fine.Head()) (RepoPath "w/i") "x" [ PutFile(RepoPath "w/i/a.json", [| 1uy |]) ] with
+        | Error(PermissionDenied _) -> ()
+        | other -> failwithf "%A" other

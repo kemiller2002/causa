@@ -111,11 +111,11 @@ let backend: Backend =
       StorageVersion = "1.1.0"
       Persistence =
         Some
-            { Connector = Connect.connector
+            { Connector = GitHubConnect.connector
               Machine = SaveMachines.withStorage (Actor.Human(NonEmptyText.create "causa-user" |> Option.get))
               Lister = GitHubLister.lister
               Codec = StorageCodecs.codec }
-      Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister }
+      Provider = Some { Connector = GitHubConnect.connector; Lister = GitHubLister.lister }
       WorkingCopy = WorkspaceAddress.workingCopy [] run }
 
 let config: AdapterConfig =
@@ -125,7 +125,8 @@ let config: AdapterConfig =
       SessionLocal = backend.Persistence.IsNone && backend.Provider.IsNone
       ValidateStart = Causa.App.Views.StartScreen.validate
       InvestigationOf = Update.investigationOf backend
-      CanSave = backend.Persistence.IsSome }
+      CanSave = backend.Persistence.IsSome
+      WorkingCopy = backend.WorkingCopy }
 
 let engine = Update.engine backend
 let ui = UiAdapter.backend config engine
@@ -154,6 +155,8 @@ let mutable private state: AdapterState option = None
 let mutable private page = ""
 let mutable private pending: Map<string, Pending> = Map.empty
 let mutable private correlation = 0L
+/// The injected deploy connection, kept in memory only (never stored, logged or rendered) so Try again can reuse it.
+let mutable private deployConnection: DeployConnection option = None
 
 let private nextCorrelation (prefix: string) =
     correlation <- correlation + 1L
@@ -177,6 +180,13 @@ let step (current: AdapterState option) (inbound: Inbound) (pendingNow: Map<stri
         let route = View.route hash
         let s2, fx = ui.Dispatch(UiIntent.Navigate route) (ensure route)
         s2, fx, false
+    | Event("UIA-DEPLOY-RETRY", _, _) ->
+        let s = ensure InvestigationsRoute
+        match deployConnection with
+        | Some c ->
+            let s2, fx = UiAdapter.deployConnect engine c.Repository c.Credential s
+            s2, fx, false
+        | None -> s, [], false
     | Event(name, key, value) ->
         let s = ensure InvestigationsRoute
         match Events.toIntent name key value with
@@ -193,6 +203,7 @@ let step (current: AdapterState option) (inbound: Inbound) (pendingNow: Map<stri
         | Some DeployConnectionRead, HttpSuccess(200, _, body) ->
             match DeployConnection.decode body with
             | Ok(Some c) ->
+                deployConnection <- Some c
                 let s2, fx = UiAdapter.deployConnect engine c.Repository c.Credential s
                 s2, fx, false
             // No connection in the file, or a file that does not decode: the Connect form, exactly as before.
@@ -253,13 +264,13 @@ let private beside (file: string) =
     let slash = page.LastIndexOf '/'
     (if slash >= 0 then page.Substring(0, slash + 1) else page + "/") + file
 
-let private render (view: AppView) (effects: HostEffect list) (deployRead: bool) (push: string option) : string =
+let private render (view: AppView) (extra: Bindings) (effects: HostEffect list) (deployRead: bool) (push: string option) : string =
     use stream = new MemoryStream()
     (
         use writer = new Utf8JsonWriter(stream)
         writer.WriteStartObject()
         writer.WritePropertyName "view"
-        View.writeBindings writer (View.bindings view)
+        View.writeBindings writer (Causa.App.Views.Bind.merge [ View.bindings view; extra ])
         writer.WriteStartArray "effects"
         for e in effects do
             match e with
@@ -304,10 +315,11 @@ let dispatch (message: string) : string =
     | HttpCompletedFor(id, _) -> pending <- pending |> Map.remove id
     | _ -> ()
     state <- Some next
-    render (ui.Project next) effects firstLoad (navigation before next.Local.Route inbound)
+    render (ui.Project next) (UiAdapter.shellBindings next) effects firstLoad (navigation before next.Local.Route inbound)
 
 /// A fresh tab: what a page reload gives the host (used by the host tests; the browser reloads the page instead).
 let reset () =
     state <- None
+    deployConnection <- None
     pending <- Map.empty
     page <- ""

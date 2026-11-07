@@ -161,3 +161,22 @@ module GitHubLister =
     let lister : WorkspaceLister =
         { List = fun ctx _ -> ListHead, request ctx ListHead
           InterpretList = interpret }
+
+/// Connect (EXT-DATA-005). Persistence's classifier now reads a repository answer without `permissions` (a
+/// fine-grained token's) as able to save, with GitHub deciding at the first commit (T19 19a2ead); this connector is
+/// that one, kept under its name so the application and its tests name one Connect.
+[<RequireQualifiedAccess>]
+module GitHubConnect =
+    let interpret (expected: RequestId) (outcome: HttpOutcome) : ConnectResult = Connect.connector.InterpretConnect expected outcome
+    let connector : Connector = Connect.connector
+
+/// What a failed read tells the user: the cause, in words, without any value from the request (EXT-DATA-005-O2).
+[<RequireQualifiedAccess>]
+module ReadFailure =
+    /// Persistence's own words for the class (Classify.message), so Connect, the list and Save say the same thing.
+    let text (error: ProviderError) : string = Classify.message error
+
+    let ofLoadFailure (failure: LoadFailure) : string =
+        match failure with
+        | ProviderFailed e -> text e
+        | Unverifiable _ -> "The repository's catalog could not be read safely, so nothing is listed."

@@ -340,7 +340,10 @@ module Update =
             | true ->
                 match connector.InterpretConnect rid outcome with
                 | ConnectAccepted canWrite -> connected backend canWrite model
-                | ConnectRejected _ -> { model with Connection = CredentialRefused; Context = None }, [ announce Assertive "GitHub refused the access token." ]
+                // A rate limit or an unreachable GitHub is not a refused credential: the tab stays disconnected and says why.
+                | ConnectRejected(RateLimited _ as e)
+                | ConnectRejected(NetworkUnavailable _ as e) -> { model with Connection = Disconnected; Context = None }, [ announce Assertive (ReadFailure.text e) ]
+                | ConnectRejected e -> { model with Connection = CredentialRefused; Context = None }, [ announce Assertive (ReadFailure.text e) ]
                 | ConnectSuperseded -> model, []
             | false ->
                 match requestContext backend model None with
@@ -371,7 +374,7 @@ module Update =
                                     ListingsInFlight = inFlight |> Map.add request.Id (target, next)
                                     NextRequestId = nextId model.NextRequestId },
                                 [ Http request ]
-                            | ListingFailed _ -> { model with ListingsInFlight = inFlight }, [ announce Assertive "The workspace could not be listed." ]
+                            | ListingFailed f -> { model with ListingsInFlight = inFlight }, [ announce Assertive ("The investigations could not be listed: " + ReadFailure.ofLoadFailure f) ]
                         | None ->
                             match model.Loads |> Map.tryFindKey (fun _ l -> match l with LoadState.Loading(id, _) -> id = rid | _ -> false) with
                             | Some ref when backend.Persistence.IsSome ->

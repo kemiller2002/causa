@@ -161,7 +161,15 @@ module Classify =
     /// "Expected branch to point to "<oid>" but it did not" (STALE_DATA).
     let private expectedBranch = Regex(@"Expected branch to point to ""?([0-9a-fA-F]{7,64})?", RegexOptions.Compiled ||| RegexOptions.IgnoreCase)
 
-    let private isPrimary (e: AnswerEvidence) = (e.Status = 403 || e.Status = 429) && e.RateRemaining = Some "0"
+    /// GH-RATE-PRIMARY: x-ratelimit-remaining 0, or (when a browser host does not pass the rate-limit headers on) the
+    /// primary-limit message "API rate limit exceeded", which GitHub also sends to an anonymous request. Never a
+    /// permission or authentication failure (INV-22).
+    let private isPrimary (e: AnswerEvidence) =
+        (e.Status = 403 || e.Status = 429)
+        && (e.RateRemaining = Some "0"
+            || (e.RateRemaining.IsNone && e.RetryAfter.IsNone
+                && mentions [ "API rate limit exceeded" ] e.Messages
+                && not (mentions [ "secondary rate limit"; "too quickly"; "abuse" ] e.Messages)))
 
     let private isSecondary (e: AnswerEvidence) =
         e.RateRemaining <> Some "0"

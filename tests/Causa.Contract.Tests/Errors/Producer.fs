@@ -49,6 +49,17 @@ module Producer =
             Assert.Equal("9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b", expected)
             Assert.Equal("4f1c7e0d2a9b8c6e5f3a1b0c9d8e7f6a5b4c3d2e", actual)
         | other -> failwithf "%A" other
+        // An anonymous request's primary-limit 403, with or without the rate-limit headers, is a rate limit: never an
+        // authentication or permission failure (observed live).
+        for form in [ "graphql-403-anonymous-primary-rate-limit"; "rest-403-anonymous-primary-rate-limit-headers-hidden" ] do
+            let r = Recordings.form form
+            match Classify.classify r.Operation (Recordings.outcome (RequestId 1L) r) with
+            | Error(RateLimited(Primary _)) -> ()
+            | other -> failwithf "%s was %A" form other
+        Assert.DoesNotContain("credential", Classify.message (RateLimited(Primary(Some 1794070800L))))
+        match Connect.connector.InterpretConnect (RequestId 1L) (Recordings.outcome (RequestId 1L) (Recordings.form "rest-403-anonymous-primary-rate-limit-headers-hidden")) with
+        | ConnectRejected(RateLimited(Primary _)) -> ()
+        | other -> failwithf "Connect under a primary rate limit was %A" other
         // No class retries beyond its bound.
         Assert.Equal(3, MatrixClass.maxAttempts GhStaleHead)
         Assert.Equal(0, MatrixClass.maxAttempts GhRateSecondary)

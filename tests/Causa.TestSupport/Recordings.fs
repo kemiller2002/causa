@@ -81,6 +81,14 @@ module Recordings =
             Headers = [ "content-type", "application/json; charset=utf-8"; "x-ratelimit-limit", "5000"; "x-ratelimit-remaining", "0"; "x-ratelimit-reset", "1794070800" ]
             Body = """{"message":"API rate limit exceeded for user ID 1.","documentation_url":"https://docs.github.com/rest/overview/rate-limits-for-the-rest-api"}"""
             ExpectedClass = GhRatePrimary }
+          { Form = "graphql-403-anonymous-primary-rate-limit"; ObservedIn = "live preview (2026-11-07): an anonymous POST /graphql"; Operation = mutation; Status = 403
+            Headers = [ "content-type", "application/json; charset=utf-8"; "x-ratelimit-limit", "60"; "x-ratelimit-remaining", "0"; "x-ratelimit-reset", "1794070800"; "x-ratelimit-used", "60"; "x-ratelimit-resource", "core" ]
+            Body = """{"message":"API rate limit exceeded for 203.0.113.7. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)","documentation_url":"https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"}"""
+            ExpectedClass = GhRatePrimary }
+          { Form = "rest-403-anonymous-primary-rate-limit-headers-hidden"; ObservedIn = "live preview (2026-11-07): GET /repos as a browser host passed it on, without the rate-limit headers"; Operation = Operation.Connect; Status = 403
+            Headers = [ "content-type", "application/json; charset=utf-8" ]
+            Body = """{"message":"API rate limit exceeded for 203.0.113.7. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)","documentation_url":"https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"}"""
+            ExpectedClass = GhRatePrimary }
           { Form = "rest-429-primary-rate-limit"; ObservedIn = kd; Operation = Operation.ReadHead; Status = 429
             Headers = [ "content-type", "application/json; charset=utf-8"; "x-ratelimit-remaining", "0"; "x-ratelimit-reset", "1794070800" ]
             Body = """{"message":"API rate limit exceeded"}"""; ExpectedClass = GhRatePrimary }

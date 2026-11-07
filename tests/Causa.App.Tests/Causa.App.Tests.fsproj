@@ -9,6 +9,7 @@
     <Compile Include="Ui/FrameTests.fs" />
     <Compile Include="../../build/DeployConnection.fs" Link="Build/DeployConnection.fs" />
     <Compile Include="DeployConnectionTests.fs" />
+    <Compile Include="DeployScanStepTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Causa.Domain/Causa.Domain.fsproj" />

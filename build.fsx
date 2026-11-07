@@ -3,7 +3,7 @@
 // It writes the complete deployable site to dist/ (DEPLOYMENT.md):
 //   dist/index.html        web/index.html with every web/screens/*.html fragment inlined at the screens marker and
 //                          every web/screens/*.css linked at the screen-styles marker (CF-08 A)
-//   dist/causa.css, dist/boundary.js, dist/causa-theme.css (when present), dist/screens/*.css
+//   dist/causa.css, dist/causa-theme.css, dist/causa-icon.svg, dist/boundary.js, dist/screens/*.css
 //   dist/vendor/forma/     the published Forma package's dist/ (@echelon-foundry/design-system, package-lock pinned)
 //   dist/vendor/limen/     the published Limen package's dist/ (@echelon-foundry/limen, package-lock pinned)
 //   dist/_framework/       the published .NET WebAssembly engine (src/Causa.Host)
@@ -80,7 +80,7 @@ let index () =
     |> Result.map (fun html -> File.WriteAllText(Path.Combine(dist, "index.html"), html))
 
 let webAssets () =
-    [ "causa.css"; "boundary.js"; "causa-theme.css" ]
+    [ "causa.css"; "causa-theme.css"; "causa-icon.svg"; "boundary.js" ]
     |> List.filter (fun f -> File.Exists(path [ "web"; f ]))
     |> List.iter (fun f -> File.Copy(path [ "web"; f ], Path.Combine(dist, f), true))
     let styles = screenFiles ".css"
@@ -105,7 +105,7 @@ let engine () =
         |> Result.map (fun () -> copyDirectory framework (Path.Combine(dist, "_framework"))))
 
 let requireSite () =
-    [ "index.html"; "causa.css"; "boundary.js"; "vendor/forma/all.css"; "vendor/limen/index.js" ]
+    [ "index.html"; "causa.css"; "causa-theme.css"; "causa-icon.svg"; "boundary.js"; "vendor/forma/all.css"; "vendor/limen/index.js" ]
     @ (if skipEngine then [] else [ "_framework/dotnet.js" ])
     |> List.filter (fun f -> not (File.Exists(Path.Combine(dist, f))))
     |> function

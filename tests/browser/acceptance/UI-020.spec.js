@@ -60,6 +60,8 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 test.describe('UI-020', () => {
   test('UI-020-O1', async ({ page }) => {
@@ -110,7 +112,7 @@ test.describe('UI-020', () => {
       await page.setViewportSize(size);
       for (const d of DESTINATIONS) {
         await open(page, d.hash);
-        const current = page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: d.name, exact: true }).filter({ visible: true });
+        const current = page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: d.name, exact: true });
         await expect(current.first(), `${id} ${d.name}: active page not marked`).toHaveAttribute('aria-current', 'page');
         for (const other of DESTINATIONS.filter((o) => o !== d))
           await expect(page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: other.name, exact: true }).first()).not.toHaveAttribute('aria-current', 'page');

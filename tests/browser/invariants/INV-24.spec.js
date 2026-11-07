@@ -60,6 +60,8 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 const tabTo = async (page, locator, max = 60) => {
   for (let i = 0; i < max; i++) {

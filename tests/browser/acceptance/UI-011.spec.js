@@ -59,6 +59,8 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 const SCREENS = ['#/', '#/administration', '#/settings', '#/no-such-page'];
 

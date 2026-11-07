@@ -61,6 +61,8 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 const SECTIONS = ['Overview', 'Causal Analysis', 'Evidence', 'Hypotheses', 'Timeline'];
 

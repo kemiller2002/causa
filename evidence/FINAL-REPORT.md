@@ -133,6 +133,8 @@ The owner directed that the preview stay live until 22:00Z, so main's automatic 
 |---|---|---|---|
 | 42402898344 | `78591f4` (#5) | push to main | 18:46Z |
 
+At about 21:01Z the owner **disabled** the "Deploy to GitHub Pages" workflow by hand ("This workflow was disabled manually"). The live site stays at `f28fd9e`, and merging this report does not deploy. The owner will re-enable the workflow after the competition.
+
 ## 7. Owner decisions made in chat, not recorded
 
 These decisions are the owner's, given in chat. **None is written as an owner record**, and the coordinator did not create one. Each is "decided by the owner in chat … not yet recorded":

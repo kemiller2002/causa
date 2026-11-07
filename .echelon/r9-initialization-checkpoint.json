@@ -1,0 +1,70 @@
+{
+  "schema": "indy-init.r9-initialization-checkpoint/1",
+  "authorizedAt": "2026-11-07T16:43:26Z",
+  "authorizedAtCommit": "252d68feae54489f1183255aff5cf3e167a7e5b1",
+  "meaning": "Implementation is authorized from the commit that adds this file. Every commit before it that changes implementation paths (src/, web/, tests/, build files), other than the T0 bootstrap, is a process violation (r9.fsx check-sequencing). Verification evidence is produced after implementation and is not part of this checkpoint.",
+  "workItems": [
+    "T10",
+    "T11",
+    "T12",
+    "T13",
+    "T14",
+    "T15",
+    "T16",
+    "T17",
+    "T18",
+    "T19",
+    "T20",
+    "T21",
+    "T22",
+    "T23",
+    "T24",
+    "T25",
+    "T26",
+    "T27",
+    "T28",
+    "T29",
+    "T30",
+    "T31",
+    "T32",
+    "T33",
+    "T34",
+    "T35",
+    "T36",
+    "WI-GEN-VER",
+    "WI-INV-LIST",
+    "WI-INV-START",
+    "WI-INV-WORKSPACE"
+  ],
+  "inScopeObligations": 921,
+  "inputs": [
+    {
+      "path": "requirements/verification/verification-manifest.json",
+      "sha256": "5513b3b9874fa24290ccdfd6dcdcfb000b797f288ed6dced9713401622c86022"
+    },
+    {
+      "path": ".echelon/r9-work-plan.json",
+      "sha256": "706cbc5035b7a5963a17047490e199674ad49fd88fdc480e95e6ac5ca6d0e397"
+    },
+    {
+      "path": ".echelon/obligations.json",
+      "sha256": "92d2d570c25fce0d904aa5658cd93482dbb72592fc31e2bacb6ba60475db03af"
+    },
+    {
+      "path": ".echelon/scope-checkpoint.json",
+      "sha256": "50d2b848ebd1056a3470f4366370e8d2a21463c03f0d5912121bd97c227ce743"
+    },
+    {
+      "path": "evidence/t0/suite-preflight.json",
+      "sha256": "06ef2006a9f3287d450c760730e9a23f7088d092c10c40967d4ef6f4ffdfcd4e"
+    },
+    {
+      "path": "evidence/t0/spec-preflight.json",
+      "sha256": "7f7c69ff1213209b0cd752005108216f5296e1647173eae9f505295bf4d0c38d"
+    },
+    {
+      "path": "evidence/t0/acceptance.log",
+      "sha256": "76ecfde697f2d7544f446287ec80fea78ca1d508e08726febb00f15266686758"
+    }
+  ]
+}

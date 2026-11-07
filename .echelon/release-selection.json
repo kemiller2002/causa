@@ -1,0 +1,343 @@
+{
+  "schema": "causa.release-selection/1",
+  "description": "Owner: integration (T10). Causa's release-set decision record (AR-023, VER-001, VER-002, VER-003, VER-005). The locked set is .echelon/dependency-lock.json, a byte-for-byte copy of the governed lock (kemiller2002/Indy-init docs/competition-readiness/dependency-lock.json, the file kickoff/competition/toolchain.lock.json pins by sha256). This record adds what the lock does not carry: per system, whether Causa actually integrates it, its owner and release channel, the freshness checks against authoritative release sources (checked timestamp, candidate, source, reason), the compatibility evidence, and every exception or prerelease approval. Causa.Acceptance.Deterministic.VER00*Tests verify this record against the lock and against what the repository declares.",
+  "lock": {
+    "path": ".echelon/dependency-lock.json",
+    "sha256": "2a5853f5decb3f74f478b9b19ac892e583da32c639ac843e2848598235578e87",
+    "governedSource": "kemiller2002/Indy-init@dae2347d26d0fb7dccc36484033515bbbaa31675:docs/competition-readiness/dependency-lock.json",
+    "pinnedBy": "kemiller2002/Indy-init@dae2347d26d0fb7dccc36484033515bbbaa31675:kickoff/competition/toolchain.lock.json dependencyLock.sha256 (toolchain lock sha256 650169ca9bea0e0480e99865efc41a50345f3a414d85c5015ea28eb722bf9d54)"
+  },
+  "releaseSet": {
+    "channel": "echelon-current",
+    "version": "1.37.0",
+    "registry": "kemiller2002/echelon-registry",
+    "registryCommit": "575240233d1fc32b57cfa827ea1031b68609fc58",
+    "setPath": "sets/echelon-current/1.37.0.json",
+    "setSha256": "bc7d163d7ff4bda0eeafe741b3bc0aedf93427526184fe347862ac69f9abe22f",
+    "approval": "OD-INDY-8 (echelon-registry#109, merged as 5752402) after Conditor qualified the set (conditor#131); adopted for the competition by ODR-COMP-LOCK (APR-COMP-OWNER-2)"
+  },
+  "baselineLockedAt": "2026-11-07T16:10:50Z",
+  "baselineLockedBy": "competition T0 bootstrap commit c7068166e78fe9c21e6aed5e392242f779b27e7f (evidence/t0/t0.json)",
+  "systems": [
+    {
+      "id": "praxis",
+      "owner": "kemiller2002/praxis",
+      "releaseChannel": "GitHub releases of kemiller2002/praxis, registered in echelon-registry releases/praxis",
+      "integration": "process-tool",
+      "integrationEvidence": ".echelon/toolchain.json praxis; ./praxis wrapper; .github/workflows/praxis-validation.yml",
+      "selected": "3.25.0"
+    },
+    {
+      "id": "ordo",
+      "owner": "kemiller2002/ordo",
+      "releaseChannel": "GitHub releases of kemiller2002/ordo, registered in echelon-registry releases/ordo",
+      "integration": "process-tool",
+      "integrationEvidence": ".echelon/toolchain.json ordo",
+      "selected": "1.20.0"
+    },
+    {
+      "id": "dokimos",
+      "owner": "kemiller2002/dokimos",
+      "releaseChannel": "GitHub releases of kemiller2002/dokimos (tags dokimos-vX.Y.Z), registered in echelon-registry releases/dokimos",
+      "integration": "verification-tool",
+      "integrationEvidence": "installed on the workstation and checked by the T0 stack-drift preflight (evidence/t0/stack-drift.json); not a runtime dependency of the application",
+      "selected": "0.11.1"
+    },
+    {
+      "id": "percepta",
+      "owner": "kemiller2002/percepta",
+      "releaseChannel": "GitHub releases of kemiller2002/percepta (tags percepta-repo-vX.Y.Z), registered in echelon-registry releases/percepta",
+      "integration": "verification-tool",
+      "integrationEvidence": ".percepta/application.json and .percepta/contracts; conditor.json component percepta",
+      "selected": "0.1.0"
+    },
+    {
+      "id": "percepta-semantic",
+      "owner": "kemiller2002/percepta",
+      "releaseChannel": "GitHub releases of kemiller2002/percepta (tags percepta-semantic-vX.Y.Z), registered in echelon-registry releases/percepta-semantic",
+      "integration": "verification-tool",
+      "integrationEvidence": "the T0 specification preflight (evidence/t0/spec-preflight.json, perceptaExit 0)",
+      "selected": "0.4.0"
+    },
+    {
+      "id": "forma",
+      "owner": "kemiller2002/forma",
+      "releaseChannel": "npm @echelon-foundry/design-system (dist-tag latest), registered in echelon-registry releases/forma",
+      "integration": "runtime",
+      "integrationEvidence": "package.json @echelon-foundry/design-system; web/index.html links vendor/forma/all.css (build.fsx)",
+      "selected": "0.13.0"
+    },
+    {
+      "id": "forma-workflow",
+      "owner": "kemiller2002/forma (packages/workflow)",
+      "releaseChannel": "npm @echelon-foundry/forma-workflow (dist-tag latest); not a component of echelon-current",
+      "integration": "runtime",
+      "integrationEvidence": "package.json @echelon-foundry/forma-workflow (the causal graph of T23/T24, WDL-013)",
+      "selected": "1.2.0"
+    },
+    {
+      "id": "limen",
+      "owner": "kemiller2002/limen",
+      "releaseChannel": "npm @echelon-foundry/limen (dist-tag latest), registered in echelon-registry releases/limen",
+      "integration": "runtime",
+      "integrationEvidence": "package.json @echelon-foundry/limen; web/boundary.js starts its BrowserKernel (build.fsx vendors dist/)",
+      "selected": "0.9.1"
+    },
+    {
+      "id": "folio",
+      "owner": "kemiller2002/folio",
+      "releaseChannel": "GitHub release asset of kemiller2002/folio (echelon-foundry-print-components-X.Y.Z.tgz); not published to npm",
+      "integration": "runtime",
+      "integrationEvidence": "package.json @echelon-foundry/print-components (report printing)",
+      "selected": "0.4.1"
+    },
+    {
+      "id": "aegis",
+      "owner": "kemiller2002/aegis",
+      "releaseChannel": "NuGet EchelonFoundry.Aegis.Core, registered in echelon-registry releases/aegis",
+      "integration": "locked-not-integrated",
+      "integrationEvidence": "referenced only by the Conditor scaffold project src/engine/App.Engine.fsproj (App.slnx), not by any Causa.slnx project; Causa models faults with its own IF41-ERRORS types",
+      "selected": "1.0.0"
+    },
+    {
+      "id": "limen-fsharp",
+      "owner": "kemiller2002/limen",
+      "releaseChannel": "GitHub release v0.9.0 of kemiller2002/limen (EchelonFoundry.Limen.Contract nupkg); not on nuget.org (checked)",
+      "integration": "locked-not-integrated",
+      "integrationEvidence": "no project references EchelonFoundry.Limen.Contract: the engine exchanges the Limen 0.9.1 protocol as JSON through the single [JSExport] host (src/Causa.Host/Host.cs) and mirrors ViewValue in Causa.Ui.Contracts BindingValue",
+      "selected": "0.9.0"
+    },
+    {
+      "id": "conditor",
+      "owner": "kemiller2002/conditor",
+      "releaseChannel": "GitHub release v0.10.21 of kemiller2002/conditor (pinned by the toolchain lock, eight artifact digests)",
+      "integration": "bootstrap-tool",
+      "integrationEvidence": ".conditor/lock.json; conditor.json",
+      "selected": "0.10.21"
+    },
+    {
+      "id": "dotnet-sdk",
+      "owner": "Microsoft (.NET)",
+      "releaseChannel": ".NET SDK feed",
+      "integration": "build-tool",
+      "integrationEvidence": "global.json sdk.version with rollForward disable",
+      "selected": "10.0.402"
+    }
+  ],
+  "notApplicable": [
+    {
+      "id": "visual-engineering",
+      "reason": "component of echelon-current 1.37.0 that neither Conditor's indy-init preset nor Causa installs or invokes (dependency-lock excluded)"
+    },
+    {
+      "id": "communication-engineering",
+      "reason": "as visual-engineering"
+    },
+    {
+      "id": "tutela",
+      "reason": "as visual-engineering"
+    },
+    {
+      "id": "strata",
+      "reason": "optional in the set; never invoked by Causa, its bootstrap or CI"
+    },
+    {
+      "id": "arca",
+      "reason": "no project, bootstrap or workflow references it"
+    },
+    {
+      "id": "fides",
+      "reason": "no reference in the package, the bootstrap, the scaffold or CI"
+    },
+    {
+      "id": "summa-contracts",
+      "reason": "no reference"
+    },
+    {
+      "id": "vigila",
+      "reason": "not in echelon-current; mentioned only in scaffold documentation (dependency-lock excluded)"
+    },
+    {
+      "id": "iter",
+      "reason": "not in echelon-current; no tags or releases; no reference"
+    },
+    {
+      "id": "vitium",
+      "reason": "not in the registry; no tags or releases; no reference"
+    },
+    {
+      "id": "tutors",
+      "reason": "no repository kemiller2002/tutors is reachable and the registry names no such system"
+    }
+  ],
+  "freshnessChecks": [
+    {
+      "system": "echelon-current",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:sets/echelon-current/1.37.0.json (git fetch: the newest set on the registry default branch, whose head was still this commit)",
+      "candidate": "1.37.0",
+      "newestStable": "1.37.0",
+      "prereleasesObserved": [],
+      "reason": "the registry's newest approved release set equals the locked set; no newer set was published since the baseline lock"
+    },
+    {
+      "system": "praxis",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:releases/praxis/3.25.0.release.json (tag v3.25.0, releaseStage stable)",
+      "candidate": "3.25.0",
+      "newestStable": "3.25.0",
+      "prereleasesObserved": [],
+      "reason": "newest stable release registered for praxis, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "ordo",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:releases/ordo/1.20.0.release.json (tag v1.20.0, releaseStage stable)",
+      "candidate": "1.20.0",
+      "newestStable": "1.20.0",
+      "prereleasesObserved": [],
+      "reason": "newest stable release registered for ordo, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "dokimos",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:releases/dokimos/0.11.1.release.json (tag dokimos-v0.11.1, releaseStage stable)",
+      "candidate": "0.11.1",
+      "newestStable": "0.11.1",
+      "prereleasesObserved": [],
+      "reason": "newest stable release registered for dokimos (0.7.0 is also published, releases/dokimos/0.7.0.release.json, and superseded), and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "percepta",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:releases/percepta/0.1.0.release.json (tag percepta-repo-v0.1.0, releaseStage stable)",
+      "candidate": "0.1.0",
+      "newestStable": "0.1.0",
+      "prereleasesObserved": [],
+      "reason": "the only published percepta release, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "percepta-semantic",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:releases/percepta-semantic/0.4.0.release.json (tag percepta-semantic-v0.4.0, releaseStage stable)",
+      "candidate": "0.4.0",
+      "newestStable": "0.4.0",
+      "prereleasesObserved": [],
+      "reason": "newest stable release registered for percepta-semantic, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "forma",
+      "checkedAt": "2026-11-07T17:01:54Z",
+      "source": "https://registry.npmjs.org/@echelon-foundry/design-system (dist-tags latest 0.13.0, main 0.13.0-main.265.1)",
+      "candidate": "0.13.0",
+      "newestStable": "0.13.0",
+      "prereleasesObserved": [
+        "0.13.0-main.265.1"
+      ],
+      "reason": "dist-tag latest and the newest stable version; the main-branch prerelease builds are not adopted (VER-005)"
+    },
+    {
+      "system": "forma-workflow",
+      "checkedAt": "2026-11-07T17:01:55Z",
+      "source": "https://registry.npmjs.org/@echelon-foundry/forma-workflow (dist-tag latest 1.2.0)",
+      "candidate": "1.2.0",
+      "newestStable": "1.2.0",
+      "prereleasesObserved": [
+        "0.0.0-stage"
+      ],
+      "reason": "dist-tag latest and the newest stable version, the one Conditor v0.10.21's indy-init preset installs (ODR-COMP-P14 A)"
+    },
+    {
+      "system": "limen",
+      "checkedAt": "2026-11-07T17:01:54Z",
+      "source": "https://registry.npmjs.org/@echelon-foundry/limen (dist-tag latest 0.9.1)",
+      "candidate": "0.9.1",
+      "newestStable": "0.9.1",
+      "prereleasesObserved": [],
+      "reason": "dist-tag latest and the newest stable version, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "folio",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:releases/folio/0.4.1.release.json (tag v0.4.1, releaseStage stable); npm has no @echelon-foundry/print-components (404 at 2026-11-07T17:01:55Z)",
+      "candidate": "0.4.1",
+      "newestStable": "0.4.1",
+      "prereleasesObserved": [],
+      "reason": "newest stable folio release, distributed as its GitHub release asset, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "aegis",
+      "checkedAt": "2026-11-07T17:01:55Z",
+      "source": "https://api.nuget.org/v3-flatcontainer/echelonfoundry.aegis.core/index.json (versions [1.0.0])",
+      "candidate": "1.0.0",
+      "newestStable": "1.0.0",
+      "prereleasesObserved": [],
+      "reason": "the only published version, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "limen-fsharp",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/echelon-registry@575240233d1fc32b57cfa827ea1031b68609fc58:releases/limen-fsharp/0.9.0.release.json (tag v0.9.0, releaseStage stable)",
+      "candidate": "0.9.0",
+      "newestStable": "0.9.0",
+      "prereleasesObserved": [],
+      "reason": "newest stable release registered for limen-fsharp, and the version echelon-current 1.37.0 selects"
+    },
+    {
+      "system": "conditor",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "kemiller2002/Indy-init@dae2347d26d0fb7dccc36484033515bbbaa31675:kickoff/competition/toolchain.lock.json conditor (tag v0.10.21, commit 528ef4576fc79540953226b7dcfd3957654e3a29, release checksums.txt digests)",
+      "candidate": "0.10.21",
+      "newestStable": "0.10.21",
+      "prereleasesObserved": [],
+      "reason": "the release the owner pinned for the competition (ODR-COMP-P14 A); echelon-registry registers conditor only up to 0.10.19, so the toolchain lock is the release source"
+    },
+    {
+      "system": "dotnet-sdk",
+      "checkedAt": "2026-11-07T17:01:56Z",
+      "source": "global.json and dotnet --version (evidence/t0/stack-drift.json dotnet-sdk checks)",
+      "candidate": "10.0.402",
+      "newestStable": "10.0.402",
+      "prereleasesObserved": [],
+      "reason": "the SDK the toolchain lock and global.json pin (rollForward disable)"
+    }
+  ],
+  "compatibilityEvidence": [
+    {
+      "id": "stack-drift-t0",
+      "path": "evidence/t0/stack-drift.json",
+      "verdict": "ready, 55 PASS, 0 DRIFT, 0 BLOCKED, 0 UNVERIFIED",
+      "covers": "release manifests, artifact digests, toolchain lock, declared and installed versions of every locked system"
+    },
+    {
+      "id": "spec-preflight-t0",
+      "path": "evidence/t0/spec-preflight.json",
+      "verdict": "PASS",
+      "covers": "percepta-semantic against the v4.1.6 contracts"
+    },
+    {
+      "id": "causa-ci",
+      "path": ".github/workflows/ci.yml",
+      "verdict": "this candidate's run",
+      "covers": "Causa.slnx builds against the locked FSharp.Core and test tooling and its tests pass"
+    },
+    {
+      "id": "deploy-build",
+      "path": "build.fsx",
+      "verdict": "this candidate's run",
+      "covers": "the locked Forma and Limen packages are vendored into dist/ and the .NET WebAssembly engine starts under the Limen kernel"
+    }
+  ],
+  "exceptions": [
+    {
+      "system": "forma-workflow",
+      "version": "1.2.0",
+      "approval": "ODR-COMP-P14 A (APR-COMP-OWNER-1)",
+      "scope": "@echelon-foundry/forma-workflow 1.2.0 only, for the 7 November competition",
+      "rationale": "not a component of echelon-current 1.37.0; Conditor v0.10.21's indy-init preset installs it and the owner exempted exactly this component and version from the echelon-current selection test (Conditor PR #134)",
+      "expires": "the next rehearsal or competition run, which re-resolves the set"
+    }
+  ],
+  "prereleaseApprovals": [],
+  "waivers": []
+}

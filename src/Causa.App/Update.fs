@@ -237,7 +237,30 @@ module Update =
                     [ announce Polite (sprintf "Started \"%s\". It is not saved yet." (NonEmptyText.value investigation.Title)) ]
 
     /// A domain command on an open session: decided against the session's current state, kept as an unsaved change.
+    /// A saved working-copy investigation reopened from the list (Loaded, no session in this tab) becomes editable on
+    /// its first edit: a session at the head it was read from, resting on that verified history (SaveMachine.Initial;
+    /// Saved, or Offline while the tab is offline).
+    let private sessionForLoaded (backend: Backend) (investigation: InvestigationId) (model: Model) : Model option =
+        match backend.Persistence with
+        | None -> None
+        | Some p ->
+            model.Loads
+            |> Map.tryPick (fun ref l ->
+                match l, Writable.ofAddress ref.Address with
+                | Loaded v, Some writable when ref.Id = investigation -> Some(ref, writable, v)
+                | _ -> None)
+            |> Option.map (fun (ref, writable, v) ->
+                let session = (machineFor p model).Initial writable v
+                let session =
+                    match model.Network with
+                    | NetworkState.Offline -> { session with State = SaveState.Offline }
+                    | NetworkState.Online -> session
+                { model with Sessions = model.Sessions |> Map.add ref session })
+
     let private command (backend: Backend) (envelope: CommandEnvelope) (model: Model) =
+        let model =
+            if model.Sessions |> Map.exists (fun ref _ -> ref.Id = envelope.Investigation) then model
+            else sessionForLoaded backend envelope.Investigation model |> Option.defaultValue model
         match model.Sessions |> Map.tryFindKey (fun ref _ -> ref.Id = envelope.Investigation) with
         | None -> refuse (Rejected "That investigation is not open for editing here.") model
         | Some ref ->

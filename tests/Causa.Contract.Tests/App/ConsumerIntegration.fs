@@ -306,3 +306,71 @@ type Connectivity() =
         Assert.Equal(SaveState.Offline, saved.Sessions[ref].State)
         let online, _ = engine.Update (Msg.Browser(ConnectivityChanged true)) saved
         Assert.Equal(SaveState.Unsaved, online.Sessions[ref].State)
+
+/// A saved working copy reopened from the list (Loaded, no session in this tab) is editable: both editors are offered,
+/// the first record opens a session on the loaded history, and Save commits at the loaded version from its head.
+type ReopenedWorkingCopy() =
+    [<Fact>]
+    member _.``a loaded working copy offers the editors, records into a new session, and saves from its head``() =
+        let address = (WorkspaceAddress.workingCopy [] "session").Value
+        let backend =
+            { Fixture.backend with
+                Persistence =
+                    Some
+                        { Connector = GitHubConnect.connector
+                          Machine = SaveMachines.withStorage Fixture.backend.Author
+                          Lister = GitHubLister.lister
+                          Codec = StorageCodecs.codec }
+                WorkingCopy = Some address }
+        let engine = Update.engine backend
+        let config = { Fixture.config with SessionLocal = false; CanSave = true; InvestigationOf = Update.investigationOf backend; WorkingCopy = Some address }
+        let ui = UiAdapter.backend config engine
+        let id = InvestigationId(Guid.NewGuid())
+        let start =
+            { CommandId = CommandIds.at Fixture.at
+              Investigation = id
+              ExpectedVersion = None
+              Command = Core(StartInvestigation { Title = (NonEmptyText.create "Saved earlier").Value; ObservationId = Guid.NewGuid(); Original = (NonEmptyText.create "It broke.").Value }) }
+        let investigation = Update.apply backend None start |> function Ok i -> i | Error e -> failwith e
+        let files = StorageCodecs.codec.EncodeNew id investigation.Timeline |> function Ok f -> f | Error e -> failwithf "%A" e
+        let ref = { Address = address; Id = id }
+        let verified = { Investigation = investigation; History = investigation.Timeline; ReadAt = CommitOid "loadedhead"; Address = address; Bytes = files }
+        let (InvestigationId g) = id
+        let route = WorkspaceRoute({ Workspace = "workspaces/demo/causa-app-session"; Role = WorkspaceRole.WorkingCopy; Id = id }, Overview)
+        let s0, _ = ui.Init route
+        let s =
+            { s0 with
+                Model =
+                    { s0.Model with
+                        Connection = Connected true
+                        Context = Some { Repository = { Owner = "o"; Name = "r"; Branch = "main" }; Credential = Credential.create "t" }
+                        Loads = Map.ofList [ ref, Loaded verified ] } }
+        // Both editors are offered and Hypotheses is listed.
+        match (ui.Project s).Screen with
+        | WorkspaceScreen v ->
+            match v.Section with
+            | OverviewSection(Ready u) ->
+                Assert.Equal(Some Available, (Understood.value u).Actions.TryFind Actions.recordObservation)
+                Assert.Equal(Some Available, (Understood.value u).Actions.TryFind Actions.recordHypothesis)
+            | other -> Assert.Fail(sprintf "%A" other)
+            match v.Frame with
+            | Ready f -> Assert.Contains(f.Sections, fun l -> l.Destination = HypothesesSection)
+            | other -> Assert.Fail(sprintf "%A" other)
+        | other -> Assert.Fail(sprintf "%A" other)
+        ignore g
+        // Recording opens a session on the loaded history.
+        let recorded =
+            s
+            |> (fun st -> ui.Dispatch (UiIntent.Input(Fields.observationText, "A new clue.", None)) st |> fst)
+            |> (fun st -> ui.Dispatch (UiIntent.Activate(Actions.recordObservation, None)) st |> fst)
+        let session = recorded.Model.Sessions |> Map.tryFind ref
+        Assert.True(session.IsSome, sprintf "no session: %A" recorded.Local.Announcements)
+        Assert.Equal(SaveState.Unsaved, session.Value.State)
+        Assert.Equal(CommitOid "loadedhead", session.Value.BaseHead)
+        Assert.Equal(Some investigation.Version, session.Value.Unsaved.Head.ExpectedVersion)
+        // Save commits from the loaded head.
+        let saving, effects = ui.Dispatch (UiIntent.Activate(Actions.save, None)) recorded
+        let mutation = effects |> List.tryPick (function Http r when r.Body.IsSome -> Some r | _ -> None)
+        Assert.True(mutation.IsSome, "Save sent no commit")
+        Assert.Contains("loadedhead", mutation.Value.Body.Value)
+        Assert.Equal(SaveState.Saving, saving.Model.Sessions[ref].State)

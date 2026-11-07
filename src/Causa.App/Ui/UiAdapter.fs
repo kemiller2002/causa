@@ -483,9 +483,17 @@ module UiAdapter =
             WorkspaceAddress.workingCopy [] (target.Workspace.Substring prefix.Length) |> Option.map (fun a -> { Address = a; Id = target.Id })
         | WorkspaceRole.WorkingCopy -> None
 
+    /// The editable investigation the route names: a session in this tab, or a saved working copy loaded from the list.
     let private sessionOfRoute (s: AdapterState) =
         match s.Local.Route with
-        | WorkspaceRoute(target, _) -> s.Model.Sessions |> Map.tryFindKey (fun ref _ -> ref.Id = target.Id && ref.Address.Workspace = Workspace target.Workspace)
+        | WorkspaceRoute(target, _) ->
+            let matches (ref: InvestigationRef) = ref.Id = target.Id && ref.Address.Workspace = Workspace target.Workspace
+            s.Model.Sessions
+            |> Map.tryFindKey (fun ref _ -> matches ref)
+            |> Option.orElse (
+                s.Model.Loads
+                |> Map.tryFindKey (fun ref l -> matches ref && ref.Address.Role = WorkspaceRole.WorkingCopy && (match l with Loaded _ -> true | _ -> false))
+            )
         | _ -> None
 
     /// INV-014 / INV-009: validate the editor, then send the kernel the command at the session's current version.
@@ -860,7 +868,11 @@ module UiAdapter =
                             { Title = frame.Title
                               ProblemStatement = (match frame.ProblemStatement with AsProjected u -> Understood.value u | AsStored v -> Visible.value v)
                               Question = frame.Question |> Option.map (function AsProjected u -> Understood.value u | AsStored v -> Visible.value v) |> Option.defaultValue "" }
-                    emptyWith (analysisOf Map.empty v.Investigation) (Ready frame) ScreenReady save details
+                    // A saved working copy is editable on a writable connection (its first edit opens a session).
+                    let editable = ref.Address.Role = WorkspaceRole.WorkingCopy && s.Model.Connection = Connected true
+                    let actions = if editable then WorkspaceAnalysis.contentActions v.Investigation else Map.empty
+                    let view = emptyWith (analysisOf actions v.Investigation) (Ready frame) ScreenReady save details
+                    if editable then { view with Drafts = { Values = s.Local.Content; Errors = s.Local.ContentErrors; OpenEditor = None } } else view
                 | Some(LoadState.Loading _) -> empty (Waiting "Opening investigation") ScreenLoading None blank
                 | Some(LoadFailed(ProviderFailed(NotFound _))) -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
                 | Some(LoadFailed(ProviderFailed AuthenticationFailed)) -> let f = UiFailure.CredentialRefused in empty (Failed f) (ScreenFailed f) None blank

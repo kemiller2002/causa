@@ -1,0 +1,28 @@
+/* Owner: integration (T10; change request CR-3 from T16). Causa's identity colours (UI-016) as custom properties.
+   This is the only file that holds literal colours: the design contract's theme boundary allows a literal colour only
+   as a custom-property value in a theme file. It declares no --ef-* property (forma-layout-contract.json); every other
+   stylesheet refers to these through var(--causa-…). Amber stays Forma's --ef-color-status-warning (ODR-V41-05).
+
+   Contrast was measured (WCAG 2.x relative luminance) before deriving the shades (UI-016-O10, -O11):
+     navy #14283F on ivory 13.47:1, white on navy 14.95:1, mist #C9D6E3 on navy 10.11:1
+     teal #087F8C on ivory 4.28:1 (large text and non-text indicators only), white on teal 4.75:1
+     teal-strong #06646E on ivory 6.19:1, white on teal-strong 6.87:1 (normal text, hover)
+     coral #D66B58 on ivory 3.10:1 (non-text indicators only), coral on navy 4.34:1 (large text, indicators)
+     coral-strong #A8402F on ivory 5.50:1, white on coral-strong 6.11:1 (normal text)
+     navy-soft #2A4566 on ivory 8.84:1 (secondary structural text, borders) */
+:root {
+  /* The canonical identity values (UI-016-O3, -O4, -O6, -O7). */
+  --causa-navy: #14283F;
+  --causa-teal: #087F8C;
+  --causa-coral: #D66B58;
+  --causa-ivory: #F5F3ED;
+
+  /* Derived shades, each with its measured use above. */
+  --causa-navy-soft: #2A4566;
+  --causa-navy-mist: #C9D6E3;
+  --causa-on-navy: #FFFFFF;
+  --causa-teal-strong: #06646E;
+  --causa-on-teal: #FFFFFF;
+  --causa-coral-strong: #A8402F;
+  --causa-on-coral: #FFFFFF;
+}

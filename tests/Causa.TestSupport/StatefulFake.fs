@@ -490,15 +490,17 @@ module Conformance =
           MissingBranch = Provider.over fake.Execute (on fake.ReadConnection "causa-t18-no-such-branch")
           Prefix = prefix }
 
-    /// The adapter over a live run (real GitHub on the run's fresh branch).
+    /// The adapter over a live run (real GitHub on the run's fresh branch). Each adapter writes under a fresh
+    /// directory of the run's prefix, so several probe runs in one test class never repeat a commit's content.
     let overLive (live: LiveRun) : Adapter =
         let on (c: ConnectionContext) branch = { c with Repository = { c.Repository with Branch = branch } }
+        let (RepoPath runPrefix) = live.Prefix
         { Mode = "live-github"
           Writer = live.Writer
           Reader = live.Reader
           BadCredential = Provider.over live.Execute { live.ReadConnection with Credential = Credential.create "causa-t18-not-a-token" }
           MissingBranch = Provider.over live.Execute (on live.ReadConnection (live.Branch + "-no-such-branch"))
-          Prefix = live.Prefix }
+          Prefix = RepoPath(sprintf "%s/probe-%s" runPrefix (Guid.NewGuid().ToString("N").Substring(0, 8))) }
 
     /// Every probe whose result differs between the two transcripts (fake/real divergence, PF-013-O2).
     let divergence (fake: Probe list) (real: Probe list) : (string * string * string) list =
@@ -690,3 +692,241 @@ type LiveSaveRig(recorder: LiveRecorder, live: LiveRun, run: string) =
     static member Create(live: LiveRun, name: string) =
         let run = (name + "-" + live.RunId).ToLowerInvariant() |> fun r -> if r.Length > 50 then r.Substring(0, 50).TrimEnd('-') else r
         LiveSaveRig(LiveRecorder live, live, run)
+// ---- T18 acceptance helpers: the repository checkout, the application's load path and the pinned catalog -------------
+
+/// The repository checkout the tests run from: the directory that holds Causa.slnx.
+[<RequireQualifiedAccess>]
+module Repo =
+    let root () : string =
+        let rec up (dir: string) =
+            if IO.File.Exists(IO.Path.Combine(dir, "Causa.slnx")) then dir
+            else
+                match IO.Path.GetDirectoryName dir with
+                | null -> failwithf "no Causa.slnx above %s" AppContext.BaseDirectory
+                | parent when parent = dir -> failwithf "no Causa.slnx above %s" AppContext.BaseDirectory
+                | parent -> up parent
+        up (AppContext.BaseDirectory.TrimEnd(IO.Path.DirectorySeparatorChar))
+
+    let path (relative: string) = IO.Path.Combine(root (), relative)
+    let exists (relative: string) = IO.File.Exists(path relative)
+    let read (relative: string) = IO.File.ReadAllText(path relative)
+
+/// Fail-closed reasons for a test whose subject is not built yet: never a pass.
+[<RequireQualifiedAccess>]
+module Blocked =
+    let codec (detail: string) : 'a =
+        raise (InvalidOperationException("BLOCKED: storage codec not wired (IF41-STORAGE): " + detail))
+
+/// Opening an investigation exactly as the application does: SM-LOAD of SaveMachines.machine, whose one request is
+/// executed by whichever provider adapter is given (the stateful fake or real GitHub). This is the one parsing,
+/// validation and reconstruction path for fixture and real data (PF-002, PF-004-O1).
+[<RequireQualifiedAccess>]
+module AppLoad =
+    let context (connection: ConnectionContext) : RequestContext =
+        { Connection = connection; NextId = RequestId 1L; MutationInFlightElsewhere = false; Now = DateTimeOffset.UtcNow }
+
+    let load (execute: Execute) (connection: ConnectionContext) (target: InvestigationRef) : LoadState =
+        // The application's causa-storage machine: loads verify with the IF41-STORAGE codec and replay the engine.
+        let m = SaveMachines.withStorage (Causa.Domain.Actor.Human(Causa.Domain.NonEmptyText.create "causa-test-reader" |> Option.get)) (fun _ -> None)
+        let ctx = context connection
+        match m.StepLoad ctx NotLoaded (LoadInput.OpenRequested target) with
+        | Error f -> failwithf "SM-LOAD refused OpenRequested: %A" f
+        | Ok(loading, effects) ->
+            let request = effects |> List.pick (function Send r -> Some r | _ -> None)
+            match m.InterpretLoad ctx loading (execute request) with
+            | LoadEvent input ->
+                match m.StepLoad ctx loading input with
+                | Ok(state, _) -> state
+                | Error f -> failwithf "SM-LOAD refused %A: %A" input f
+            | LoadNextRequest(state, _) -> failwithf "SM-LOAD asked for a second read from %A" state
+
+    let private notWired (failures: VerificationFailure list) =
+        failures |> List.exists (function ReaderStage("CODEC-NOT-WIRED", _, _, _) -> true | _ -> false)
+
+    /// The verified investigation, or the test fails: BLOCKED while the codec is not wired, FAIL with the typed cause
+    /// otherwise.
+    let requireVerified (what: string) (state: LoadState) : VerifiedInvestigation =
+        match state with
+        | Loaded v -> v
+        | LoadFailed(Unverifiable failures) when notWired failures -> Blocked.codec (sprintf "%s answered CODEC-NOT-WIRED" what)
+        | other -> failwithf "%s did not verify: %A" what other
+
+    /// Fails closed with BLOCKED when the application's load path has no codec: a file set in a working copy of the
+    /// stateful fake is opened through SaveMachines.machine; CODEC-NOT-WIRED there means no investigation can verify.
+    let requireCodec () : unit =
+        let fake = StatefulFake()
+        let address = (WorkspaceAddress.workingCopy [] "t18-codec-probe").Value
+        let id = Causa.Domain.InvestigationId(Guid "00000000-0000-4000-8000-000000000018")
+        let (RepoPath prefix) = Writes.prefixOf address id
+        fake.CommitAsOtherWriter("seed", [ for n in Writes.fileNames -> prefix + "/" + n, Some(Encoding.UTF8.GetBytes "{}\n") ]) |> ignore
+        match load fake.Execute fake.ReadConnection { Address = address; Id = id } with
+        | LoadFailed(Unverifiable failures) when notWired failures -> Blocked.codec "SaveMachines.machine verifies with noCodec"
+        | _ -> ()
+
+/// The catalog the live tests are pinned to (PF-014-O1): causa-data catalog/active.json -> demonstration-v1 1.0.0,
+/// with the four case ids and the digests and versions its manifest records.
+[<RequireQualifiedAccess>]
+module PinnedCatalog =
+    type Case =
+        { Key: string
+          Id: Guid
+          EventsSha256: string
+          ExpectedVersion: int
+          ExpectedStateSha256: string
+          ExpectedLifecycle: string }
+
+    let activePath = "catalog/active.json"
+    let catalogId = "causa-demonstration"
+    let catalogVersion = "1.0.0"
+    let manifestPath = "catalog/demonstration-v1/manifest.json"
+    let workspace = Workspace "workspaces/demo/demonstration-v1"
+    /// The retained, immutable v1.0.0 compatibility dataset: the fixture manifest with expected error outcomes.
+    let compatibilityManifestPath = "fixtures/v1.0.0/manifest.json"
+
+    let cases =
+        [ { Key = "apollo-1"; Id = Guid "c6b26614-fc43-5013-a15c-cf95942ee07b"
+            EventsSha256 = "c97bc96c4c48ad9ca53268b4fe66637e211c3627ebb3cbe667a1a6f1066ab3a6"; ExpectedVersion = 432
+            ExpectedStateSha256 = "67af9c9f05db07d67279f84bb185600f12604b5af67a3954c337581dfdd6552f"; ExpectedLifecycle = "awaitingVerification" }
+          { Key = "apollo-11"; Id = Guid "e3adbee5-5096-5a10-bbfb-cecda86a154b"
+            EventsSha256 = "e533fe7fc251a4d0d7f520838735f14373da5b9783682715dae12a7a2dff04c9"; ExpectedVersion = 431
+            ExpectedStateSha256 = "b82ac9ce37f218fbb53709945bd83283b06bc85e8cb4e4121bd1eaf1dc914f92"; ExpectedLifecycle = "awaitingEvidence" }
+          { Key = "challenger-sts-51l"; Id = Guid "1784da3c-7141-59ee-a495-1d5d44bf2284"
+            EventsSha256 = "e3b442f0ff3ea178c4d81d4964cef5deda4d104cc426785f7da5a78e9bed9c25"; ExpectedVersion = 452
+            ExpectedStateSha256 = "296bdf273968cf15a8526126a242852738cc5fa811bc853f6467fb3e3c67a7e8"; ExpectedLifecycle = "active" }
+          { Key = "burned-out-lightbulb"; Id = Guid "fc3f71a9-4c14-5a31-8196-7ce17a7041c1"
+            EventsSha256 = "2de5e17b1f870cbcb8f6de032af455c5aed3d18be0a1c1fee85b198b92e02a1b"; ExpectedVersion = 48
+            ExpectedStateSha256 = "40d11a632a97c1f94ff4fa48af94a373e5a2c7e9feadfc42bca9d891532a36bc"; ExpectedLifecycle = "resolved" } ]
+
+    let address = WorkspaceAddress.catalog workspace
+    let target (c: Case) : InvestigationRef = { Address = address; Id = Causa.Domain.InvestigationId c.Id }
+    let filePath (c: Case) (name: string) =
+        let (RepoPath p) = Writes.prefixOf address (Causa.Domain.InvestigationId c.Id)
+        RepoPath(p + "/" + name)
+
+    let sha256 (bytes: byte[]) = Convert.ToHexString(SHA256.HashData bytes).ToLowerInvariant()
+
+    /// One case's three stored files, read through a port at one commit.
+    let readFiles (port: ProviderPort) (at: CommitOid) (c: Case) : Result<FileSet, ProviderError> =
+        let read name = port.ReadFile at (filePath c name)
+        match read "manifest.json", read "events.ndjson", read "snapshot.json" with
+        | Ok m, Ok e, Ok s -> Ok { Manifest = m; Events = e; Snapshot = s }
+        | Error e, _, _
+        | _, Error e, _
+        | _, _, Error e -> Error e
+
+    /// The events of a file set, one JSON document per line.
+    let events (files: FileSet) : Json option list =
+        (Encoding.UTF8.GetString files.Events).Split('\n', StringSplitOptions.RemoveEmptyEntries) |> Array.map Json.parse |> List.ofArray
+
+    /// A stateful fake whose branch holds exactly these bytes at the case's path: fixture data identical to real data.
+    let seed (fake: StatefulFake) (c: Case) (files: FileSet) : CommitOid =
+        let (RepoPath p) = Writes.prefixOf address (Causa.Domain.InvestigationId c.Id)
+        fake.CommitAsOtherWriter(
+            "seed " + c.Key,
+            [ p + "/manifest.json", Some files.Manifest; p + "/events.ndjson", Some files.Events; p + "/snapshot.json", Some files.Snapshot ])
+
+    /// A live read that must succeed, or the test fails with the typed cause.
+    let ok (what: string) (r: Result<'a, ProviderError>) : 'a =
+        match r with
+        | Ok v -> v
+        | Error e -> failwithf "%s failed: %A" what e
+
+/// Listing a workspace exactly as the application does (IF41-SAVE WorkspaceLister: catalog discovery from
+/// catalog/active.json, EXT-DATA-013). The lister is found where persistence publishes it; until it is published a
+/// test that needs it fails closed with BLOCKED.
+[<RequireQualifiedAccess>]
+module AppList =
+    let require () : WorkspaceLister =
+        typeof<ProviderPort>.Assembly.GetTypes()
+        |> Seq.collect (fun t -> t.GetProperties(Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static))
+        |> Seq.tryFind (fun p -> p.PropertyType = typeof<WorkspaceLister>)
+        |> function
+            | Some p ->
+                match p.GetValue(null) with
+                | :? WorkspaceLister as l -> l
+                | _ -> raise (InvalidOperationException(sprintf "BLOCKED: workspace lister %s holds no value" p.Name))
+            | None -> raise (InvalidOperationException "BLOCKED: workspace lister not wired (IF41-SAVE WorkspaceLister, EXT-DATA-013 catalog discovery): Causa.Persistence publishes no WorkspaceLister value")
+
+    /// Every read of one listing, each with the next request identity, until it completes or fails.
+    let list (execute: Execute) (connection: ConnectionContext) (target: ListingTarget) : Result<Listing, LoadFailure> =
+        let lister = require ()
+        let ctx n = { AppLoad.context connection with NextId = RequestId n }
+        let first, request = lister.List (ctx 1L) target
+        let rec go n step request =
+            if n > 50L then failwith "a listing took more than 50 reads"
+            else
+                match lister.InterpretList (ctx (n + 1L)) target step (execute request) with
+                | ListingComplete listing -> Ok listing
+                | ListingNextRequest(next, r) -> go (n + 1L) next r
+                | ListingFailed f -> Error f
+        go 1L first request
+
+/// The verification plan as the repository carries it (.echelon/obligations.json): obligations with their priority,
+/// and the tests bound to them with their suite.
+[<RequireQualifiedAccess>]
+module Plan =
+    type BoundTest = { Id: string; Suite: string; Obligations: string list }
+    type PlanObligation = { Id: string; Requirement: string; Priority: string; Criterion: string }
+    type PlanSuite = { Id: string; Command: string; DependsOn: string list }
+
+    let private doc () = Json.parse (Repo.read ".echelon/obligations.json")
+    let private strs (j: Json option) = j |> Json.items |> List.choose (Some >> Json.text)
+
+    let tests () : BoundTest list =
+        doc () |> Json.field "tests" |> Json.items |> List.map Some
+        |> List.map (fun t -> { Id = t |> Json.field "id" |> Json.text |> Option.defaultValue ""; Suite = t |> Json.field "suite" |> Json.text |> Option.defaultValue ""; Obligations = t |> Json.field "obligations" |> strs })
+
+    let obligations () : PlanObligation list =
+        doc () |> Json.field "obligations" |> Json.items |> List.map Some
+        |> List.map (fun o ->
+            { Id = o |> Json.field "id" |> Json.text |> Option.defaultValue ""
+              Requirement = o |> Json.field "requirement" |> Json.text |> Option.defaultValue ""
+              Priority = o |> Json.field "priority" |> Json.text |> Option.defaultValue ""
+              Criterion = o |> Json.field "criterion" |> Json.text |> Option.defaultValue "" })
+
+    let suites () : PlanSuite list =
+        doc () |> Json.field "suites" |> Json.items |> List.map Some
+        |> List.map (fun s -> { Id = s |> Json.field "id" |> Json.text |> Option.defaultValue ""; Command = s |> Json.field "command" |> Json.text |> Option.defaultValue ""; DependsOn = s |> Json.field "dependsOn" |> strs })
+
+    let rec private isFact (t: Type | null) =
+        match t with
+        | null -> false
+        | t -> t.FullName = "Xunit.FactAttribute" || isFact t.BaseType
+
+    /// The xunit Fact (or Theory) attribute of a method, if it is a test.
+    let factOf (m: Reflection.MethodInfo) : obj option = m.GetCustomAttributes(true) |> Array.tryFind (fun a -> isFact (a.GetType()))
+
+    /// Every xunit test method of an assembly as its dotnet test identity (dotnet:<namespace>.<class>.<method>).
+    let identities (assembly: Reflection.Assembly) : (string * Reflection.MethodInfo) list =
+        [ for t in assembly.GetTypes() do
+              for m in t.GetMethods() do
+                  if (factOf m).IsSome then
+                      yield sprintf "dotnet:%s.%s" (string t.FullName) m.Name, m ]
+
+    /// The Skip reason of a test, if it is skipped.
+    let skipOf (m: Reflection.MethodInfo) : string option =
+        factOf m
+        |> Option.bind (fun a ->
+            match a.GetType().GetProperty "Skip" with
+            | null -> None
+            | p -> p.GetValue a |> Option.ofObj |> Option.map string |> Option.filter (String.IsNullOrEmpty >> not))
+
+/// What makes a browser spec depend on live GitHub or a credential (PF-005-O1, PF-011-O2): a credential it requires
+/// (read from the environment with no stand-in), or a request to api.github.com it does not answer itself.
+[<RequireQualifiedAccess>]
+module OfflineSpec =
+    let private requiredToken = RegularExpressions.Regex(@"process\.env\.CAUSA_(GITHUB|WRITE)_TOKEN(?!\s*(\|\||\?\?))")
+
+    let liveDependencies (text: string) : string list =
+        [ for m in requiredToken.Matches text -> sprintf "requires %s" m.Value
+          if text.Contains "api.github.com" && not (text.Contains ".route(") then yield "reaches api.github.com without answering it" ]
+
+    /// Every browser spec under a directory with its live dependencies, if any.
+    let scan (relativeDir: string) : (string * string list) list =
+        let dir = Repo.path relativeDir
+        if not (IO.Directory.Exists dir) then []
+        else
+            [ for spec in IO.Directory.EnumerateFiles(dir, "*.js", IO.SearchOption.AllDirectories) do
+                  match liveDependencies (IO.File.ReadAllText spec) with
+                  | [] -> ()
+                  | reasons -> yield spec, reasons ]

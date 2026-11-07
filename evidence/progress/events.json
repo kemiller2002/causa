@@ -1,0 +1,187 @@
+[
+  {
+    "kind": "implementation-started",
+    "workItem": "T10",
+    "requirements": [
+      "AR-023",
+      "VER-001",
+      "VER-002",
+      "VER-003",
+      "VER-005"
+    ],
+    "at": "2026-11-07T16:10:50Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T11",
+    "requirements": [
+      "AR-011",
+      "VER-004",
+      "VER-006",
+      "VER-008"
+    ],
+    "at": "2026-11-07T16:45:30Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T12",
+    "requirements": [
+      "AR-009",
+      "AR-022",
+      "PERSIST-023",
+      "PERSIST-051"
+    ],
+    "at": "2026-11-07T16:45:30Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T18",
+    "requirements": [
+      "AR-010",
+      "AR-014",
+      "PERSIST-008",
+      "PERSIST-025",
+      "PF-001",
+      "PF-002",
+      "PF-003",
+      "PF-004",
+      "PF-005",
+      "PF-006",
+      "PF-007",
+      "PF-008",
+      "PF-009",
+      "PF-011",
+      "PF-012",
+      "PF-013",
+      "PF-014",
+      "PF-015",
+      "PF-016",
+      "PF-017",
+      "PF-018",
+      "PF-019",
+      "PF-020"
+    ],
+    "at": "2026-11-07T16:45:30Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T13",
+    "requirements": [
+      "AR-006"
+    ],
+    "at": "2026-11-07T16:47:30Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T15",
+    "requirements": [
+      "EXT-DATA-011"
+    ],
+    "at": "2026-11-07T16:47:30Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T16",
+    "requirements": [
+      "UI-011",
+      "UI-014",
+      "UI-016",
+      "UI-020",
+      "UI-029"
+    ],
+    "at": "2026-11-07T16:47:30Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T19",
+    "requirements": [
+      "PERSIST-002",
+      "PERSIST-003",
+      "PERSIST-004",
+      "PERSIST-005",
+      "PERSIST-006",
+      "PERSIST-007",
+      "PERSIST-009",
+      "PERSIST-010",
+      "PERSIST-011",
+      "PERSIST-012",
+      "PERSIST-013",
+      "PERSIST-014",
+      "PERSIST-015",
+      "PERSIST-016",
+      "PERSIST-017",
+      "PERSIST-018",
+      "PERSIST-019",
+      "PERSIST-020",
+      "PERSIST-021",
+      "PERSIST-022",
+      "PERSIST-024",
+      "UI-006"
+    ],
+    "at": "2026-11-07T16:47:30Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "T20",
+    "requirements": [
+      "EXT-DATA-001",
+      "EXT-DATA-002",
+      "EXT-DATA-003",
+      "EXT-DATA-004",
+      "EXT-DATA-005",
+      "EXT-DATA-006",
+      "EXT-DATA-007",
+      "EXT-DATA-008",
+      "EXT-DATA-009",
+      "EXT-DATA-010",
+      "EXT-DATA-011",
+      "EXT-DATA-012",
+      "EXT-DATA-013"
+    ],
+    "at": "2026-11-07T16:47:30Z"
+  },
+  {
+    "kind": "implementation-completed",
+    "workItem": "T10",
+    "requirements": [
+      "AR-023",
+      "VER-001",
+      "VER-002",
+      "VER-003",
+      "VER-005"
+    ],
+    "commit": "deb04ae9cbc9bcb73ab63dd6219ad1d3151a91d9",
+    "at": "2026-11-07T17:08:00Z"
+  },
+  {
+    "kind": "implementation-completed",
+    "workItem": "T18",
+    "requirements": [
+      "AR-010",
+      "AR-014",
+      "PERSIST-008",
+      "PERSIST-025",
+      "PF-001",
+      "PF-002",
+      "PF-003",
+      "PF-004",
+      "PF-005",
+      "PF-006",
+      "PF-007",
+      "PF-008",
+      "PF-009",
+      "PF-011",
+      "PF-012",
+      "PF-013",
+      "PF-014",
+      "PF-015",
+      "PF-016",
+      "PF-017",
+      "PF-018",
+      "PF-019",
+      "PF-020"
+    ],
+    "commit": "666a0680e8635df8081458408073a7383d5d1b8f",
+    "at": "2026-11-07T17:55:00Z"
+  }
+]

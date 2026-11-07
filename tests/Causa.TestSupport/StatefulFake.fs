@@ -27,6 +27,8 @@ type Fault =
     | TimeOutAfterApplying
     /// GitHub answers with a recorded form instead (a secondary rate limit, a 502, ...), applying nothing.
     | AnswerWith of form: string
+    /// Another writer commits an unrelated file just before this request is handled (the branch advances).
+    | AdvanceFirst
 
 /// Which recorded stale-head form the fake answers a moved head with: GitHub sends both (INV-22).
 type StaleForm =
@@ -42,7 +44,7 @@ type FakeState =
       Faults: (bool * Fault) list
       StaleForm: StaleForm
       Clock: DateTimeOffset
-      /// Every request the fake received, in order (method, url), with no credential.
+      /// Every request the fake received, in order (method, url; "Mutation" for createCommitOnBranch), with no credential.
       Received: (string * string) list
       Sequence: int }
 
@@ -195,11 +197,19 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                         answerJson id 200 (Json.Object [ "status", Json.String "diverged"; "ahead_by", Json.Number(decimal ahead.Length); "behind_by", Json.Number 1M; "total_commits", Json.Number(decimal ahead.Length); "commits", Json.Array [] ])
                     | Some i ->
                         let after = headLine |> List.take i |> List.rev
+                        let baseTree, headTree = s.Commits[baseOid].Tree, s.Commits[headOid].Tree
+                        let changed =
+                            Seq.append (Map.keys baseTree) (Map.keys headTree)
+                            |> Seq.distinct
+                            |> Seq.filter (fun p -> baseTree.TryFind p <> headTree.TryFind p)
+                            |> Seq.map (fun p -> Json.Object [ "filename", Json.String p ])
+                            |> List.ofSeq
                         let perPage = query url "per_page" |> Option.map int |> Option.defaultValue 250 |> min 250
                         let page = query url "page" |> Option.map int |> Option.defaultValue 1 |> max 1
                         let listed = after |> List.skip (min after.Length ((page - 1) * perPage)) |> List.truncate perPage
                         answerJson id 200 (Json.Object [ "status", Json.String(if after.IsEmpty then "identical" else "ahead"); "ahead_by", Json.Number(decimal after.Length); "behind_by", Json.Number 0M
                                                          "total_commits", Json.Number(decimal after.Length)
+                                                         "files", Json.Array changed
                                                          "commits", Json.Array(listed |> List.map (fun o -> Json.Object [ "sha", Json.String o; "commit", Json.Object [ "message", Json.String s.Commits[o].Message ] ])) ])
             | _ -> recorded id "rest-404-file"
 
@@ -277,7 +287,7 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
     let execute (request: HttpRequest) : HttpOutcome =
         lock gate (fun () ->
             let isMutation = GitHubRequests.isMutation request
-            let s0 = { state with Received = state.Received @ [ string request.Method, request.Url ] }
+            let s0 = { state with Received = state.Received @ [ (if isMutation then "Mutation" else string request.Method), request.Url ] }
             let fault, s1 = takeFault isMutation s0
             let token = tokenOf request
             let outcome, s2 =
@@ -285,6 +295,10 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                 | Some FailBeforeSending -> NotAnswered(request.Id, TransportFailure.FailedBeforeSending), s1
                 | Some LoseBeforeApplying -> NotAnswered(request.Id, TransportFailure.LostAfterSending), s1
                 | Some(AnswerWith form) -> recorded request.Id form, s1
+                | Some AdvanceFirst when isMutation ->
+                    let s2, _ = apply s1 initialBranch (sprintf "other writer %d" s1.Sequence) [ sprintf "workspaces/demo/other/f%d.json" s1.Sequence, Some(Encoding.UTF8.GetBytes "{}") ]
+                    let s3, answered, _ = mutate s2 request
+                    answered, s3
                 | _ ->
                     match token |> Option.bind s1.Tokens.TryFind with
                     | None -> (if isMutation then recorded request.Id "graphql-401-bad-credentials" else recorded request.Id "rest-401-bad-credentials"), s1
@@ -601,4 +615,4 @@ type SaveRig(fake: StatefulFake, run: string) =
         | Error f -> failwithf "reload failed: %A" f
 
     /// The mutations the fake received (createCommitOnBranch), in order.
-    member _.Mutations = fake.State.Received |> List.filter (fun (m, u) -> m = "Post" && u = GitHubRequests.GraphQlUrl) |> List.length
+    member _.Mutations = fake.State.Received |> List.filter (fun (m, _) -> m = "Mutation") |> List.length

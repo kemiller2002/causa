@@ -408,3 +408,46 @@ module PrimaryQuestion =
             match e.Payload with
             | CoreEvent(UnknownIdentified u) -> Some u.Question.Value
             | _ -> None)
+
+/// Reapply (PERSIST-012-O3/O4, T-C07): each unsaved command re-decided in its original order through the engine at
+/// the GitHub version. Accepted commands become the unsaved changes on that version; refused ones are listed with
+/// the engine's reason and never applied. Nothing is saved.
+[<RequireQualifiedAccess>]
+module Reapply =
+    open Causa.Domain
+
+    let redecide (actor: Actor) (remote: VerifiedInvestigation) (commands: CommandEnvelope list) : CommandEnvelope list * RefusedCommand list =
+        let actorId = match actor with Actor.Human a | Actor.System a | Actor.Agent(a, _, _) -> a.Value
+        let version = match remote.History with e :: _ -> e.Provenance.FormatVersion | [] -> "1.1.0"
+        let reason (d: Decision) =
+            match d with
+            | Blocked bs -> bs |> List.map (fun b -> b.Message) |> String.concat " "
+            | RequiresReview rs -> String.concat " " rs
+            | UnsupportedSemantics ids -> "unsupported: " + String.concat ", " ids
+            | Conflict(AggregateVersion e, AggregateVersion a) -> sprintf "expected version %d, found %d" e a
+            | Duplicate _ -> "already applied"
+            | Allowed _ -> ""
+        let folder (state: Investigation, accepted, refused) (cmd: CommandEnvelope) =
+            // Re-decided at the GitHub version: the version the command observed no longer applies.
+            let cmd' = { cmd with ExpectedVersion = None }
+            match Kernel.kernel.Decide Policies.coreDefault { ActorId = actorId } (Some state) cmd' with
+            | Allowed payloads ->
+                let at = Writes.requestedAt cmd.CommandId |> Option.defaultValue DateTimeOffset.UnixEpoch
+                let (AggregateVersion v0) = state.Version
+                let (InvestigationId g) = state.Id
+                let evolved =
+                    payloads
+                    |> List.mapi (fun k p ->
+                        let v = v0 + int64 k + 1L
+                        { EventId = EventId(Guid(Canonical.eventId (Canonical.guidText g) v (Canonical.guidText cmd.CommandId)))
+                          Investigation = state.Id
+                          Version = AggregateVersion v
+                          Provenance = { OccurredAt = at; Actor = actor; CorrelationId = cmd.CommandId; FormatVersion = version; SemanticVersion = version }
+                          Payload = p })
+                    |> List.fold (fun acc e -> acc |> Result.bind (fun s -> Kernel.kernel.Evolve (Some s) e)) (Ok state)
+                match evolved with
+                | Ok s -> s, accepted @ [ cmd' ], refused
+                | Error e -> state, accepted, refused @ [ { Command = cmd; Reason = e.Reason } ]
+            | other -> state, accepted, refused @ [ { Command = cmd; Reason = reason other } ]
+        let _, accepted, refused = commands |> List.fold folder (remote.Investigation, [], [])
+        accepted, refused

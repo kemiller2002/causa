@@ -144,6 +144,7 @@ These decisions are the owner's, given in chat. **None is written as an owner re
 - **P18 extension:** also when the refusals include DEPENDENCY_NOT_INTEGRATED on P18-merged dependencies. Decided by the owner in chat; not yet recorded.
 - **P19 = A:** the primary question is persisted as an informational unknown. Decided by the owner in chat; not yet recorded. See Indy-init#195.
 - **Preview deploy, and option A:** demonstrate from the integration branch, and show it in draft PR #6, which is not to be merged.
+- **Option C (about 21:05Z):** "C: merge PR #6 as implementer-verified". The integration branch is merged into main, labelled **implementer-verified, not governed-accepted**. The conditions were CI green on the head, a local build of the exact merge result, and all non-live tests passing. Decided by the owner in chat; not yet recorded. See section 2a.
 
 ## 8. Failures and corrective actions (including the coordinator's own)
 

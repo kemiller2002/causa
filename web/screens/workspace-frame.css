@@ -87,3 +87,12 @@
 .causa-timeline { margin-block-start: var(--ef-primitive-space-2); }
 .causa-timeline .ef-timeline__content { background: var(--ef-color-surface-primary); }
 .causa-timeline .ef-timeline__meta { color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
+/* Long record lists (observations) read as one ruled list rather than a stack of cards. */
+.causa-list--compact .causa-item {
+  border: 0;
+  border-block-end: 1px solid var(--ef-color-border-subtle);
+  padding-inline: 0;
+  background: transparent;
+}
+.causa-item__more > summary { min-block-size: var(--ef-layout-target-min); display: flex; align-items: center; cursor: pointer; }
+.causa-item__assessments { display: flex; flex-direction: column; gap: var(--ef-primitive-space-1); }

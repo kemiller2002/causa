@@ -66,6 +66,8 @@
         </nav>
       </template>
 
+      <template data-if="section.show-summary">
+      <div class="ef-stack causa-workspace__summary">
       <dl class="ef-key-value-list causa-workspace__facts">
         <div><dt>Investigation identifier</dt><dd class="causa-workspace__identifier" data-text="workspace.identifier"></dd></div>
         <div><dt>Created</dt><dd data-requirement-id="INV-007" data-text="workspace.created"></dd></div>
@@ -83,7 +85,8 @@
           <p class="causa-verbatim" data-requirement-id="INV-023" data-text="workspace.question"></p>
         </section>
       </template>
-
+      </div>
+      </template>
       <!-- The section the route names (T22): read-only content from the domain engine's projection. -->
       <template data-if="section.loading">
         <p class="causa-loading" role="status"><span class="ef-spinner" aria-hidden="true"></span> <span data-text="section.loading-text"></span></p>
@@ -127,9 +130,9 @@
           <template data-if="overview.observations-present">
             <section class="ef-stack" aria-labelledby="causa-sec-observations">
               <h3 id="causa-sec-observations" class="causa-section__subtitle">Observations</h3>
-              <ul class="ef-stack causa-list">
+              <ul class="causa-list causa-list--compact">
                 <template data-each="overview.observations" data-key="key">
-                  <li class="ef-card causa-item">
+                  <li class="causa-item">
                     <p class="causa-item__text" data-text="text"></p>
                     <template data-if="hasSource"><p class="causa-item__note">Source: <span data-text="source"></span></p></template>
                   </li>
@@ -151,6 +154,7 @@
                   <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
+                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
                 </li>
               </template>
             </ul>
@@ -174,6 +178,7 @@
                     <div><dt>Captured</dt><dd data-text="captured"></dd></div>
                     <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
                   </dl>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><p class="causa-item__text" data-text="assessments"></p></div></template>
                 </li>
               </template>
             </ul>

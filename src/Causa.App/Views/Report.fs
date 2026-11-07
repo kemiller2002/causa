@@ -19,6 +19,8 @@ module InvestigationWorkspace =
             [ Bind.ofList
                   [ for s in SectionData.slugs do
                         yield Bind.flag ("section." + s) (frameReady && ready && s = current)
+                    // The frame's facts and statements belong to the Overview; other sections open on their content.
+                    yield Bind.flag "section.show-summary" (not (frameReady && ready) || current = "overview")
                     yield Bind.text "section.heading" (Shell.sectionLabel (match view.Section with
                                                                            | OverviewSection _ -> Overview
                                                                            | CausalAnalysisView _ -> CausalAnalysis

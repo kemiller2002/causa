@@ -64,6 +64,16 @@ module SectionData =
             | [] -> if current.IsEmpty then "No evidence assessed against it yet" else sprintf "%d assessment(s)" current.Length
             | parts -> String.concat " · " parts
 
+    /// Each current assessment as one line, "Supports — <other side>: <rationale>", for a card's detail (INV-044:
+    /// the assessment shows on both the evidence and the hypothesis).
+    let assessmentLines (otherSide: LinkCard -> string) (links: LinkCard list) =
+        links
+        |> List.filter (fun l -> l.Current)
+        |> List.map (fun l ->
+            let why = if l.Rationale.Trim() = "" then "" else ": " + l.Rationale
+            sprintf "%s — %s%s" (kindText l.Kind) (otherSide l) why)
+        |> String.concat "\n"
+
 module OverviewSectionView =
     let bindings (view: WorkspaceView) : Bindings =
         let a = SectionData.analysis view.Section

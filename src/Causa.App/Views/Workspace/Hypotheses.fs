@@ -28,4 +28,6 @@ module HypothesesSectionView =
                           Bind.cellText "tone" (stateTone h.State)
                           Bind.cellText "explanation" (h.Explanation |> Option.defaultValue "")
                           Bind.cellFlag "hasExplanation" h.Explanation.IsSome
-                          Bind.cellText "evidence" (SectionData.linkSummary h.Links) ] ] ]
+                          Bind.cellText "evidence" (SectionData.linkSummary h.Links)
+                          Bind.cellText "assessments" (SectionData.assessmentLines (fun l -> l.EvidenceLabel) h.Links)
+                          Bind.cellFlag "hasAssessments" (h.Links |> List.exists (fun l -> l.Current)) ] ] ]

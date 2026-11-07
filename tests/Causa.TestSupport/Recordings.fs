@@ -391,6 +391,21 @@ type LiveFixture<'TestClass>() =
 module TestValues =
     open Microsoft.FSharp.Reflection
 
+    /// The empty or first value of a type: Empty for a list or map, the first field-less case of a union, "" for a
+    /// string, the default of a value type.
+    let private orNull (x: obj | null) : obj = Unchecked.nonNull x
+
+    let rec private neutral (t: Type) : obj =
+        match t.GetProperty("Empty", Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static) with
+        | null ->
+            if t = typeof<string> then orNull (box "")
+            elif t.IsValueType then orNull (Activator.CreateInstance t)
+            elif FSharpType.IsUnion(t, Reflection.BindingFlags.Public ||| Reflection.BindingFlags.NonPublic) then
+                let case = FSharpType.GetUnionCases(t, Reflection.BindingFlags.Public ||| Reflection.BindingFlags.NonPublic) |> Array.head
+                orNull (FSharpValue.MakeUnion(case, case.GetFields() |> Array.map (fun f -> neutral f.PropertyType), Reflection.BindingFlags.Public ||| Reflection.BindingFlags.NonPublic))
+            else Unchecked.defaultof<obj>
+        | empty -> orNull (empty.GetValue null)
+
     let investigation (id: Causa.Domain.InvestigationId) (version: Causa.Domain.AggregateVersion) : Causa.Domain.Investigation =
         let t = typeof<Causa.Domain.Investigation>
         let values =
@@ -399,6 +414,5 @@ module TestValues =
                 match f.Name with
                 | "Id" -> box id
                 | "Version" -> box version
-                | _ when f.PropertyType.IsValueType -> Activator.CreateInstance f.PropertyType
-                | _ -> null)
+                | _ -> neutral f.PropertyType)
         FSharpValue.MakeRecord(t, values) :?> Causa.Domain.Investigation

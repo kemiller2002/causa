@@ -60,10 +60,20 @@ module Producer =
         let connect body = Connect.connector.InterpretConnect (RequestId 3L) (Answered(RequestId 3L, 200, [], body))
         Assert.Equal(ConnectAccepted true, connect """{"permissions":{"admin":false,"push":true,"pull":true}}""")
         Assert.Equal(ConnectAccepted false, connect """{"permissions":{"admin":false,"push":false,"pull":true}}""")
-        match connect """{"full_name":"o/r"}""" with
+        // a fine-grained token: GitHub states no permissions; write is decided by GitHub at the first commit
+        Assert.Equal(ConnectAccepted true, connect (Recordings.form "rest-repo-fine-grained-no-permissions").Body)
+        match connect """{"id":1}""" with
         | ConnectRejected(Malformed _) -> ()
-        | other -> failwithf "a read without stated permissions granted %A" other
+        | other -> failwithf "an answer that names no repository was %A" other
         Assert.Equal(ConnectSuperseded, Connect.connector.InterpretConnect (RequestId 4L) (Answered(RequestId 3L, 200, [], "{}")))
         let fake = StatefulFake()
         Assert.Equal(ConnectAccepted false, (Provider.over fake.Execute fake.ReadConnection).Connect())
         Assert.Equal(ConnectAccepted true, (Provider.over fake.Execute fake.WriteConnection).Connect())
+        // a fine-grained read-only token connects, and GitHub refuses its first commit as a permission failure
+        let fine = StatefulFake()
+        fine.AnswerAsFineGrained()
+        let reader = Provider.over fine.Execute fine.ReadConnection
+        Assert.Equal(ConnectAccepted true, reader.Connect())
+        match reader.Commit (fine.Head()) (RepoPath "w/i") "x" [ PutFile(RepoPath "w/i/a.json", [| 1uy |]) ] with
+        | Error(PermissionDenied _) -> ()
+        | other -> failwithf "%A" other

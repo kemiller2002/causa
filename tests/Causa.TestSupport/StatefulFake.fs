@@ -43,6 +43,8 @@ type FakeState =
       /// Faults waiting for the next request they match: (mutationsOnly, fault), first first.
       Faults: (bool * Fault) list
       StaleForm: StaleForm
+      /// Answer the repository read as GitHub does for a fine-grained token: no `permissions` object.
+      FineGrained: bool
       Clock: DateTimeOffset
       /// Every request the fake received, in order (method, url; "Mutation" for createCommitOnBranch), with no credential.
       Received: (string * string) list
@@ -78,6 +80,7 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
           Tokens = Map.ofList [ readToken, false; writeToken, true ]
           Faults = []
           StaleForm = ForbiddenMovedHead
+          FineGrained = false
           Clock = root.CommittedAt
           Received = []
           Sequence = 1 }
@@ -143,8 +146,11 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
         let url = request.Url
         if url.TrimEnd('/') + "/" = repoPrefix then
             let canWrite = tokenOf request |> Option.bind s.Tokens.TryFind |> Option.defaultValue false
-            answerJson id 200 (Json.Object [ "full_name", Json.String(owner + "/" + name); "default_branch", Json.String initialBranch
-                                             "permissions", Json.Object [ "admin", Json.Bool false; "maintain", Json.Bool false; "push", Json.Bool canWrite; "pull", Json.Bool true ] ])
+            if s.FineGrained then
+                answerJson id 200 (Json.Object [ "full_name", Json.String(owner + "/" + name); "default_branch", Json.String initialBranch ])
+            else
+                answerJson id 200 (Json.Object [ "full_name", Json.String(owner + "/" + name); "default_branch", Json.String initialBranch
+                                                 "permissions", Json.Object [ "admin", Json.Bool false; "maintain", Json.Bool false; "push", Json.Bool canWrite; "pull", Json.Bool true ] ])
         elif not (url.StartsWith repoPrefix) then recorded id "rest-404-connect-hidden"
         else
             let rest = pathPart url
@@ -382,6 +388,9 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
         lock gate (fun () -> state <- { state with Faults = state.Faults @ [ defaultArg mutationsOnly true, fault ] })
 
     member _.UseStaleForm(form: StaleForm) = lock gate (fun () -> state <- { state with StaleForm = form })
+
+    /// Answer as GitHub does for a fine-grained token (no `permissions` on the repository).
+    member _.AnswerAsFineGrained() = lock gate (fun () -> state <- { state with FineGrained = true })
 
     member _.RevokeToken(token: string) = lock gate (fun () -> state <- { state with Tokens = Map.remove token state.Tokens })
 

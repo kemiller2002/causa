@@ -1,6 +1,9 @@
 # Owner: integration. Written at bootstrap by requirements-compiler v41 (package 4.1.6).
 # Builds and tests the Causa solution. Conditor's build-and-test.yml covers its own App.slnx only (Rehearsal 010:
 # CI never built or tested Causa.slnx). A run that skips a test assembly or a test is not a pass.
+# The npm tree is installed (npm ci, from package-lock.json) before the tests: the release-set gate (VER-008) checks the
+# installed artifacts against the lock, and the cross-system tests (VER-006) run the engine's output through Limen's
+# own codec. Without it those tests fail as BLOCKED; they never pass vacuously.
 name: Causa CI
 
 on:
@@ -24,6 +27,11 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Install the locked npm tree
+        run: npm ci
       - name: Build Causa.slnx
         run: dotnet build Causa.slnx -c Release
       - name: Test Causa.slnx

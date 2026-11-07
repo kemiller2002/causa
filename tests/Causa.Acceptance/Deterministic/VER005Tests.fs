@@ -23,7 +23,7 @@ type VER005Tests() =
     /// No alpha, beta, RC, unpublished source or unverified local build is adopted because it is newer.
     [<Fact>]
     member _.``VER-005-O1``() =
-        Gate.noDefects
+        Gate.assertNoDefects
             "prereleases or unpublished sources"
             [ for what, v in adopted () do
                   if isPrerelease v then yield sprintf "%s %s is a prerelease" what v
@@ -40,7 +40,7 @@ type VER005Tests() =
                   if c.PrereleasesObserved |> List.contains c.Candidate then yield sprintf "%s selects the prerelease %s" c.System c.Candidate ]
         // A newer prerelease was seen (Forma's main-branch builds) and not adopted.
         let seen = checks record |> List.collect (fun c -> c.PrereleasesObserved |> List.map (fun p -> c.System, p))
-        Gate.noDefects
+        Gate.assertNoDefects
             "observed prereleases"
             [ for system, p in seen do
                   if adopted () |> List.exists (fun (_, v) -> v = p) then yield sprintf "%s prerelease %s is adopted" system p ]
@@ -49,15 +49,15 @@ type VER005Tests() =
     [<Fact>]
     member _.``VER-005-O2``() =
         let approvals = prereleaseApprovals record
-        Gate.noDefects "unapproved prereleases" (prereleaseDefects (adopted ()) approvals)
-        Gate.noDefects
+        Gate.assertNoDefects "unapproved prereleases" (prereleaseDefects (adopted ()) approvals)
+        Gate.assertNoDefects
             "prerelease approvals"
             (prereleaseDefects (approvals |> List.map (fun a -> a.System, a.Version)) approvals)
         let candidate = [ "forma", "0.13.0-main.265.1" ]
-        Gate.defectsFound "a prerelease without approval" (prereleaseDefects candidate [])
+        Gate.assertRejects "a prerelease without approval" (prereleaseDefects candidate [])
         let partial =
             { System = "forma"; Version = "0.13.0-main.265.1"; Approval = "ODR-EXAMPLE A"; Provenance = ""; CompatibilityEvidence = "run 1"; SecurityEvidence = "" }
-        Gate.defectsFound "a prerelease approval without provenance or security evidence" (prereleaseDefects candidate [ partial ])
-        Gate.noDefects
+        Gate.assertRejects "a prerelease approval without provenance or security evidence" (prereleaseDefects candidate [ partial ])
+        Gate.assertNoDefects
             "a fully approved prerelease"
             (prereleaseDefects candidate [ { partial with Provenance = "forma@abc build 265"; SecurityEvidence = "audit 1" } ])

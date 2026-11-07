@@ -61,6 +61,8 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 // UI-016's canonical identity colours. Amber is drawn with Forma's --ef-color-status-warning (ODR-V41-05).
 const PALETTE = {
@@ -260,6 +262,9 @@ test.describe('UI-016', () => {
     expect(ratio(fg, bg), `primary action text ${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
     none('textContrast', await kit.textContrast(page));
     none('nonTextContrast', await kit.nonTextContrast(page));
+    // Status indicators (Administration's fact lozenges) stay distinct under forced colours.
+    await open(page, '#/administration');
+    none('administration textContrast', await kit.textContrast(page));
     none('forcedColorsDistinct', await kit.forcedColorsDistinct(page));
   });
 

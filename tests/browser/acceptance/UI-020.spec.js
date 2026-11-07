@@ -60,6 +60,8 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 test.describe('UI-020', () => {
   test('UI-020-O1', async ({ page }) => {
@@ -110,10 +112,14 @@ test.describe('UI-020', () => {
       await page.setViewportSize(size);
       for (const d of DESTINATIONS) {
         await open(page, d.hash);
-        const current = page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: d.name, exact: true }).filter({ visible: true });
-        await expect(current.first(), `${id} ${d.name}: active page not marked`).toHaveAttribute('aria-current', 'page');
+        // Every copy of the link (the persistent list and Forma's collapsed disclosure) carries the same state.
+        const link = (name) => page.locator('nav[aria-label="Primary"] a').filter({ hasText: new RegExp(`^\\s*${name}\\s*$`) });
+        expect(await link(d.name).count(), `${id}: no ${d.name} link`).toBeGreaterThan(0);
+        for (let k = 0; k < await link(d.name).count(); k++)
+          await expect(link(d.name).nth(k), `${id} ${d.name}: active page not marked`).toHaveAttribute('aria-current', 'page');
         for (const other of DESTINATIONS.filter((o) => o !== d))
-          await expect(page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: other.name, exact: true }).first()).not.toHaveAttribute('aria-current', 'page');
+          for (let k = 0; k < await link(other.name).count(); k++)
+            await expect(link(other.name).nth(k)).not.toHaveAttribute('aria-current', 'page');
         none(`${id} ${d.name} noHorizontalScroll`, await kit.noHorizontalScroll(page));
       }
       none(`${id} navigationReachable`, await kit.navigationReachable(page));

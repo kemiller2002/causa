@@ -15,6 +15,14 @@ module AdministrationScreen =
           "deployed-commit", view.DeployedCommit
           "data-validation", view.DataValidation ]
 
+    /// Forma's status-lozenge states; the words are always shown with them (UI-016-O13).
+    let lozengeState (s: SystemFactStatus) =
+        match s with
+        | FactKnown _ -> "ok"
+        | FactUnknown
+        | FactUnavailable -> "unknown"
+        | FactFailed _ -> "blocked"
+
     let bindings (view: AdministrationView) : Bindings =
         Bind.ofList
             [ Bind.items
@@ -24,7 +32,8 @@ module AdministrationScreen =
                         [ Bind.cellText "key" key
                           Bind.cellText "label" f.Label
                           Bind.cellText "value" text
-                          Bind.cellText "tone" (Language.toneName tone) ] ]
+                          Bind.cellText "tone" (Language.toneName tone)
+                          Bind.cellText "state" (lozengeState f.Status) ] ]
               Bind.flag "administration.diagnostics-present" (not (List.isEmpty view.Diagnostics))
               Bind.items
                   "administration.diagnostics"

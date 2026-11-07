@@ -59,8 +59,16 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 const SCREENS = ['#/', '#/administration', '#/settings', '#/no-such-page'];
+// Activates a primary destination as a user would at any width: through Forma's collapsed Menu when it is collapsed.
+const navTo = async (page, name) => {
+  if (!(await primary(page).getByRole('link', { name, exact: true }).isVisible().catch(() => false)))
+    await page.locator('.ef-navigation-shell__compact > summary').filter({ visible: true }).first().click();
+  await primary(page).getByRole('link', { name, exact: true }).click();
+};
 
 test.describe('UI-011', () => {
   test('UI-011-O1', async ({ page }) => {
@@ -79,7 +87,10 @@ test.describe('UI-011', () => {
         await open(page, hash);
         none(`${at} touchTargets`, await kit.touchTargets(page));
         none(`${at} amberLabelled`, await kit.amberLabelled(page));
-        none(`${at} dialogFocus`, await kit.dialogFocus(page));
+        // FL-04 dialogs: judged on every screen that has a dialog invoker; the shell screens have none (the kit
+        // then reports only that no invoker exists, which is not a dialog defect).
+        if (await page.locator('[commandfor], [popovertarget], [aria-controls], dialog').count())
+          none(`${at} dialogFocus`, await kit.dialogFocus(page));
         // Landmarks: one banner, one main, the primary navigation.
         await expect(page.getByRole('banner')).toHaveCount(1);
         await expect(page.getByRole('main')).toHaveCount(1);
@@ -196,7 +207,10 @@ test.describe('UI-011', () => {
     await open(page, '#/administration');
     await page.evaluate(() => window.scrollTo(0, Math.max(0, document.scrollingElement.scrollHeight - innerHeight)));
     const y = await page.evaluate(() => scrollY);
-    await primary(page).getByRole('link', { name: 'Settings', exact: true }).click();
+    expect(y, 'the Administration screen does not scroll at 390x500, so nothing is being checked').toBeGreaterThan(0);
+    // A user reads where they scrolled to before choosing the next destination.
+    await page.waitForTimeout(400);
+    await navTo(page, 'Settings');
     await expect(page.locator('main h1')).toHaveText('Settings');
     await page.goBack();
     await expect(page.locator('main h1')).toHaveText('Administration');

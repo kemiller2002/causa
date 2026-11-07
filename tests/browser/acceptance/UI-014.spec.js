@@ -60,6 +60,8 @@ const openInvestigation = async (page, tag) => {
   return title;
 };
 // ---------------------------------------------------------------------------------------------------------------------
+// Each obligation test walks several screens and viewports.
+test.describe.configure({ timeout: 300_000 });
 
 // Engine assets (the .NET WebAssembly runtime and the application assemblies).
 const ENGINE = /\/_framework\/.*(\.m?js|\.wasm|\.dll|\.dat|\.blat|\.json)(\?.*)?$/;

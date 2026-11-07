@@ -1,0 +1,50 @@
+{
+  "schema": "praxis.requirement-implementation-map/1",
+  "description": "Where each CAT-CAUSA-INVESTIGATION requirement is implemented: the file that carries its data-requirement-id. Compiled into the governed manifest by `praxis requirements manifest compile --mappings` in verification-gate.yml; Dokimos checks each listed file for the attribute (V1/mapped). Shared by every screen: each screen appends its own entries, one per requirement and file, sorted by requirement id.",
+  "mappings": [
+    {
+      "requirement": "INV-001",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-002",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-003",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-004",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-005",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-006",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-019",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-020",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-021",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-022",
+      "location": "web/screens/investigation-start.html"
+    },
+    {
+      "requirement": "INV-023",
+      "location": "web/screens/investigation-start.html"
+    }
+  ]
+}

@@ -30,3 +30,5 @@
 .causa-loading { display: flex; gap: var(--ef-primitive-space-2); align-items: center; }
 /* Measured: Forma's secondary text on this surface is 4.0:1, under 4.5:1 for normal text (UI-016-O11). */
 .causa-panel p, .causa-panel .ef-field__description, .causa-lead { color: var(--ef-color-text-primary); }
+/* The Connect card's heading reads as a card title, not a page title. */
+.causa-connect h2 { font-size: var(--ef-type-size-h3); margin: 0; }

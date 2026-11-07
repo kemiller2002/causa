@@ -121,6 +121,30 @@ type ConsumerIntegration() =
         // The browser build writes to a data repository: before Connect, Start is refused with the reason, nothing created.
         Assert.True(after.GetProperty("start.refused").GetBoolean())
 
+    [<Fact>]
+    member _.``A deploy connection that cannot reach GitHub says why, with Try again, not Not connected alone``() =
+        Program.reset ()
+        let send (m: string) = JsonDocument.Parse(Program.dispatch m).RootElement
+        let effects (r: JsonElement) = r.GetProperty("effects").EnumerateArray() |> List.ofSeq |> List.filter (fun e -> e.GetProperty("kind").GetString() = "Http")
+        let corr (e: JsonElement) : string = e.GetProperty("correlationId").GetString() |> Option.ofObj |> Option.defaultValue ""
+        let result (c: string) (outcome: string) = sprintf "{\"kind\":\"EffectResult\",\"result\":{\"kind\":\"HttpResult\",\"correlationId\":\"%s\",\"outcome\":%s}}" c outcome
+        let first = send "{\"kind\":\"Initialize\",\"protocolVersion\":1,\"capabilities\":[],\"location\":{\"origin\":\"https://x.test\",\"path\":\"/\",\"query\":\"\",\"hash\":\"\"}}"
+        let read = effects first |> List.head
+        let file = "{\"schema\":\"causa.deploy-connection/1\",\"connection\":{\"owner\":\"o\",\"repository\":\"r\",\"branch\":\"main\",\"key\":\"k\"}}"
+        let connecting = send (result (corr read) (sprintf "{\"kind\":\"Success\",\"status\":200,\"body\":%s}" (JsonSerializer.Serialize file)))
+        let connect = effects connecting |> List.head
+        // GH-NETWORK-BEFORE: the request failed before anything was sent.
+        let failed = send (result (corr connect) "{\"kind\":\"Failure\",\"reason\":\"network\"}")
+        let view = failed.GetProperty "view"
+        Assert.True(view.GetProperty("deploy.failed").GetBoolean())
+        Assert.Contains("Could not reach GitHub to connect to o/r@main (test deployment)", view.GetProperty("deploy.failure-text").GetString())
+        Assert.True(view.GetProperty("connection.connect-offered").GetBoolean(), "the Connect form is no longer offered")
+        // Try again retries the same connection.
+        let retried = send "{\"kind\":\"Event\",\"event\":{\"kind\":\"Event\",\"name\":\"UIA-DEPLOY-RETRY\"}}"
+        Assert.Contains(effects retried, fun e -> e.GetProperty("url").GetString() = "https://api.github.com/repos/o/r")
+        Assert.False(retried.GetProperty("view").GetProperty("deploy.failed").GetBoolean())
+        Program.reset ()
+
 /// A listing that fails shows the list as unavailable with the reason and a Retry, never the empty state.
 type ListingFailure() =
     let backend =

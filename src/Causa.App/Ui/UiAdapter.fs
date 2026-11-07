@@ -60,7 +60,9 @@ type Local =
       /// Connected with the deployed test build's injected connection (EXT-DATA-004-O5), not a typed key.
       DeployConnected: bool
       /// The last listing that failed, as the list shows it (never the empty state); cleared by a listing that lands.
-      ListFailure: UiFailure option }
+      ListFailure: UiFailure option
+      /// Why the deployed test build's injected connection did not connect (UI-010: what happened and a next step).
+      DeployFailure: string option }
 
 type AdapterState = { Model: Model; Local: Local }
 
@@ -394,6 +396,18 @@ module UiAdapter =
     let browser (engine: Engine) (signal: BrowserSignal) (s: AdapterState) : AdapterState * HostEffect list =
         let s2, fx = step engine (Msg.Browser signal) s
         match signal with
+        | HttpCompleted outcome when s.Local.DeployConnected && (match s.Model.Connection with Connecting id -> id = (match outcome with Answered(i, _, _, _) | NotAnswered(i, _) -> i) | _ -> false) ->
+            match s2.Model.Connection, s.Model.Context with
+            | Connected _, _ -> { s2 with Local = { s2.Local with DeployFailure = None } }, fx
+            | _, Some ctx ->
+                let target = sprintf "%s/%s@%s (test deployment)" ctx.Repository.Owner ctx.Repository.Name ctx.Repository.Branch
+                let reason =
+                    match Classify.classify Operation.Connect outcome with
+                    | Error(NetworkUnavailable _) -> sprintf "Could not reach GitHub to connect to %s. Check your connection and try again." target
+                    | Error e -> sprintf "Could not connect to %s. %s" target (Classify.message e)
+                    | Ok _ -> sprintf "Could not connect to %s. GitHub sent an answer that could not be read." target
+                { s2 with Local = { s2.Local with DeployFailure = Some reason } }, fx
+            | _ -> s2, fx
         | HttpCompleted outcome ->
             let rid = match outcome with Answered(id, _, _, _) | NotAnswered(id, _) -> id
             let wasListing = s.Model.ListingsInFlight.ContainsKey rid
@@ -418,16 +432,24 @@ module UiAdapter =
     /// The deployed test build's injected connection (EXT-DATA-004-O5): used only while the tab is disconnected, so a
     /// connection the user already made is never replaced. The key stays the opaque credential.
     let deployConnect (engine: Engine) (repository: Repository) (credential: Credential.T) (s: AdapterState) : AdapterState * HostEffect list =
+        let retrying = s.Local.DeployConnected && s.Model.Connection = CredentialRefused
         match s.Model.Connection with
-        | Disconnected ->
+        | _ when s.Model.Connection = Disconnected || retrying ->
             let s2, fx = step engine (Msg.Connection(ConnectionInput.ConnectSubmitted(repository, credential))) s
             { s2 with
                 Local =
                     { s2.Local with
                         DeployConnected = true
+                        DeployFailure = None
                         Form = { Owner = repository.Owner; Repository = repository.Name; Branch = repository.Branch; CredentialEntered = true } } },
             fx
         | _ -> s, []
+
+    /// The shell's own bindings beyond the AppView: the deploy connection's failure, shown as an alert with Try again.
+    let shellBindings (s: AdapterState) : Bindings =
+        Map.ofList
+            [ "deploy.failed", BindingValue.Flag s.Local.DeployFailure.IsSome
+              "deploy.failure-text", BindingValue.Text(s.Local.DeployFailure |> Option.defaultValue "") ]
 
     /// The investigation a route names: a catalog workspace, or a working copy (`workspaces/demo/causa-app-<run>`).
     let refOf (config: AdapterConfig) (target: RouteTarget) : InvestigationRef option =
@@ -802,7 +824,8 @@ module UiAdapter =
               Submission = Submission.NotSubmitted
               Announcements = []
               DeployConnected = false
-              ListFailure = None } },
+              ListFailure = None
+              DeployFailure = None } },
         effects
 
     /// The frozen Engine as a UiBackend. Effects are the frozen HostEffect, performed by the browser host.

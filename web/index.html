@@ -80,6 +80,20 @@
     </aside>
 
     <main class="causa-main" id="causa-main" tabindex="-1" hidden>
+      <!-- The deployed test build's injected connection did not connect: what happened and a safe next step (UI-010).
+           The Connect form stays available below. -->
+      <template data-if="deploy.failed">
+        <aside class="ef-alert ef-fault-banner causa-deploy-fault" role="alert" data-ef-intent="banner" data-ef-severity="warning" aria-labelledby="causa-deploy-fault-title">
+          <div class="ef-fault-banner__body">
+            <h2 class="ef-alert__title" id="causa-deploy-fault-title">Not connected</h2>
+            <p data-text="deploy.failure-text"></p>
+            <p>Nothing was changed. You can also connect with the form below.</p>
+          </div>
+          <div class="ef-recovery-actions" role="group" aria-label="Recovery actions">
+            <button type="button" class="ef-button" data-event="UIA-DEPLOY-RETRY">Try again</button>
+          </div>
+        </aside>
+      </template>
       <!-- causa:screens -->
     </main>
 

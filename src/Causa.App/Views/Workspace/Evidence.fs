@@ -8,11 +8,10 @@ open Causa.App.Views
 module EvidenceSectionView =
     let bindings (view: WorkspaceView) : Bindings =
         let es = SectionData.analysis view.Section |> Option.map (fun a -> a.Evidence) |> Option.defaultValue []
-        Bind.ofList
+        Bind.ofList(
             [ Bind.flag "evidence.present" (not es.IsEmpty)
-              Bind.text "evidence.count" (string es.Length)
-              Bind.items
-                  "evidence.items"
+              Bind.text "evidence.count" (string es.Length) ]
+            @ SectionData.paged "evidence" "evidence items"
                   [ for e in es ->
                         let url = e.SourceUrl |> Option.map SafeUrl.value
                         [ Bind.cellText "key" e.Id
@@ -25,4 +24,4 @@ module EvidenceSectionView =
                           Bind.cellText "captured" (e.CapturedAt |> Option.map Copy.date |> Option.defaultValue "Not recorded")
                           Bind.cellText "bearing" (SectionData.linkSummary e.Links)
                           Bind.cellText "assessments" (SectionData.assessmentLines (fun l -> l.HypothesisStatement) e.Links)
-                          Bind.cellFlag "hasAssessments" (e.Links |> List.exists (fun l -> l.Current)) ] ] ]
+                          Bind.cellFlag "hasAssessments" (e.Links |> List.exists (fun l -> l.Current)) ] ])

@@ -70,26 +70,37 @@ module SectionData =
         links
         |> List.filter (fun l -> l.Current)
         |> List.map (fun l ->
-            let why = if l.Rationale.Trim() = "" then "" else ": " + l.Rationale
+            let why = if l.Rationale.Trim() = "" then "" else " Why: " + l.Rationale
             sprintf "%s — %s%s" (kindText l.Kind) (otherSide l) why)
         |> String.concat "\n"
+
+    /// How many records a section shows before the rest are folded into a "Show more" disclosure.
+    let firstShown = 10
+
+    /// A long list as two data-each lists: the first rows, and the rest behind a disclosure (no engine state needed:
+    /// the disclosure is the browser's own <details>).
+    let paged (prefix: string) (noun: string) (rows: (string * BindingPrimitive) list list) : (string * BindingValue) list =
+        let first, rest = if rows.Length <= firstShown then rows, [] else List.splitAt firstShown rows
+        [ Bind.items (prefix + ".items") first
+          Bind.items (prefix + ".more") rest
+          Bind.flag (prefix + ".more-present") (not rest.IsEmpty)
+          Bind.text (prefix + ".more-label") (sprintf "Show %d more %s" rest.Length noun) ]
 
 module OverviewSectionView =
     let bindings (view: WorkspaceView) : Bindings =
         let a = SectionData.analysis view.Section
         let count f = a |> Option.map (f >> string) |> Option.defaultValue ""
-        Bind.ofList
+        Bind.ofList(
             [ Bind.text "overview.hypotheses" (count (fun a -> a.Hypotheses.Length))
               Bind.text "overview.evidence" (count (fun a -> a.Evidence.Length))
               Bind.text "overview.relationships" (count (fun a -> a.Relationships |> List.filter (fun l -> l.Current) |> List.length))
               Bind.text "overview.conclusions" (count (fun a -> a.Conclusions.Length))
               Bind.text "overview.contradictions" (a |> Option.map (fun a -> Copy.count a.UnresolvedContradictions) |> Option.defaultValue "")
-              Bind.flag "overview.observations-present" (a |> Option.exists (fun a -> not a.Observations.IsEmpty))
-              Bind.items
-                  "overview.observations"
+              Bind.flag "overview.observations-present" (a |> Option.exists (fun a -> not a.Observations.IsEmpty)) ]
+            @ SectionData.paged "overview.observations" "observations"
                   [ for o in (a |> Option.map (fun a -> a.Observations) |> Option.defaultValue []) ->
                         [ Bind.cellText "key" o.Id
                           Bind.cellText "text" o.Text
                           Bind.cellText "source" (o.SourceReference |> Option.defaultValue "")
                           Bind.cellFlag "hasSource" o.SourceReference.IsSome
-                          Bind.cellText "when" (o.ObservedAt |> Option.map Copy.date |> Option.defaultValue "") ] ] ]
+                          Bind.cellText "when" (o.ObservedAt |> Option.map Copy.date |> Option.defaultValue "") ] ])

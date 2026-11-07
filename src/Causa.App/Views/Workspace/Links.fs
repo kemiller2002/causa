@@ -11,11 +11,10 @@ module CausalAnalysisSectionView =
             SectionData.analysis view.Section
             |> Option.map (fun a -> a.Relationships |> List.filter (fun l -> l.Current))
             |> Option.defaultValue []
-        Bind.ofList
+        Bind.ofList(
             [ Bind.flag "relationships.present" (not ls.IsEmpty)
-              Bind.text "relationships.count" (string ls.Length)
-              Bind.items
-                  "relationships.items"
+              Bind.text "relationships.count" (string ls.Length) ]
+            @ SectionData.paged "relationships" "assessments"
                   [ for l in ls ->
                         [ Bind.cellText "key" l.Id
                           Bind.cellText "evidence" l.EvidenceLabel
@@ -23,4 +22,4 @@ module CausalAnalysisSectionView =
                           Bind.cellText "kind" (SectionData.kindText l.Kind)
                           Bind.cellText "tone" (SectionData.kindTone l.Kind)
                           Bind.cellText "rationale" l.Rationale
-                          Bind.cellFlag "hasRationale" (l.Rationale.Trim() <> "") ] ] ]
+                          Bind.cellFlag "hasRationale" (l.Rationale.Trim() <> "") ] ])

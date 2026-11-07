@@ -298,7 +298,290 @@
         <section class="ef-stack causa-section" aria-labelledby="causa-sec-causal">
           <h2 id="causa-sec-causal" class="causa-section__title">Causal Analysis</h2>
           <p class="causa-section__lead">How each piece of evidence bears on each hypothesis (the current assessment of every pair).</p>
+          <template data-if="focus.present">
+            <section class="ef-stack causa-focus" aria-labelledby="causa-focus-heading">
+              <h3 id="causa-focus-heading" class="causa-section__subtitle">By hypothesis</h3>
+              <p class="causa-section__lead">Each hypothesis with the evidence assessed against it, most supported first. A solid bar supports, a dashed bar contradicts, a dotted bar is another assessment.</p>
+              <ol class="causa-focus__list">
+              <template data-if="focus.p1.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details" open>
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p1.title"></span> <span class="causa-focus__counts" data-text="focus.p1.counts"></span></summary>
+                    <template data-if="focus.p1.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p1.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p2.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p2.title"></span> <span class="causa-focus__counts" data-text="focus.p2.counts"></span></summary>
+                    <template data-if="focus.p2.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p2.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p3.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p3.title"></span> <span class="causa-focus__counts" data-text="focus.p3.counts"></span></summary>
+                    <template data-if="focus.p3.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p3.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p4.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p4.title"></span> <span class="causa-focus__counts" data-text="focus.p4.counts"></span></summary>
+                    <template data-if="focus.p4.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p4.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p5.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p5.title"></span> <span class="causa-focus__counts" data-text="focus.p5.counts"></span></summary>
+                    <template data-if="focus.p5.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p5.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p6.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p6.title"></span> <span class="causa-focus__counts" data-text="focus.p6.counts"></span></summary>
+                    <template data-if="focus.p6.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p6.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p7.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p7.title"></span> <span class="causa-focus__counts" data-text="focus.p7.counts"></span></summary>
+                    <template data-if="focus.p7.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p7.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p8.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p8.title"></span> <span class="causa-focus__counts" data-text="focus.p8.counts"></span></summary>
+                    <template data-if="focus.p8.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p8.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p9.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p9.title"></span> <span class="causa-focus__counts" data-text="focus.p9.counts"></span></summary>
+                    <template data-if="focus.p9.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p9.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p10.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p10.title"></span> <span class="causa-focus__counts" data-text="focus.p10.counts"></span></summary>
+                    <template data-if="focus.p10.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p10.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p11.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p11.title"></span> <span class="causa-focus__counts" data-text="focus.p11.counts"></span></summary>
+                    <template data-if="focus.p11.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p11.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p12.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p12.title"></span> <span class="causa-focus__counts" data-text="focus.p12.counts"></span></summary>
+                    <template data-if="focus.p12.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p12.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p13.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p13.title"></span> <span class="causa-focus__counts" data-text="focus.p13.counts"></span></summary>
+                    <template data-if="focus.p13.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p13.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p14.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p14.title"></span> <span class="causa-focus__counts" data-text="focus.p14.counts"></span></summary>
+                    <template data-if="focus.p14.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p14.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p15.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p15.title"></span> <span class="causa-focus__counts" data-text="focus.p15.counts"></span></summary>
+                    <template data-if="focus.p15.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p15.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p16.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p16.title"></span> <span class="causa-focus__counts" data-text="focus.p16.counts"></span></summary>
+                    <template data-if="focus.p16.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p16.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              </ol>
+              <template data-if="focus.more-present"><p class="causa-item__note" data-text="focus.more"></p></template>
+            </section>
+          </template>
           <template data-if="graph.present">
+            <details class="causa-graph__full-view">
+            <summary class="causa-focus__summary">Show full graph</summary>
             <figure class="causa-graph" data-requirement-id="UI-026">
               <div class="causa-graph__scroll" role="region" aria-label="Causal graph, scrolls sideways" tabindex="0">
                 <div class="causa-graph__canvas">
@@ -312,13 +595,14 @@
                   <template data-each="graph.nodes" data-key="key">
                     <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><g><title data-text="full"></title><rect data-bind-class="cls" data-bind-x="x" data-bind-y="y" data-bind-width="w" data-bind-height="h" rx="6"></rect><text class="causa-graph__label" data-bind-x="tx" data-bind-y="ty" data-text="label"></text></g></svg></div>
                   </template>
-                  <template data-each="graph.edges" data-key="key">
-                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><text class="causa-graph__word" data-bind-x="lx" data-bind-y="ly" data-text="word"></text></svg></div>
+                  <template data-each="graph.labels" data-key="key">
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><text class="causa-graph__word" data-bind-x="x" data-bind-y="y" data-text="text"></text></svg></div>
                   </template>
                 </div>
               </div>
               <figcaption class="causa-graph__caption">Evidence (left) bears on hypotheses (middle): a solid line supports, a dashed line contradicts, a dotted line is another assessment; each line carries its word. Every assessment is also listed below as text.</figcaption>
             </figure>
+            </details>
           </template>
           <h3 class="causa-section__subtitle">Relationship index</h3>
           <template data-if="relationships.present">

@@ -111,3 +111,47 @@ let ``a working copy with one hypothesis and no assessment still draws its node`
     Assert.Equal(1, g.Nodes.Length)
     Assert.Empty(g.Edges)
     Assert.True(g.Width > 0.0 && g.Height > 0.0)
+
+[<Fact>]
+let ``the words beside an evidence card never repeat: one per kind, with a count`` () =
+    let p =
+        projection
+            2
+            3
+            [ link 1 "e1" "h1" (CatalogKind Supports) true
+              link 2 "e1" "h2" (CatalogKind Supports) true
+              link 3 "e1" "h3" (CatalogKind Contradicts) true
+              link 4 "e2" "h1" (CatalogKind Supports) true ]
+            0
+    let g = CausalGraph.layout p
+    let e1 = g.Labels |> List.filter (fun l -> l.Evidence = "evidence:e1") |> List.map (fun l -> l.Text)
+    Assert.Equal<string list>([ "Supports ×2"; "Contradicts" ], e1)
+    Assert.Equal<string list>([ "Supports" ], g.Labels |> List.filter (fun l -> l.Evidence = "evidence:e2") |> List.map (fun l -> l.Text))
+    for (_, ls) in g.Labels |> List.groupBy (fun l -> l.Evidence) do
+        Assert.Equal(ls.Length, ls |> List.map (fun l -> l.Y) |> List.distinct |> List.length)
+
+[<Fact>]
+let ``the focused view lists every assessment once, under its own hypothesis, most supported first`` () =
+    let panels = CausalGraph.focus sample
+    let current = sample.Relationships |> List.filter (fun l -> l.Current)
+    let cards = panels |> List.collect (fun p -> p.Cards |> List.map (fun c -> p.Key, c.Key))
+    Assert.Equal(current.Length, cards.Length)
+    for l in current do
+        Assert.Equal((l.Hypothesis.Id, l.Id), cards |> List.filter (fun (_, k) -> k = l.Id) |> List.exactlyOne)
+    // h1: 1 supporting, 1 contradicting; h2: 1 supporting; h3: 2 other. Ties on support go by title.
+    Assert.Equal<string list>([ "h1"; "h2"; "h3" ], panels |> List.map (fun p -> p.Key))
+    let supports = panels |> List.map (fun p -> p.Supports)
+    Assert.Equal<int list>(supports |> List.sortDescending, supports)
+    Assert.Equal("1 supporting · 1 contradicting", CausalGraph.counts panels.Head)
+    Assert.Equal("2 other", CausalGraph.counts panels[2])
+    // Within a panel supporting cards come first.
+    Assert.Equal(EdgeKind.SupportsEdge, panels.Head.Cards.Head.Kind)
+    Assert.True((CausalGraph.focus sample = panels), "the focused view is not deterministic")
+
+[<Fact>]
+let ``the focused view keeps a hypothesis with nothing assessed and orders by support`` () =
+    let p =
+        projection 3 3 [ link 1 "e1" "h3" (CatalogKind Supports) true; link 2 "e2" "h3" (CatalogKind Supports) true; link 3 "e3" "h2" (CatalogKind Supports) true ] 0
+    let panels = CausalGraph.focus p
+    Assert.Equal<string list>([ "h3"; "h2"; "h1" ], panels |> List.map (fun p -> p.Key))
+    Assert.Equal("No evidence assessed yet", CausalGraph.counts panels[2])

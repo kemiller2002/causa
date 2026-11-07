@@ -36,7 +36,9 @@ type Backend =
       /// The storage contract version written into new events (formatVersion and semanticVersion).
       StorageVersion: string
       Persistence: Persistence option
-      Provider: ProviderSeam option }
+      Provider: ProviderSeam option
+      /// The working copy this tab creates in and lists after Connect (CONTRACT section 9.4), when there is one.
+      WorkingCopy: WorkspaceAddress.T option }
 
 /// Why a message changed nothing, as words for the live region (never a silent drop).
 type Refusal =
@@ -125,6 +127,35 @@ module Update =
         | Some session ->
             session.Unsaved @ session.AfterInFlight
             |> List.fold (fun acc c -> acc |> Result.bind (fun s -> apply backend s c |> Result.map Some)) (Ok baseState)
+
+    /// A save the read-back confirmed (BaseHead moved to the saved commit) makes the saved history the session's new
+    /// verified base: the previous base with the saved commands applied, the files the encoder wrote (the read-back
+    /// matched them byte for byte), read at that commit. Later saves and the view rest on it (PERSIST-023).
+    let confirmBase (backend: Backend) (p: Persistence) (ref: InvestigationRef) (before: InvestigationSession) (after: InvestigationSession) (model: Model) : Model =
+        if after.BaseHead = before.BaseHead then model
+        else
+            let baseVerified =
+                match model.Loads |> Map.tryFind ref with
+                | Some(Loaded v) -> Some v
+                | _ -> None
+            let saved =
+                before.Unsaved
+                |> List.fold (fun acc c -> acc |> Result.bind (fun st -> apply backend st c |> Result.map Some)) (Ok(baseVerified |> Option.map (fun v -> v.Investigation)))
+            match saved with
+            | Ok(Some investigation) ->
+                let history = investigation.Timeline
+                let bytes =
+                    match baseVerified with
+                    | None -> p.Codec.EncodeNew investigation.Id history |> Result.toOption
+                    | Some v ->
+                        let (AggregateVersion known) = v.Investigation.Version
+                        Some(p.Codec.Encode v (history |> List.filter (fun e -> let (AggregateVersion n) = e.Version in n > known)))
+                match bytes with
+                | Some files ->
+                    let verified = { Investigation = investigation; History = history; ReadAt = after.BaseHead; Address = ref.Address; Bytes = files }
+                    { model with Loads = model.Loads |> Map.add ref (Loaded verified) }
+                | None -> model
+            | _ -> model
 
     let private sessionRef (session: InvestigationSession) : InvestigationRef =
         { Address = Writable.address session.Address; Id = session.Id }
@@ -219,10 +250,11 @@ module Update =
             match (machineFor p model).Step ctx session input with
             | Ok(s, effects) ->
                 let fx, sent = hostEffects effects
-                { model with
-                    Sessions = model.Sessions |> Map.add ref s
-                    NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) },
-                fx
+                let model' =
+                    { model with
+                        Sessions = model.Sessions |> Map.add ref s
+                        NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }
+                (confirmBase backend p ref session s model', fx)
             | Error fault -> refuse (Rejected fault.Reason) model
 
     let private connection (backend: Backend) (input: ConnectionInput) (model: Model) =
@@ -264,7 +296,27 @@ module Update =
     /// (EXT-DATA-003: the connected repository's catalog, EXT-DATA-013).
     let private connected (backend: Backend) (canWrite: bool) (model: Model) =
         let model, fx = list backend ActiveCatalog { model with Connection = Connected canWrite }
-        model, announce Polite (if canWrite then "Connected. Changes can be saved." else "Connected, read-only.") :: fx
+        let model, fx2 =
+            match backend.WorkingCopy with
+            | Some wc -> list backend (WorkingCopyOf wc) model
+            | None -> model, []
+        model, announce Polite (if canWrite then "Connected. Changes can be saved." else "Connected, read-only.") :: fx @ fx2
+
+    /// Opens (SM-LOAD) an investigation that is neither loaded nor being edited here.
+    let openInvestigation (backend: Backend) (ref: InvestigationRef) (model: Model) : Model * HostEffect list =
+        match backend.Persistence, requestContext backend model (Some ref) with
+        | Some p, Some ctx when not (model.Sessions.ContainsKey ref) ->
+            let current = model.Loads |> Map.tryFind ref |> Option.defaultValue NotLoaded
+            match current with
+            | Loaded _
+            | LoadState.Loading _ -> model, []
+            | _ ->
+                match (machineFor p model).StepLoad ctx current (LoadInput.OpenRequested ref) with
+                | Ok(l, effects) ->
+                    let fx, sent = hostEffects effects
+                    { model with Loads = model.Loads |> Map.add ref l; NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }, fx
+                | Error _ -> model, []
+        | _ -> model, []
 
     /// An answer from the host goes to whatever awaits its request id; an answer nothing awaits is superseded.
     let private httpCompleted (backend: Backend) (outcome: HttpOutcome) (model: Model) =
@@ -308,7 +360,12 @@ module Update =
                             let inFlight = model.ListingsInFlight |> Map.remove rid
                             match (listerOf backend |> Option.get).InterpretList ctx target step outcome with
                             | ListingComplete listing ->
-                                { model with ListingsInFlight = inFlight; Listings = model.Listings |> Map.add listing.Address listing }, []
+                                let model = { model with ListingsInFlight = inFlight; Listings = model.Listings |> Map.add listing.Address listing }
+                                // A working copy's investigations are opened so the list can show their titles (J1-05).
+                                if listing.Address.Role = WorkspaceRole.WorkingCopy then
+                                    listing.Investigations
+                                    |> List.fold (fun (m, acc) i -> let m2, fx = openInvestigation backend i.Ref m in m2, acc @ fx) (model, [])
+                                else model, []
                             | ListingNextRequest(next, request) ->
                                 { model with
                                     ListingsInFlight = inFlight |> Map.add request.Id (target, next)

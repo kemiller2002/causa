@@ -18,16 +18,12 @@ open Causa.Ui.Contracts
 /// Writes.requestedAt (slice T19) are merged; then both delegate to those.
 [<RequireQualifiedAccess>]
 module CommandIds =
-    /// A UUIDv7 for a command requested at `requestedAt` (millisecond precision; the rest is random).
-    let at (requestedAt: DateTimeOffset) : Guid = Guid.CreateVersion7(requestedAt)
+    /// A UUIDv7 for a command requested at `requestedAt` (persistence's Writes.commandIdAt; the rest is random).
+    let at (requestedAt: DateTimeOffset) : Guid =
+        Writes.commandIdAt requestedAt (System.Security.Cryptography.RandomNumberGenerator.GetBytes 16)
 
-    /// The RequestedAt a UUIDv7 command id carries; None for any other id (a save then fails closed).
-    let requestedAt (id: Guid) : DateTimeOffset option =
-        if id.Version <> 7 then None
-        else
-            let b = id.ToByteArray(true)
-            let ms = (int64 b[0] <<< 40) ||| (int64 b[1] <<< 32) ||| (int64 b[2] <<< 24) ||| (int64 b[3] <<< 16) ||| (int64 b[4] <<< 8) ||| int64 b[5]
-            Some(DateTimeOffset.FromUnixTimeMilliseconds ms)
+    /// The RequestedAt a UUIDv7 command id carries (Writes.requestedAt); None for any other id (a save fails closed).
+    let requestedAt (id: Guid) : DateTimeOffset option = Writes.requestedAt id
 
 /// How the adapter is configured at the edge (Program.fs).
 type AdapterConfig =
@@ -153,7 +149,19 @@ module UiAdapter =
 
     /// INV-004: validate, then CreateRequested in the working copy (and the question as the next command); on
     /// acceptance open the new investigation's workspace.
+    /// Whether Start is offered: a writable connection, or the session-local build (UI-004: the engine's reason shown).
+    let startAvailability (config: AdapterConfig) (s: AdapterState) =
+        match s.Model.Connection with
+        | Connected true -> Available
+        | Connected false -> Unavailable "This token cannot save changes."
+        | _ when config.SessionLocal -> Available
+        | _ -> Unavailable "Connect a data repository first."
+
     let private start (config: AdapterConfig) (engine: Engine) (s: AdapterState) =
+        match startAvailability config s with
+        | Unavailable reason -> { s with Local = { s.Local with Submission = Submission.Refused [ reason ] } }, []
+        | NotOffered -> s, []
+        | Available ->
         match startCommand config s.Local.StartCommandId s.Local.Start, workingCopy config with
         | Error(errors, reasons), _ ->
             { s with Local = { s.Local with StartErrors = errors; Submission = Submission.Refused reasons } }, []
@@ -164,12 +172,11 @@ module UiAdapter =
             let before = s.Model.Sessions.ContainsKey ref
             let s2, effects = step engine (Msg.CreateRequested(writable, envelope)) { s with Local = { s.Local with Submission = Submission.Submitting; StartErrors = [] } }
             if not before && s2.Model.Sessions.ContainsKey ref then
+                // P19 = A: the question is the next command group (PrimaryQuestion.startCommands, T19).
+                let questionId = CommandIds.at (config.Now())
+                let rest = PrimaryQuestion.startCommands envelope (s.Local.Start.Question.Trim()) questionId (derivedId questionId "primary-question") |> List.tail
                 let s2, effects =
-                    match questionCommand config envelope s.Local.Start.Question with
-                    | Some q ->
-                        let s3, fx = step engine (Msg.DomainCommand q) s2
-                        s3, effects @ fx
-                    | None -> s2, effects
+                    rest |> List.fold (fun (st, acc) c -> let st2, fx = step engine (Msg.DomainCommand c) st in st2, acc @ fx) (s2, effects)
                 let (Workspace workspace) = address.Workspace
                 let route = WorkspaceRoute({ Workspace = workspace; Role = WorkspaceRole.WorkingCopy; Id = envelope.Investigation }, Overview)
                 let s3, fx = step engine (Msg.Navigate(Route(Navigation.format route))) s2
@@ -200,6 +207,15 @@ module UiAdapter =
             fx
         | _ -> s, []
 
+    /// The investigation a route names: a catalog workspace, or a working copy (`workspaces/demo/causa-app-<run>`).
+    let refOf (config: AdapterConfig) (target: RouteTarget) : InvestigationRef option =
+        let prefix = "workspaces/demo/causa-app-"
+        match target.Role with
+        | WorkspaceRole.Catalog -> Some { Address = WorkspaceAddress.catalog (Workspace target.Workspace); Id = target.Id }
+        | WorkspaceRole.WorkingCopy when target.Workspace.StartsWith prefix ->
+            WorkspaceAddress.workingCopy [] (target.Workspace.Substring prefix.Length) |> Option.map (fun a -> { Address = a; Id = target.Id })
+        | WorkspaceRole.WorkingCopy -> None
+
     let private currentRef (s: AdapterState) =
         match s.Local.Route with
         | WorkspaceRoute(t, _) ->
@@ -209,7 +225,21 @@ module UiAdapter =
     let dispatch (config: AdapterConfig) (engine: Engine) (intent: UiIntent) (s: AdapterState) : AdapterState * HostEffect list =
         match intent with
         | UiIntent.Navigate r ->
-            let s2, fx = step engine (Msg.Navigate(Route(Navigation.format r))) s
+            let s1, fx0 = step engine (Msg.Navigate(Route(Navigation.format r))) s
+            // Opening a workspace that is neither being edited nor loaded reads it (SM-LOAD).
+            let s2, fx =
+                match r with
+                | WorkspaceRoute(target, _) ->
+                    match refOf config target with
+                    | Some ref when not (s1.Model.Sessions.ContainsKey ref) ->
+                        match s1.Model.Loads |> Map.tryFind ref with
+                        | Some(Loaded _)
+                        | Some(LoadState.Loading _) -> s1, fx0
+                        | _ ->
+                            let s3, fx1 = step engine (Msg.LoadStep(ref, LoadInput.OpenRequested ref)) s1
+                            s3, fx0 @ fx1
+                    | _ -> s1, fx0
+                | _ -> s1, fx0
             let local =
                 match r, s.Local.Route with
                 | StartRoute, StartRoute -> s2.Local
@@ -273,20 +303,19 @@ module UiAdapter =
           Errors = s.Local.StartErrors
           Destination = destination
           Profile = None
-          Start =
-            (match s.Model.Connection with
-             | Connected true -> Available
-             | Connected false -> Unavailable "This token cannot save changes."
-             | _ when config.SessionLocal -> Available
-             | _ -> Unavailable "Connect a data repository first.")
+          Start = startAvailability config s
           Cancel = Available
           Submission = s.Local.Submission }
 
     /// One card per listed investigation (UI-001, UI-022): title and place as stored (Data Visible); lifecycle and
     /// counts are not claimed before the investigation is opened and replayed.
-    let summaries (listing: Listing) : InvestigationSummary list =
+    let summaries (model: Model) (listing: Listing) : InvestigationSummary list =
         listing.Investigations
         |> List.map (fun i ->
+            let loadedTitle =
+                match model.Loads |> Map.tryFind i.Ref with
+                | Some(Loaded v) -> Some(NonEmptyText.value v.Investigation.Title)
+                | _ -> None
             let (Workspace workspace) = i.Ref.Address.Workspace
             let catalog = i.Ref.Address.Role = WorkspaceRole.Catalog
             let route =
@@ -295,7 +324,7 @@ module UiAdapter =
                     Overview
                 )
             { Ref = i.Ref
-              Title = i.Title |> Option.defaultValue (let (InvestigationId g) = i.Ref.Id in g.ToString "D")
+              Title = loadedTitle |> Option.orElse i.Title |> Option.defaultValue (let (InvestigationId g) = i.Ref.Id in g.ToString "D")
               Status = None
               LastActivity = None
               Counts = None
@@ -310,7 +339,7 @@ module UiAdapter =
                 Failed(UiFailure.ProviderError "The investigations could not be listed."), ScreenFailed(UiFailure.ProviderError "The investigations could not be listed.")
             | Connected _, [] -> Waiting "Listing investigations", ScreenLoading
             | Connected _, _ ->
-                let all = listings |> List.collect summaries
+                let all = listings |> List.collect (summaries s.Model)
                 let (CommitOid commit) = (List.head listings).ReadAt
                 Ready(Visible.stored { Path = "catalog/active.json"; Commit = Some commit } all), (if all.IsEmpty then ScreenEmpty else ScreenReady)
             | _ -> NotRequested, ScreenReady
@@ -441,9 +470,46 @@ module UiAdapter =
             | Ok None -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
             | Error reason -> let f = UiFailure.InvalidData reason in empty (Failed f) (ScreenFailed f) None blank
         | None ->
-            // Opening a stored investigation needs the verified reader (T19); until then it says so, never a guess.
-            let f = UiFailure.CapabilityAbsent(DataUnderstood, "Opening a saved investigation arrives with the repository reader; this build lists it only.")
-            empty (Failed f) (ScreenFailed f) None blank
+            match refOf config target with
+            | None -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
+            | Some ref ->
+                match s.Model.Loads |> Map.tryFind ref with
+                | Some(Loaded v) ->
+                    let frame = frameOf target section ref v.Investigation
+                    let save =
+                        if ref.Address.Role = WorkspaceRole.WorkingCopy then
+                            let kind = SavedKind
+                            Some
+                                { Kind = kind
+                                  Indicator =
+                                    { InvestigationId = ref.Id
+                                      Label = PresentationLanguage.saveState kind
+                                      Text = PresentationLanguage.saveState kind
+                                      Glyph = ""
+                                      Actions = []
+                                      Politeness = Polite
+                                      LastSavedCommitTime = None }
+                                  Save = NotOffered
+                                  Conflict = None
+                                  NotSaved = [] }
+                        else None
+                    let details =
+                        closedDetails
+                            { Title = frame.Title
+                              ProblemStatement = (match frame.ProblemStatement with AsProjected u -> Understood.value u | AsStored v -> Visible.value v)
+                              Question = frame.Question |> Option.map (function AsProjected u -> Understood.value u | AsStored v -> Visible.value v) |> Option.defaultValue "" }
+                    empty (Ready frame) ScreenReady save details
+                | Some(LoadState.Loading _) -> empty (Waiting "Opening investigation") ScreenLoading None blank
+                | Some(LoadFailed(ProviderFailed(NotFound _))) -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
+                | Some(LoadFailed(ProviderFailed AuthenticationFailed)) -> let f = UiFailure.CredentialRefused in empty (Failed f) (ScreenFailed f) None blank
+                | Some(LoadFailed(ProviderFailed e)) -> let f = UiFailure.ProviderError(Classify.message e) in empty (Failed f) (ScreenFailed f) None blank
+                | Some(LoadFailed(Unverifiable fs)) -> let f = UiFailure.InvalidData(sprintf "%d verification failure(s)" fs.Length) in empty (Failed f) (ScreenFailed f) None blank
+                | Some UnavailableOffline -> let f = UiFailure.ProviderUnreachable in empty (Failed f) (ScreenFailed f) None blank
+                | Some NotLoaded
+                | None ->
+                    match s.Model.Connection with
+                    | Connected _ -> empty (Waiting "Opening investigation") ScreenLoading None blank
+                    | _ -> let f = UiFailure.CapabilityAbsent(DataVisible, "Connect a data repository to open this investigation.") in empty (Failed f) (ScreenFailed f) None blank
 
     let private unknownFact label = { Label = label; Status = FactUnknown }
 

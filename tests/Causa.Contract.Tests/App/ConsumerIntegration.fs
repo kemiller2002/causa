@@ -24,7 +24,8 @@ module private Fixture =
           Now = fun () -> at
           StorageVersion = "1.1.0"
           Persistence = None
-          Provider = None }
+          Provider = None
+          WorkingCopy = None }
 
     let identifier = Guid.Parse "6b1c6f0e-2f7a-4a52-9a8e-0d8d6f1e3c11"
 
@@ -116,4 +117,5 @@ type ConsumerIntegration() =
         let event name value = sprintf "{\"kind\":\"Event\",\"event\":{\"kind\":\"Event\",\"name\":\"%s\",\"value\":\"%s\"}}" name value
         send (event "INV-001" "A checkpoint problem statement") |> ignore
         let after = send "{\"kind\":\"Event\",\"event\":{\"kind\":\"Event\",\"name\":\"INV-004\"}}"
-        Assert.Contains("not saved yet", after.GetProperty("announce.polite").GetString())
+        // The browser build writes to a data repository: before Connect, Start is refused with the reason, nothing created.
+        Assert.True(after.GetProperty("start.refused").GetBoolean())

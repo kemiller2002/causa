@@ -25,7 +25,8 @@ module AppDrive =
           Now = fun () -> DateTimeOffset.UtcNow
           StorageVersion = "1.1.0"
           Persistence = None
-          Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister } }
+          Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister }
+          WorkingCopy = None }
 
     let engine = Update.engine backend
 

@@ -99,6 +99,9 @@ let parse (message: string) : Inbound =
 
 /// The engine's backend: the one domain kernel, the host clock, the GitHub provider's read side (T18 requests and
 /// classifier, T20 lister), and no persistence adapter until T19 is merged.
+/// The working-copy run this deployment creates investigations in (CONTRACT section 9.4: workspaces/demo/causa-app-<run>).
+let run = "preview"
+
 let backend: Backend =
     { Kernel = Kernel.kernel
       Policies = Policies.coreDefault
@@ -106,13 +109,19 @@ let backend: Backend =
       Author = Actor.Human(NonEmptyText.create "causa-user" |> Option.get)
       Now = fun () -> DateTimeOffset.UtcNow
       StorageVersion = "1.1.0"
-      Persistence = None
-      Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister } }
+      Persistence =
+        Some
+            { Connector = Connect.connector
+              Machine = SaveMachines.withStorage (Actor.Human(NonEmptyText.create "causa-user" |> Option.get))
+              Lister = GitHubLister.lister
+              Codec = StorageCodecs.codec }
+      Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister }
+      WorkingCopy = WorkspaceAddress.workingCopy [] run }
 
 let config: AdapterConfig =
     { NewIdentifier = Guid.NewGuid
       Now = fun () -> DateTimeOffset.UtcNow
-      Run = "session"
+      Run = run
       SessionLocal = backend.Persistence.IsNone && backend.Provider.IsNone
       ValidateStart = Causa.App.Views.StartScreen.validate
       InvestigationOf = Update.investigationOf backend

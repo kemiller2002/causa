@@ -114,8 +114,15 @@ All 203 are open. They fall into these causes:
 | 42405580386 | `febf478` | success |
 | 42406706976 | `95c6dd9` | success |
 | 42407452267 | `aefd042` | success |
+| (dispatch at 20:08Z) | `85ba0ed` | success |
+| (dispatch at 20:33Z) | `f28fd9e` | success: **the frozen demo build** |
 
   Before each one, the coordinator told the coordination session, then ran the GitHub-independent suite against live (4 of 4 passed each time after `abdef87`).
+- **Checks on the frozen build `f28fd9e`** (implementer-run; a local build against the harness GitHub double seeded with causa-data's catalog):
+  - `workspace-catalog.spec.js`: 12/12 in Chromium (integration lane) and 12/12 in WebKit (coordinator). It covers four catalog cases at 1280 and 390 px, the working-copy record, save and read-back, the causal graph, and 44 px tap targets.
+  - Offline suites: App 52, Domain 14, Contract 31, Persistence 71, Invariants 7 (offline), Acceptance 71 (live excluded).
+  - Demo flows 8/8 against the double.
+- **Demo recording and slide deck:** `docs/demo/causa-demo.mp4` (2 min 19 s) and `docs/demo/causa-demo.html` (8 slides). They cover the application and how it was built with AI: testing, security and delivery. The recording uses the harness double, because the sandbox browser cannot authenticate to GitHub. Both are linked from the README.
 - **The causal graph**, a demonstration piece the owner asked for in the window: a pure F# layout, an inline SVG, Forma tokens only, and a text relationship index. It is in the Causal Analysis section.
 
 ## 6. Pages deploys from main that the coordinator cancelled
@@ -160,6 +167,10 @@ These decisions are the owner's, given in chat. **None is written as an owner re
 | 18 | Owner-reported: a duplicate hypothesis in the owner's data | Two separate Record actions: the form sat above the list on a phone. Layout changed; the data was left untouched |
 | 19 | A rebase-on-moved-head save could encode commands twice (found during item 18) | Fixed in `0695219`, with a contract test |
 | 20 | WebKit flaked once on the catalog spec | Re-runs passed; recorded as possibly flaky, not hidden |
+| 21 | Owner-reported: the graph did not demo well on a phone (one tall column, edges off-screen, a repeated label) | One panel per hypothesis at narrow widths; the full graph behind "Show full graph"; labels de-duplicated (`7d5527d`) |
+| 22 | Phone audit at 390 px: section links, card titles and the masthead link were 20–24 px tall; 11–13 px card text | 44 px targets and 14 px text (`7d5527d`, `f28fd9e`), with a 390 px tap-target test |
+| 23 | Audit-reported: Causal Analysis missing after a same-tab save and reopen | Not reproducible at `f28fd9e`; regression test `ReopenAfterSave` added |
+| 24 | The README did not explain how to run the project, and listed no known limitations | README rewritten: Try it now, Known limitations, Run it locally, Connect to your own data, Tests |
 
 ## 9. Governance findings
 

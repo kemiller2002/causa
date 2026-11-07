@@ -124,7 +124,7 @@ module FrameTests =
             | d when File.Exists(Path.Combine(d.FullName, "Causa.slnx")) -> d.FullName
             | d -> up d.Parent
         let html = File.ReadAllText(Path.Combine(up (DirectoryInfo AppContext.BaseDirectory), "web", "screens", "workspace-frame.html"))
-        Assert.Contains("class=\"ef-status-lozenge causa-save__state\" role=\"status\" aria-label=\"Save state\" data-requirement-id=\"INV-016\"", html)
+        Assert.Contains("class=\"ef-status-lozenge causa-save__state\" role=\"status\" aria-label=\"Save state\" aria-describedby=\"causa-save-explanation\" data-requirement-id=\"INV-016\"", html)
         Assert.Contains(">Save</button>", html)
         Assert.Contains("aria-label=\"Investigation sections\"", html)
         Assert.Contains("data-if=\"screen.investigation-workspace\"", html)

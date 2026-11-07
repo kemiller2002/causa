@@ -38,7 +38,8 @@ module InvestigationWorkspace =
               EvidenceSectionView.bindings view
               CausalAnalysisSectionView.bindings view
               TimelineSectionView.bindings view
-              ContentEditors.bindings view ]
+              ContentEditors.bindings view
+              CausalGraph.bindings view ]
 
     let bindings (view: WorkspaceView) : Bindings =
         Bind.merge

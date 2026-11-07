@@ -526,7 +526,6 @@ type ProviderRig(execute: Execute, connection: ConnectionContext, run: string) =
     let mutable now = DateTimeOffset(2026, 11, 7, 18, 0, 0, TimeSpan.Zero)
     let mutable scheduled : int list = []
     let mutable announced : string list = []
-    let random = Random(18)
     let address = WorkspaceAddress.workingCopy [] run |> Option.get
 
     let machine () = SaveMachines.withStorage actor (fun s -> bases.TryFind s.Id)
@@ -583,13 +582,12 @@ type ProviderRig(execute: Execute, connection: ConnectionContext, run: string) =
     /// A command envelope with a UUIDv7 id carrying the current time.
     member _.Command (investigation: Causa.Domain.InvestigationId) (command: Causa.Domain.CoreCommand) : Causa.Domain.CommandEnvelope =
         now <- now.AddMilliseconds 7.0
-        let bytes = Array.zeroCreate<byte> 16
-        random.NextBytes bytes
+        let bytes = Guid.NewGuid().ToByteArray()
         { CommandId = Writes.commandIdAt now bytes; Investigation = investigation; ExpectedVersion = None; Command = Causa.Domain.Core command }
 
     /// A new investigation's session at the fake's head, holding its StartInvestigation command.
     member this.Create (title: string) (problem: string) : InvestigationSession =
-        let inv = Causa.Domain.InvestigationId(Guid(Array.init 16 (fun _ -> byte (random.Next 256))))
+        let inv = Causa.Domain.InvestigationId(Guid.NewGuid())
         let start = this.Command inv (Causa.Domain.StartInvestigation { Title = text title; ObservationId = Guid.NewGuid(); Original = text problem })
         let head = (Provider.over execute connection).ReadHead() |> Result.defaultWith (fun e -> failwithf "head read failed: %A" e)
         (machine ()).InitialNew this.Writable inv head start true
@@ -654,7 +652,11 @@ type LiveRecorder(live: LiveRun) =
         |> Seq.choose (fun (r, o) ->
             match o with
             | Answered(_, 200, _, body) when r.Url.Contains "/git/ref/heads/" -> Json.parse body |> Json.path [ "object"; "sha" ] |> Json.text
-            | Answered(_, 200, _, body) when r.Url = GitHubRequests.GraphQlUrl -> Json.parse body |> Json.path [ "data"; "repository"; "ref"; "target"; "oid" ] |> Json.text
+            | Answered(_, 200, _, body) when r.Url = GitHubRequests.GraphQlUrl ->
+                // a head-and-files read names the head; a read-back names the commit it re-read
+                let j = Json.parse body
+                Json.path [ "data"; "repository"; "ref"; "target"; "oid" ] j |> Json.text
+                |> Option.orElse (Json.path [ "data"; "repository"; "c"; "oid" ] j |> Json.text)
             | _ -> None)
         |> List.ofSeq
     member _.Mutations = log |> Seq.filter GitHubRequests.isMutation |> List.ofSeq

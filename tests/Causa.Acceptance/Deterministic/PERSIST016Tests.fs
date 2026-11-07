@@ -13,6 +13,8 @@ module PERSIST016Tests =
     let private totalFailure name =
         let r = rig name
         let s0 = r.Create "Title" "Problem statement"
+        // what the tab read before the save (its base head) is not part of the save's network activity
+        let before = r.Fake.State.Received.Length
         for _ in 1..50 do
             r.Fake.Inject(LoseBeforeApplying, false)
         let mutable s = r.Step s0 SaveInput.SaveRequested
@@ -22,12 +24,12 @@ module PERSIST016Tests =
         s <- r.Step s SaveInput.WentOnline
         for _ in 1..5 do
             s <- r.Step s SaveInput.CheckAgain
-        r, s
+        r, s, before
 
     [<Fact>]
     let ``PERSIST-016-O1`` () =
-        let r, _ = totalFailure "persist016-o1"
-        Assert.True(r.Fake.State.Received.Length <= 1 + 4)
+        let r, _, before = totalFailure "persist016-o1"
+        Assert.True(r.Fake.State.Received.Length - before <= 1 + 4)
 
     [<Fact>]
     let ``PERSIST-016-O2`` () =
@@ -71,15 +73,16 @@ module PERSIST016Tests =
     /// O5: total failure: at most four mutations and at most four reconciliation reads in 60 s.
     [<Fact>]
     let ``PERSIST-016-O5`` () =
-        let r, _ = totalFailure "persist016-o5"
+        let r, _, before = totalFailure "persist016-o5"
+        let reads = r.Fake.State.Received |> List.skip before |> List.filter (fun (_, u) -> u.Contains "/git/ref/heads/") |> List.length
         Assert.True(r.Mutations <= 4)
-        Assert.True(headReads r <= 4, sprintf "%d reconciliation reads" (headReads r))
+        Assert.True(reads <= 4, sprintf "%d reconciliation reads" reads)
 
     /// O6 (PAT-08): counted under total network failure and under constant branch advance.
     [<Fact>]
     let ``PERSIST-016-O6`` () =
-        let r, _ = totalFailure "persist016-o6"
-        Assert.True(r.Mutations + headReads r <= 8)
+        let r, _, before = totalFailure "persist016-o6"
+        Assert.True(r.Fake.State.Received.Length - before <= 8)
         let r2 = rig "persist016-o6b"
         let s0 = r2.Create "T" "P"
         for _ in 1..10 do

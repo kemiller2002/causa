@@ -43,7 +43,7 @@ module Writes =
     /// loads, investigations and saves. Audit metadata in the commit message, never in the investigation's bytes.
     let marker (s: InvestigationSession) : WriteMarker =
         let (CommitOid head) = s.BaseHead
-        let basis = guidOf s.Id |> string |> fun g -> g + "/" + head
+        let basis = workspaceOf (Writable.address s.Address) + "/" + string (guidOf s.Id) + "/" + head
         let h = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes basis)
         let seq = (BitConverter.ToInt64(h, 0) &&& 0x0000FFFFFFFFFFFFL) * 16L + int64 (s.Mutations % 16)
         { Session = tabSession; Sequence = seq }

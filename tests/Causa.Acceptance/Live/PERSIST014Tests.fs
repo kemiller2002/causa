@@ -46,7 +46,7 @@ type PERSIST014Tests(fixture: LiveFixture<PERSIST014Tests>) =
         step a (observe a sA "after B") SaveInput.SaveRequested |> ignore
         let all = markers a @ markers b
         Assert.True(all.Length >= 3)
-        Assert.Equal(all.Length, (List.distinct all).Length)
+        Assert.True((all.Length = (List.distinct all).Length), sprintf "%A" all)
 
     /// O4 (PAT-02): markers of concurrent tabs and reloads differ.
     [<Fact>]

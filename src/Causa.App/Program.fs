@@ -1,9 +1,11 @@
-// Owner: integration (T10, T17). The engine entry the browser host calls (src/Causa.Host/Host.cs, IF41-APP): one Limen
-// message in, one Limen answer out, both as JSON. T17 wires the real path: a Limen event becomes a UiIntent
-// (Ui/Events.fs), the adapter (Ui/UiAdapter.fs) turns it into an engine message, the engine (Update.fs) decides it
-// through the domain kernel, and the adapter projects the AppView that View.bindings renders. Persistence is the
-// Backend's optional adapter: None until the persistence lane's slices are merged (T19/T20), so today every accepted
-// command stays in the tab, unsaved, and the screens say so.
+// Owner: integration (T10, T17, T20). The engine entry the browser host calls (src/Causa.Host/Host.cs, IF41-APP): one
+// Limen message in, one Limen answer out, both as JSON. A Limen event becomes a UiIntent (Ui/Events.fs), the adapter
+// (Ui/UiAdapter.fs) turns it into an engine message, the engine (Update.fs) decides it through the domain kernel and
+// asks for host effects; this file turns those into Limen effects (HTTP to api.github.com, navigation) and Limen's
+// results back into engine messages. The provider's read side (Connect, the investigation listing) is wired (T20);
+// saving arrives with the persistence adapter (T19), until then accepted commands stay in the tab, unsaved.
+// At load the app reads `deploy-connection.json` from its own origin (no credential sent) and, when the deployed test
+// build injected a connection, connects with it (EXT-DATA-004-O5, ODR-COMP-P13 A).
 module Causa.App.Program
 
 open System
@@ -11,14 +13,23 @@ open System.IO
 open System.Text
 open System.Text.Json
 open Causa.Domain
+open Causa.Persistence
 open Causa.Ui.Contracts
 open Causa.App.Ui
+
+/// The outcome of one Limen HTTP effect.
+type HttpResult =
+    | HttpSuccess of status: int * headers: (string * string) list * body: string
+    | HttpFailure of reason: string
+    | HttpCancelled
+    | HttpUnknown of reason: string
 
 /// The Limen browser-to-engine messages the engine distinguishes (Limen 0.9.1 protocol).
 type Inbound =
     | Initialize of origin: string * path: string * hash: string
     | LocationChanged of hash: string
     | Event of name: string * key: string option * value: string option
+    | HttpCompletedFor of correlationId: string * HttpResult
     | Other of kind: string
     | Malformed
 
@@ -35,32 +46,59 @@ let private tryString (element: JsonElement) =
     | JsonValueKind.String -> element.GetString() |> Option.ofObj
     | _ -> None
 
+let private httpResult (outcome: JsonElement) : HttpResult =
+    let str name = outcome |> tryProperty name |> Option.bind tryString
+    match str "kind" with
+    | Some "Success" ->
+        let status = outcome |> tryProperty "status" |> Option.filter (fun s -> s.ValueKind = JsonValueKind.Number) |> Option.map (fun s -> s.GetInt32()) |> Option.defaultValue 0
+        let headers =
+            match outcome |> tryProperty "headers" with
+            | Some h when h.ValueKind = JsonValueKind.Object ->
+                [ for p in h.EnumerateObject() do
+                      match tryString p.Value with
+                      | Some v -> yield p.Name, v
+                      | None -> () ]
+            | _ -> []
+        let body =
+            match outcome |> tryProperty "body" with
+            | Some b when b.ValueKind = JsonValueKind.String -> b.GetString() |> Option.ofObj |> Option.defaultValue ""
+            | Some b when b.ValueKind = JsonValueKind.Null || b.ValueKind = JsonValueKind.Undefined -> ""
+            | Some b -> b.GetRawText()
+            | None -> ""
+        HttpSuccess(status, headers, body)
+    | Some "Failure" -> HttpFailure(str "reason" |> Option.defaultValue "network")
+    | Some "Cancelled" -> HttpCancelled
+    | _ -> HttpUnknown(str "reason" |> Option.defaultValue "unknown")
+
 let parse (message: string) : Inbound =
     try
         use document = JsonDocument.Parse message
         let root = document.RootElement
-        let hash () =
-            root
-            |> tryProperty "location"
-            |> Option.bind (tryProperty "hash")
-            |> Option.bind tryString
-            |> Option.defaultValue ""
         let locationField name =
             root |> tryProperty "location" |> Option.bind (tryProperty name) |> Option.bind tryString |> Option.defaultValue ""
         match root |> tryProperty "kind" |> Option.bind tryString with
-        | Some "Initialize" -> Initialize(locationField "origin", locationField "path", hash ())
-        | Some "LocationChanged" -> LocationChanged(hash ())
+        | Some "Initialize" -> Initialize(locationField "origin", locationField "path", locationField "hash")
+        | Some "LocationChanged" -> LocationChanged(locationField "hash")
         | Some "Event" ->
             let event = root |> tryProperty "event"
             let field name = event |> Option.bind (tryProperty name) |> Option.bind tryString
             match field "name" with
             | Some name -> Event(name, field "key", field "value")
             | None -> Malformed
+        | Some "EffectResult" ->
+            let result = root |> tryProperty "result"
+            match result |> Option.bind (tryProperty "kind") |> Option.bind tryString,
+                  result |> Option.bind (tryProperty "correlationId") |> Option.bind tryString,
+                  result |> Option.bind (tryProperty "outcome") with
+            | Some "HttpResult", Some correlation, Some outcome -> HttpCompletedFor(correlation, httpResult outcome)
+            | Some kind, _, _ -> Other kind
+            | None, _, _ -> Malformed
         | Some kind -> Other kind
         | None -> Malformed
     with :? JsonException -> Malformed
 
-/// The engine's backend: the one domain kernel, the host clock, and no persistence adapter yet.
+/// The engine's backend: the one domain kernel, the host clock, the GitHub provider's read side (T18 requests and
+/// classifier, T20 lister), and no persistence adapter until T19 is merged.
 let backend: Backend =
     { Kernel = Kernel.kernel
       Policies = Policies.coreDefault
@@ -68,22 +106,50 @@ let backend: Backend =
       Author = Actor.Human(NonEmptyText.create "causa-user" |> Option.get)
       Now = fun () -> DateTimeOffset.UtcNow
       StorageVersion = "1.1.0"
-      Persistence = None }
+      Persistence = None
+      Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister } }
 
 let config: AdapterConfig =
     { NewIdentifier = Guid.NewGuid
       Now = fun () -> DateTimeOffset.UtcNow
       Run = "session"
-      SessionLocal = backend.Persistence.IsNone
+      SessionLocal = backend.Persistence.IsNone && backend.Provider.IsNone
       ValidateStart = Causa.App.Views.StartScreen.validate }
 
-let ui = UiAdapter.backend config (Update.engine backend)
+let engine = Update.engine backend
+let ui = UiAdapter.backend config engine
 
-/// The tab's state (the browser host is single-threaded; this is the only mutable value).
+/// What a Limen effect's correlation id stands for.
+type Pending =
+    | EngineRequest of RequestId
+    | DeployConnectionRead
+
+/// The headers the classifier reads (IF41-ERRORS: rate limits, retry).
+let private responseHeaders = [ "retry-after"; "x-ratelimit-remaining"; "x-ratelimit-reset" ]
+
+/// An engine answer for a Limen HTTP outcome. Limen's "network" failure means nothing can have changed (the method
+/// was safe or the browser was offline); any other failure may have reached the server.
+let outcomeOf (rid: RequestId) (result: HttpResult) : HttpOutcome =
+    match result with
+    | HttpSuccess(status, headers, body) -> Answered(rid, status, headers, body)
+    | HttpFailure "network" -> NotAnswered(rid, FailedBeforeSending)
+    | HttpFailure _
+    | HttpCancelled -> NotAnswered(rid, LostAfterSending)
+    | HttpUnknown "timeout-after-dispatch" -> NotAnswered(rid, TimedOut)
+    | HttpUnknown _ -> NotAnswered(rid, LostAfterSending)
+
+/// The tab's state (the browser host is single-threaded; these are its only mutable values).
 let mutable private state: AdapterState option = None
+let mutable private page = ""
+let mutable private pending: Map<string, Pending> = Map.empty
+let mutable private correlation = 0L
 
-/// Pure step: the next adapter state for a message.
-let step (current: AdapterState option) (inbound: Inbound) : AdapterState =
+let private nextCorrelation (prefix: string) =
+    correlation <- correlation + 1L
+    sprintf "%s-%d" prefix correlation
+
+/// Pure step: the next adapter state and the host effects it asked for.
+let step (current: AdapterState option) (inbound: Inbound) (pendingNow: Map<string, Pending>) : AdapterState * HostEffect list * bool =
     let ensure route =
         match current with
         | Some s -> s
@@ -92,21 +158,38 @@ let step (current: AdapterState option) (inbound: Inbound) : AdapterState =
     | Initialize(_, _, hash) ->
         let route = View.route hash
         match current with
-        | None -> ui.Init route |> fst
-        | Some s -> ui.Dispatch(UiIntent.Navigate route) s |> fst
+        | None -> ui.Init route |> fst, [], true
+        | Some s ->
+            let s2, fx = ui.Dispatch(UiIntent.Navigate route) s
+            s2, fx, false
     | LocationChanged hash ->
         let route = View.route hash
-        ui.Dispatch(UiIntent.Navigate route) (ensure route) |> fst
+        let s2, fx = ui.Dispatch(UiIntent.Navigate route) (ensure route)
+        s2, fx, false
     | Event(name, key, value) ->
         let s = ensure InvestigationsRoute
         match Events.toIntent name key value with
-        | Some intent -> ui.Dispatch intent s |> fst
-        | None -> s
+        | Some intent ->
+            let s2, fx = ui.Dispatch intent s
+            s2, fx, false
+        | None -> s, [], false
+    | HttpCompletedFor(id, result) ->
+        let s = ensure InvestigationsRoute
+        match pendingNow.TryFind id, result with
+        | Some(EngineRequest rid), _ ->
+            let s2, fx = UiAdapter.browser engine (HttpCompleted(outcomeOf rid result)) s
+            s2, fx, false
+        | Some DeployConnectionRead, HttpSuccess(200, _, body) ->
+            match DeployConnection.decode body with
+            | Ok(Some c) ->
+                let s2, fx = UiAdapter.deployConnect engine c.Repository c.Credential s
+                s2, fx, false
+            // No connection in the file, or a file that does not decode: the Connect form, exactly as before.
+            | Ok None
+            | Error _ -> s, [], false
+        | _ -> s, [], false
     | Other _
-    | Malformed -> ensure InvestigationsRoute
-
-/// Where the page is served (origin and path, from Initialize): a navigation the engine asks for stays on it.
-let mutable private page = ""
+    | Malformed -> ensure InvestigationsRoute, [], false
 
 /// A Limen navigation request when the engine moved the route itself (an accepted Start opens its workspace). Never in
 /// answer to LocationChanged: the browser has already moved (Limen routing rule).
@@ -115,9 +198,51 @@ let navigation (before: UiRoute option) (after: UiRoute) (inbound: Inbound) : st
     | Event _, Some previous when previous <> after && page <> "" -> Some(page + Navigation.format after)
     | _ -> None
 
-let mutable private correlation = 0L
+let private methodName (m: HttpMethod) =
+    match m with
+    | Get -> "GET"
+    | Post -> "POST"
+    | Put -> "PUT"
+    | Patch -> "PATCH"
 
-let private render (view: AppView) (push: string option) : string =
+let private writeHttp (writer: Utf8JsonWriter) (id: string) (request: HttpRequest) =
+    writer.WriteStartObject()
+    writer.WriteString("kind", "Http")
+    writer.WriteString("correlationId", id)
+    writer.WriteString("method", methodName request.Method)
+    writer.WriteString("url", request.Url)
+    writer.WriteStartObject "headers"
+    for k, v in request.Headers do
+        writer.WriteString(k, v)
+    writer.WriteEndObject()
+    request.Body |> Option.iter (fun b -> writer.WriteString("body", b))
+    writer.WriteNumber("timeoutMs", 30000)
+    writer.WriteString("response", "text")
+    writer.WriteStartArray "responseHeaders"
+    for h in responseHeaders do
+        writer.WriteStringValue h
+    writer.WriteEndArray()
+    writer.WriteString("credentials", "omit")
+    writer.WriteEndObject()
+
+/// The same-origin read of the deploy connection: a GET without credentials (TEST-DEPLOY-KEY section 2.4).
+let private writeDeployRead (writer: Utf8JsonWriter) (id: string) (url: string) =
+    writer.WriteStartObject()
+    writer.WriteString("kind", "Http")
+    writer.WriteString("correlationId", id)
+    writer.WriteString("method", "GET")
+    writer.WriteString("url", url)
+    writer.WriteNumber("timeoutMs", 15000)
+    writer.WriteString("response", "text")
+    writer.WriteString("credentials", "omit")
+    writer.WriteEndObject()
+
+/// The URL of a file next to the page (a GitHub Pages project site lives under /<repository>/).
+let private beside (file: string) =
+    let slash = page.LastIndexOf '/'
+    (if slash >= 0 then page.Substring(0, slash + 1) else page + "/") + file
+
+let private render (view: AppView) (effects: HostEffect list) (deployRead: bool) (push: string option) : string =
     use stream = new MemoryStream()
     (
         use writer = new Utf8JsonWriter(stream)
@@ -125,13 +250,27 @@ let private render (view: AppView) (push: string option) : string =
         writer.WritePropertyName "view"
         View.writeBindings writer (View.bindings view)
         writer.WriteStartArray "effects"
+        for e in effects do
+            match e with
+            | Http request ->
+                let id = nextCorrelation "http"
+                pending <- pending |> Map.add id (EngineRequest request.Id)
+                writeHttp writer id request
+            // Timers, the leave guard and downloads arrive with the save machine (T19); announcements are in the view.
+            | Timer _
+            | SetLeaveGuard _
+            | Download _
+            | LiveAnnounce _ -> ()
+        if deployRead && page <> "" then
+            let id = nextCorrelation "deploy"
+            pending <- pending |> Map.add id DeployConnectionRead
+            writeDeployRead writer id (beside DeployConnection.FileName)
         match push with
         | Some url ->
-            correlation <- correlation + 1L
             writer.WriteStartObject()
             writer.WriteString("kind", "Navigation")
             writer.WriteString("operation", "push")
-            writer.WriteString("correlationId", sprintf "nav-%d" correlation)
+            writer.WriteString("correlationId", nextCorrelation "nav")
             writer.WriteString("url", url)
             writer.WriteEndObject()
         | None -> ()
@@ -142,14 +281,16 @@ let private render (view: AppView) (push: string option) : string =
     )
     Encoding.UTF8.GetString(stream.ToArray())
 
-/// One Limen message (JSON) in, one Limen answer (JSON) out. Host effects other than announcements (HTTP, timers,
-/// the leave guard, downloads) arrive with the persistence adapter; the adapter keeps announcements in the view.
+/// One Limen message (JSON) in, one Limen answer (JSON) out.
 let dispatch (message: string) : string =
     let inbound = parse message
     match inbound with
     | Initialize(origin, path, _) -> page <- origin + path
     | _ -> ()
     let before = state |> Option.map (fun s -> s.Local.Route)
-    let next = step state inbound
+    let next, effects, firstLoad = step state inbound pending
+    match inbound with
+    | HttpCompletedFor(id, _) -> pending <- pending |> Map.remove id
+    | _ -> ()
     state <- Some next
-    render (ui.Project next) (navigation before next.Local.Route inbound)
+    render (ui.Project next) effects firstLoad (navigation before next.Local.Route inbound)

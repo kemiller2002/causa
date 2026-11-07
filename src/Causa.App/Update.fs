@@ -20,6 +20,10 @@ type Persistence =
       Lister: WorkspaceLister
       Codec: StorageCodec }
 
+/// The provider's read side: Connect and the investigation listing (T20). Used when no full persistence adapter is
+/// wired; a Persistence adapter brings its own and takes precedence.
+type ProviderSeam = { Connector: Connector; Lister: WorkspaceLister }
+
 /// Everything the engine takes from outside. Swapping Persistence = None for Some adapter is the whole integration of
 /// the provider; the domain side is always the one kernel.
 type Backend =
@@ -31,7 +35,8 @@ type Backend =
       Now: unit -> DateTimeOffset
       /// The storage contract version written into new events (formatVersion and semanticVersion).
       StorageVersion: string
-      Persistence: Persistence option }
+      Persistence: Persistence option
+      Provider: ProviderSeam option }
 
 /// Why a message changed nothing, as words for the live region (never a silent drop).
 type Refusal =
@@ -41,6 +46,19 @@ type Refusal =
 [<RequireQualifiedAccess>]
 module Update =
     let private nextId (RequestId n) = RequestId(n + 1L)
+
+    /// The connector and lister in use: the persistence adapter's, else the provider seam's.
+    let private connectorOf (backend: Backend) =
+        match backend.Persistence, backend.Provider with
+        | Some p, _ -> Some p.Connector
+        | None, Some r -> Some r.Connector
+        | None, None -> None
+
+    let private listerOf (backend: Backend) =
+        match backend.Persistence, backend.Provider with
+        | Some p, _ -> Some p.Lister
+        | None, Some r -> Some r.Lister
+        | None, None -> None
 
     let private announce politeness text = LiveAnnounce(politeness, text)
 
@@ -208,29 +226,45 @@ module Update =
             | Error fault -> refuse (Rejected fault.Reason) model
 
     let private connection (backend: Backend) (input: ConnectionInput) (model: Model) =
-        match input, backend.Persistence with
-        | ConnectionInput.ConnectSubmitted(repository, credential), Some p ->
+        match input, connectorOf backend with
+        | ConnectionInput.ConnectSubmitted(repository, credential), Some connector ->
             let ctx = { Repository = repository; Credential = credential }
             { model with
                 Connection = Connecting model.NextRequestId
                 Context = Some ctx
                 NextRequestId = nextId model.NextRequestId },
-            [ Http(p.Connector.ConnectRequest model.NextRequestId ctx) ]
+            [ Http(connector.ConnectRequest model.NextRequestId ctx) ]
         | ConnectionInput.ConnectSubmitted _, None -> refuse (NotWired "Connecting") model
         | ConnectionInput.ConnectSucceeded canWrite, _ -> { model with Connection = Connected canWrite }, [ announce Polite "Connected." ]
         | ConnectionInput.ConnectRefused _, _
         | ConnectionInput.AuthFailed, _ -> { model with Connection = CredentialRefused; Context = None }, [ announce Assertive "GitHub refused the access token." ]
-        | ConnectionInput.ReconnectSubmitted credential, Some p ->
+        | ConnectionInput.ReconnectSubmitted credential, Some connector ->
             match model.Context with
             | Some ctx ->
                 let ctx = { ctx with Credential = credential }
                 { model with Connection = Reauthenticating; Context = Some ctx; NextRequestId = nextId model.NextRequestId },
-                [ Http(p.Connector.ConnectRequest model.NextRequestId ctx) ]
+                [ Http(connector.ConnectRequest model.NextRequestId ctx) ]
             | None -> refuse (Rejected "Connect first.") model
         | ConnectionInput.ReconnectSubmitted _, None -> refuse (NotWired "Reconnecting") model
         | ConnectionInput.DisconnectConfirmed, _ ->
             { model with Connection = Disconnected; Context = None; Listings = Map.empty; ListingsInFlight = Map.empty },
             [ announce Polite "Disconnected." ]
+
+    /// Lists a workspace (v4.1.5 L1). Nothing is written (EXT-DATA-006).
+    let private list (backend: Backend) (target: ListingTarget) (model: Model) =
+        match listerOf backend, requestContext backend model None with
+        | None, _ -> refuse (NotWired "Listing investigations") model
+        | Some _, None -> refuse (Rejected "Connect a data repository first.") model
+        | Some lister, Some ctx ->
+            let step, request = lister.List ctx target
+            { model with ListingsInFlight = model.ListingsInFlight |> Map.add request.Id (target, step); NextRequestId = nextId model.NextRequestId },
+            [ Http request ]
+
+    /// Connect accepted (EXT-DATA-005): connected with the write scope GitHub states, then the active catalog is listed
+    /// (EXT-DATA-003: the connected repository's catalog, EXT-DATA-013).
+    let private connected (backend: Backend) (canWrite: bool) (model: Model) =
+        let model, fx = list backend ActiveCatalog { model with Connection = Connected canWrite }
+        model, announce Polite (if canWrite then "Connected. Changes can be saved." else "Connected, read-only.") :: fx
 
     /// An answer from the host goes to whatever awaits its request id; an answer nothing awaits is superseded.
     let private httpCompleted (backend: Backend) (outcome: HttpOutcome) (model: Model) =
@@ -238,9 +272,9 @@ module Update =
             match outcome with
             | Answered(id, _, _, _) -> id
             | NotAnswered(id, _) -> id
-        match backend.Persistence with
+        match connectorOf backend with
         | None -> model, []
-        | Some p ->
+        | Some connector ->
             let claimed =
                 model.Sessions |> Map.exists (fun _ s -> s.Outstanding |> Option.exists (fun (id, _) -> id = rid))
                 || model.ListingsInFlight.ContainsKey rid
@@ -252,8 +286,8 @@ module Update =
                 | _ -> false
             match awaitsConnect with
             | true ->
-                match p.Connector.InterpretConnect rid outcome with
-                | ConnectAccepted canWrite -> { model with Connection = Connected canWrite }, [ announce Polite "Connected." ]
+                match connector.InterpretConnect rid outcome with
+                | ConnectAccepted canWrite -> connected backend canWrite model
                 | ConnectRejected _ -> { model with Connection = CredentialRefused; Context = None }, [ announce Assertive "GitHub refused the access token." ]
                 | ConnectSuperseded -> model, []
             | false ->
@@ -261,17 +295,18 @@ module Update =
                 | None -> model, []
                 | Some ctx ->
                     match model.Sessions |> Map.tryFindKey (fun _ s -> s.Outstanding |> Option.exists (fun (id, _) -> id = rid)) with
-                    | Some ref ->
+                    | Some ref when backend.Persistence.IsSome ->
+                        let p = backend.Persistence.Value
                         let session = model.Sessions[ref]
                         match (machineFor p model).Interpret ctx session outcome with
                         | NextRequest(s, request) ->
                             { model with Sessions = model.Sessions |> Map.add ref s; NextRequestId = nextId model.NextRequestId }, [ Http request ]
                         | MachineEvent input -> sessionInput backend ref input model
-                    | None ->
+                    | _ ->
                         match model.ListingsInFlight |> Map.tryFind rid with
                         | Some(target, step) ->
                             let inFlight = model.ListingsInFlight |> Map.remove rid
-                            match p.Lister.InterpretList ctx target step outcome with
+                            match (listerOf backend |> Option.get).InterpretList ctx target step outcome with
                             | ListingComplete listing ->
                                 { model with ListingsInFlight = inFlight; Listings = model.Listings |> Map.add listing.Address listing }, []
                             | ListingNextRequest(next, request) ->
@@ -282,7 +317,8 @@ module Update =
                             | ListingFailed _ -> { model with ListingsInFlight = inFlight }, [ announce Assertive "The workspace could not be listed." ]
                         | None ->
                             match model.Loads |> Map.tryFindKey (fun _ l -> match l with LoadState.Loading(id, _) -> id = rid | _ -> false) with
-                            | Some ref ->
+                            | Some ref when backend.Persistence.IsSome ->
+                                let p = backend.Persistence.Value
                                 match (machineFor p model).InterpretLoad ctx model.Loads[ref] outcome with
                                 | LoadNextRequest(l, request) ->
                                     { model with Loads = model.Loads |> Map.add ref l; NextRequestId = nextId model.NextRequestId }, [ Http request ]
@@ -292,16 +328,9 @@ module Update =
                                         let fx, sent = hostEffects effects
                                         { model with Loads = model.Loads |> Map.add ref l; NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }, fx
                                     | Error fault -> refuse (Rejected fault.Reason) model
-                            | None -> model, []
+                            | _ -> model, []
 
-    let private listRequested (backend: Backend) (target: ListingTarget) (model: Model) =
-        match backend.Persistence, requestContext backend model None with
-        | None, _ -> refuse (NotWired "Listing investigations") model
-        | Some _, None -> refuse (Rejected "Connect a data repository first.") model
-        | Some p, Some ctx ->
-            let step, request = p.Lister.List ctx target
-            { model with ListingsInFlight = model.ListingsInFlight |> Map.add request.Id (target, step); NextRequestId = nextId model.NextRequestId },
-            [ Http request ]
+    let private listRequested (backend: Backend) (target: ListingTarget) (model: Model) = list backend target model
 
     let private network (input: NetworkInput) (model: Model) =
         match input with

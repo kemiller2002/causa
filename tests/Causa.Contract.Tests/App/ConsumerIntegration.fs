@@ -23,7 +23,8 @@ module private Fixture =
           Author = Actor.Human(NonEmptyText.create "test" |> Option.get)
           Now = fun () -> at
           StorageVersion = "1.1.0"
-          Persistence = None }
+          Persistence = None
+          Provider = None }
 
     let identifier = Guid.Parse "6b1c6f0e-2f7a-4a52-9a8e-0d8d6f1e3c11"
 

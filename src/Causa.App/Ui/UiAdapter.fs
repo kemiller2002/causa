@@ -54,7 +54,9 @@ type Local =
       StartErrors: ValidationError list
       Submission: Submission
       /// The newest first; the shell shows the latest of each politeness.
-      Announcements: (Politeness * string) list }
+      Announcements: (Politeness * string) list
+      /// Connected with the deployed test build's injected connection (EXT-DATA-004-O5), not a typed key.
+      DeployConnected: bool }
 
 type AdapterState = { Model: Model; Local: Local }
 
@@ -176,6 +178,24 @@ module UiAdapter =
         let s2, fx = step engine (Msg.Navigate(Route(Navigation.format InvestigationsRoute))) s
         { s2 with Local = { freshStart config s2.Local with Route = InvestigationsRoute } }, fx
 
+    /// A browser signal for the engine (an HTTP answer, connectivity, a timer, a leave attempt).
+    let browser (engine: Engine) (signal: BrowserSignal) (s: AdapterState) : AdapterState * HostEffect list =
+        step engine (Msg.Browser signal) s
+
+    /// The deployed test build's injected connection (EXT-DATA-004-O5): used only while the tab is disconnected, so a
+    /// connection the user already made is never replaced. The key stays the opaque credential.
+    let deployConnect (engine: Engine) (repository: Repository) (credential: Credential.T) (s: AdapterState) : AdapterState * HostEffect list =
+        match s.Model.Connection with
+        | Disconnected ->
+            let s2, fx = step engine (Msg.Connection(ConnectionInput.ConnectSubmitted(repository, credential))) s
+            { s2 with
+                Local =
+                    { s2.Local with
+                        DeployConnected = true
+                        Form = { Owner = repository.Owner; Repository = repository.Name; Branch = repository.Branch; CredentialEntered = true } } },
+            fx
+        | _ -> s, []
+
     let private currentRef (s: AdapterState) =
         match s.Local.Route with
         | WorkspaceRoute(t, _) ->
@@ -220,7 +240,11 @@ module UiAdapter =
           Errors = s.Local.Errors
           Connect = (match s.Model.Connection with Connected _ | Connecting _ -> NotOffered | _ -> Available)
           Disconnect = (match s.Model.Connection with Connected _ -> Available | _ -> NotOffered)
-          Connected = s.Model.Context |> Option.map (fun c -> sprintf "%s/%s on %s" c.Repository.Owner c.Repository.Name c.Repository.Branch)
+          Connected =
+            s.Model.Context
+            |> Option.map (fun c ->
+                if s.Local.DeployConnected then sprintf "%s/%s@%s (test deployment)" c.Repository.Owner c.Repository.Name c.Repository.Branch
+                else sprintf "%s/%s on %s" c.Repository.Owner c.Repository.Name c.Repository.Branch)
           WriteScope = (match s.Model.Connection with Connected true -> Writable | Connected false -> ReadOnlyConnection | _ -> WriteScopeUnknown) }
 
     let private sessionLocalFailure =
@@ -245,16 +269,48 @@ module UiAdapter =
           Cancel = Available
           Submission = s.Local.Submission }
 
+    /// One card per listed investigation (UI-001, UI-022): title and place as stored (Data Visible); lifecycle and
+    /// counts are not claimed before the investigation is opened and replayed.
+    let summaries (listing: Listing) : InvestigationSummary list =
+        listing.Investigations
+        |> List.map (fun i ->
+            let (Workspace workspace) = i.Ref.Address.Workspace
+            let catalog = i.Ref.Address.Role = WorkspaceRole.Catalog
+            let route =
+                WorkspaceRoute(
+                    { Workspace = workspace; Role = (if catalog then WorkspaceRole.Catalog else WorkspaceRole.WorkingCopy); Id = i.Ref.Id },
+                    Overview
+                )
+            { Ref = i.Ref
+              Title = i.Title |> Option.defaultValue (let (InvestigationId g) = i.Ref.Id in g.ToString "D")
+              Status = None
+              LastActivity = None
+              Counts = None
+              Copy = (if catalog then FrozenDemonstration else WorkingCopy)
+              Href = Navigation.format route })
+
     let listView (config: AdapterConfig) (s: AdapterState) : InvestigationListView =
+        let listings = s.Model.Listings |> Map.toList |> List.map snd
+        let investigations, state =
+            match s.Model.Connection, listings with
+            | Connected _, [] when s.Model.ListingsInFlight.IsEmpty ->
+                Failed(UiFailure.ProviderError "The investigations could not be listed."), ScreenFailed(UiFailure.ProviderError "The investigations could not be listed.")
+            | Connected _, [] -> Waiting "Listing investigations", ScreenLoading
+            | Connected _, _ ->
+                let all = listings |> List.collect summaries
+                let (CommitOid commit) = (List.head listings).ReadAt
+                Ready(Visible.stored { Path = "catalog/active.json"; Commit = Some commit } all), (if all.IsEmpty then ScreenEmpty else ScreenReady)
+            | _ -> NotRequested, ScreenReady
         { Connection = connectionView s
-          Investigations = (match s.Model.Connection with Connected _ -> Waiting "Listing investigations" | _ -> NotRequested)
+          Investigations = investigations
           Sort = ByUpdated
           NewInvestigation =
             (match s.Model.Connection with
              | Connected true -> Available
+             | Connected false -> Unavailable "This token cannot save changes."
              | _ when config.SessionLocal -> Available
              | _ -> NotOffered)
-          State = (match s.Model.Connection with Connected _ -> ScreenLoading | _ -> ScreenReady) }
+          State = state }
 
     let private notFound (requested: string) : NotFoundView =
         { Requested = requested
@@ -310,7 +366,8 @@ module UiAdapter =
               StartCommandId = CommandIds.at (config.Now())
               StartErrors = []
               Submission = Submission.NotSubmitted
-              Announcements = [] } },
+              Announcements = []
+              DeployConnected = false } },
         effects
 
     /// The frozen Engine as a UiBackend. Effects are the frozen HostEffect, performed by the browser host.

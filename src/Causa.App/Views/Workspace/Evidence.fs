@@ -23,5 +23,5 @@ module EvidenceSectionView =
                           Bind.cellText "url" (url |> Option.defaultValue "")
                           Bind.cellText "captured" (e.CapturedAt |> Option.map Copy.date |> Option.defaultValue "Not recorded")
                           Bind.cellText "bearing" (SectionData.linkSummary e.Links)
-                          Bind.cellText "assessments" (SectionData.assessmentLines (fun l -> l.HypothesisStatement) e.Links)
+                          Bind.cellText "assessments" (SectionData.evidenceAssessments e.Links)
                           Bind.cellFlag "hasAssessments" (e.Links |> List.exists (fun l -> l.Current)) ] ])

@@ -109,7 +109,15 @@
 }
 /* Content editors (writable working copy only). */
 .causa-editor { max-inline-size: var(--ef-layout-measure); }
-.causa-editor textarea, .causa-editor input { inline-size: 100%; box-sizing: border-box; min-block-size: var(--ef-layout-target-min); }
+.causa-editor textarea, .causa-editor input:not([type="radio"]) { inline-size: 100%; box-sizing: border-box; min-block-size: var(--ef-layout-target-min); }
+/* Choice groups (relationship kind, evidence category, conclusion strength): the whole card is the radio's own target,
+   so the input covers its card (still invisible, Forma draws the mark) and the card's text is not a second target. */
+.causa-choices { margin: 0; padding: 0; border: 0; min-inline-size: 0; }
+.causa-choices .ef-choice { cursor: default; min-block-size: var(--ef-layout-target-min); }
+.causa-choices .ef-choice input { inset: 0; inline-size: 100%; block-size: 100%; margin: 0; cursor: pointer; }
+.causa-choices .ef-choice:has(input:focus-visible) { outline: 3px solid var(--ef-color-focus-ring); outline-offset: 2px; }
+.causa-choices .ef-choice__content { overflow-wrap: anywhere; }
+.causa-editor .ef-select__input { box-sizing: border-box; min-block-size: var(--ef-layout-target-min); }
 .causa-editor__actions { gap: var(--ef-primitive-space-2); }
 .causa-editor .causa-item__note:empty { display: none; }
 .causa-list__entry { list-style: none; }

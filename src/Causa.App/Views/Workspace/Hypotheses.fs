@@ -28,5 +28,5 @@ module HypothesesSectionView =
                           Bind.cellText "explanation" (h.Explanation |> Option.defaultValue "")
                           Bind.cellFlag "hasExplanation" h.Explanation.IsSome
                           Bind.cellText "evidence" (SectionData.linkSummary h.Links)
-                          Bind.cellText "assessments" (SectionData.assessmentLines (fun l -> l.EvidenceLabel) h.Links)
+                          Bind.cellText "assessments" (SectionData.hypothesisAssessments h.Links)
                           Bind.cellFlag "hasAssessments" (h.Links |> List.exists (fun l -> l.Current)) ] ])

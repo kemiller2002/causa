@@ -30,7 +30,7 @@
         </div>
         <template data-if="save.present">
           <div class="ef-record-header__actions ef-cluster causa-save" data-requirement-id="INV-043">
-            <p class="ef-status-lozenge causa-save__state" role="status" aria-label="Save state" data-requirement-id="INV-016" data-bind-data-state="save.state" data-text="save.label"></p>
+            <p class="ef-status-lozenge causa-save__state" role="status" aria-label="Save state" aria-describedby="causa-save-explanation" data-requirement-id="INV-016" data-bind-data-state="save.state" data-text="save.label"></p>
             <template data-if="save.offered">
               <button class="ef-button causa-action-primary" type="button" data-requirement-id="INV-015" data-event="INV-015" data-bind-disabled="save.disabled">Save</button>
             </template>
@@ -42,7 +42,7 @@
       </header>
 
       <template data-if="save.present">
-        <div class="ef-stack causa-save__details">
+        <div class="ef-stack causa-save__details" id="causa-save-explanation">
         <p class="causa-save__detail" data-text="save.text"></p>
         <template data-if="save.last-saved-present"><p class="causa-save__detail">Last saved: <span data-text="save.last-saved"></span></p></template>
         <template data-if="save.conflict-present"><p class="causa-save__detail" role="alert" data-text="save.conflict"></p></template>

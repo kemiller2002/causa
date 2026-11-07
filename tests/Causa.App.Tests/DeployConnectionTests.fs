@@ -210,3 +210,34 @@ type DeployConnectionTests() =
         Assert.Contains(typed, fun e -> (Deploy.str "url" e |> string).EndsWith "/repos/someone/their-data")
         let answer = Causa.App.Program.dispatch (Deploy.httpResult (Deploy.str "correlationId" read) 200 (render (Some Deploy.settings)))
         Assert.DoesNotContain(Deploy.effects answer, fun e -> Deploy.str "kind" e = "Http")
+
+/// Connect with the deployment's fine-grained token: GitHub's repository answer has no `permissions` object.
+type FineGrainedConnectTests() =
+    let id = Causa.Persistence.RequestId 7L
+
+    // Recorded shape of the live preview's answer (the body trimmed to its identifying fields; no permissions, no
+    // x-oauth-scopes header).
+    let fineGrained =
+        """{"id":1,"name":"causa-data","full_name":"kemiller2002/causa-data","private":false,"owner":{"login":"kemiller2002"},"default_branch":"main","visibility":"public"}"""
+
+    [<Fact>]
+    member _.``a 200 without permissions is accepted and saving is left to GitHub at the first commit``() =
+        let outcome = Causa.Persistence.Answered(id, 200, [ "content-type", "application/json; charset=utf-8" ], fineGrained)
+        Assert.Equal(Causa.Persistence.ConnectAccepted true, Causa.App.GitHubConnect.interpret id outcome)
+
+    [<Fact>]
+    member _.``stated permissions are still honoured exactly``() =
+        let readOnly = """{"full_name":"o/r","permissions":{"admin":false,"maintain":false,"push":false,"pull":true}}"""
+        let writer = """{"full_name":"o/r","permissions":{"admin":false,"push":true,"pull":true}}"""
+        Assert.Equal(Causa.Persistence.ConnectAccepted false, Causa.App.GitHubConnect.interpret id (Causa.Persistence.Answered(id, 200, [], readOnly)))
+        Assert.Equal(Causa.Persistence.ConnectAccepted true, Causa.App.GitHubConnect.interpret id (Causa.Persistence.Answered(id, 200, [], writer)))
+
+    [<Fact>]
+    member _.``a refusal or another request's answer is never accepted``() =
+        match Causa.App.GitHubConnect.interpret id (Causa.Persistence.Answered(id, 401, [], """{"message":"Bad credentials"}""")) with
+        | Causa.Persistence.ConnectRejected _ -> ()
+        | other -> Assert.Fail(sprintf "401 gave %A" other)
+        match Causa.App.GitHubConnect.interpret id (Causa.Persistence.Answered(id, 404, [], """{"message":"Not Found"}""")) with
+        | Causa.Persistence.ConnectRejected _ -> ()
+        | other -> Assert.Fail(sprintf "404 gave %A" other)
+        Assert.Equal(Causa.Persistence.ConnectSuperseded, Causa.App.GitHubConnect.interpret id (Causa.Persistence.Answered(Causa.Persistence.RequestId 8L, 200, [], fineGrained)))

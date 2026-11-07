@@ -526,7 +526,13 @@ module UiAdapter =
           Diagnostics = [] }
 
     let settingsView (s: AdapterState) : SettingsView =
-        { Preferences = []
+        { // The one preference this build has: the investigation list's order, which the list view applies (ByUpdated).
+          Preferences =
+            [ { Id = "list-sort"
+                Label = "Investigation list order"
+                Scope = SessionScope
+                Options = [ "Most recently updated"; "Title" ]
+                Effective = "Most recently updated" } ]
           ConnectionPreference = { Label = "Data repository connection"; Status = FactKnown(Connection.describe s.Model.Connection) } }
 
     let project (config: AdapterConfig) (s: AdapterState) : AppView =

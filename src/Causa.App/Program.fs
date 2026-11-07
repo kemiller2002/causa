@@ -111,11 +111,11 @@ let backend: Backend =
       StorageVersion = "1.1.0"
       Persistence =
         Some
-            { Connector = Connect.connector
+            { Connector = GitHubConnect.connector
               Machine = SaveMachines.withStorage (Actor.Human(NonEmptyText.create "causa-user" |> Option.get))
               Lister = GitHubLister.lister
               Codec = StorageCodecs.codec }
-      Provider = Some { Connector = Connect.connector; Lister = GitHubLister.lister }
+      Provider = Some { Connector = GitHubConnect.connector; Lister = GitHubLister.lister }
       WorkingCopy = WorkspaceAddress.workingCopy [] run }
 
 let config: AdapterConfig =

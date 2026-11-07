@@ -161,3 +161,34 @@ module GitHubLister =
     let lister : WorkspaceLister =
         { List = fun ctx _ -> ListHead, request ctx ListHead
           InterpretList = interpret }
+
+/// Connect (EXT-DATA-005) for the tokens the deployment uses. GitHub's repository answer carries a `permissions` object
+/// for classic tokens and OAuth/App user tokens; for a fine-grained personal access token it carries none (observed on
+/// the live preview: 200 with no `permissions` and no x-oauth-scopes header). Then the 200 itself proves read access to
+/// the named repository, and write access is not stated: Connect is accepted as able to save, and the first commit is
+/// where GitHub decides (createCommitOnBranch refused -> the error matrix's GH-PERMISSION / GH-AUTH -> Save failed,
+/// with the changes kept). A stated `permissions` object is still honoured exactly (push, maintain or admin).
+[<RequireQualifiedAccess>]
+module GitHubConnect =
+    let private statesPermissions (body: string) =
+        try
+            use doc = JsonDocument.Parse body
+            doc.RootElement.ValueKind = JsonValueKind.Object
+            && (match doc.RootElement.TryGetProperty "permissions" with
+                | true, p -> p.ValueKind = JsonValueKind.Object
+                | _ -> false)
+        with :? JsonException -> false
+
+    let interpret (expected: RequestId) (outcome: HttpOutcome) : ConnectResult =
+        match outcome with
+        | Answered(id, _, _, _)
+        | NotAnswered(id, _) when id <> expected -> ConnectSuperseded
+        | Answered(_, status, _, body) when status >= 200 && status < 300 && not (statesPermissions body) ->
+            match Classify.classify Operation.Connect outcome with
+            | Ok _ -> ConnectAccepted true
+            | Error e -> ConnectRejected e
+        | _ -> Connect.connector.InterpretConnect expected outcome
+
+    let connector : Connector =
+        { ConnectRequest = Connect.connector.ConnectRequest
+          InterpretConnect = interpret }

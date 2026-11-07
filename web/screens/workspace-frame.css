@@ -107,3 +107,9 @@
   font-weight: var(--ef-type-weight-strong, 600);
   color: var(--causa-teal-strong, var(--ef-color-accent-primary));
 }
+/* Content editors (writable working copy only). */
+.causa-editor { max-inline-size: var(--ef-layout-measure); }
+.causa-editor textarea, .causa-editor input { inline-size: 100%; box-sizing: border-box; min-block-size: var(--ef-layout-target-min); }
+.causa-editor__actions { gap: var(--ef-primitive-space-2); }
+.causa-editor .causa-item__note:empty { display: none; }
+.causa-list__entry { list-style: none; }

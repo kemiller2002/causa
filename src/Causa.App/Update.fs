@@ -131,8 +131,18 @@ module Update =
     /// A save the read-back confirmed (BaseHead moved to the saved commit) makes the saved history the session's new
     /// verified base: the previous base with the saved commands applied, the files the encoder wrote (the read-back
     /// matched them byte for byte), read at that commit. Later saves and the view rest on it (PERSIST-023).
-    let confirmBase (backend: Backend) (p: Persistence) (ref: InvestigationRef) (before: InvestigationSession) (after: InvestigationSession) (model: Model) : Model =
-        if after.BaseHead = before.BaseHead then model
+    ///
+    /// Only a confirmation re-bases: a read-back that matched, or a reconciliation that found this tab's bytes. A rebase
+    /// onto a fresh head during a save also moves BaseHead while the session still holds its unsaved commands; treating
+    /// that as a confirmation would put those commands into the base AND keep them unsaved, so the next encode would
+    /// write them twice.
+    let confirmBase (backend: Backend) (p: Persistence) (ref: InvestigationRef) (input: SaveInput) (before: InvestigationSession) (after: InvestigationSession) (model: Model) : Model =
+        let confirmation =
+            match input with
+            | SaveInput.ReadBackMatched _
+            | SaveInput.ReconcileMarkerBytesMatch _ -> true
+            | _ -> false
+        if not confirmation || after.BaseHead = before.BaseHead then model
         else
             let baseVerified =
                 match model.Loads |> Map.tryFind ref with
@@ -295,7 +305,7 @@ module Update =
                     { model with
                         Sessions = model.Sessions |> Map.add ref s
                         NextRequestId = (if sent then nextId model.NextRequestId else model.NextRequestId) }
-                (confirmBase backend p ref session s model', fx)
+                (confirmBase backend p ref input session s model', fx)
             | Error fault -> refuse (Rejected fault.Reason) model
 
     let private connection (backend: Backend) (input: ConnectionInput) (model: Model) =

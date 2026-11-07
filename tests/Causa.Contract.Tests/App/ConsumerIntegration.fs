@@ -374,3 +374,62 @@ type ReopenedWorkingCopy() =
         Assert.True(mutation.IsSome, "Save sent no commit")
         Assert.Contains("loadedhead", mutation.Value.Body.Value)
         Assert.Equal(SaveState.Saving, saving.Model.Sessions[ref].State)
+
+/// A hypothesis recorded once is saved once, even when the save rebases over another writer's commit and Save is
+/// pressed again: exactly one hypothesis and one hypothesis event in what GitHub holds.
+type SaveOnce() =
+    [<Fact>]
+    member _.``record, save over a moved head, save again: one hypothesis, one event``() =
+        let fake = Causa.TestSupport.StatefulFake()
+        let address = (WorkspaceAddress.workingCopy [] "save-once").Value
+        let writable = (Writable.ofAddress address).Value
+        let backend =
+            { Fixture.backend with
+                Persistence =
+                    Some
+                        { Connector = GitHubConnect.connector
+                          Machine = SaveMachines.withStorage Fixture.backend.Author
+                          Lister = GitHubLister.lister
+                          Codec = StorageCodecs.codec }
+                WorkingCopy = Some address }
+        let engine = Update.engine backend
+        let rec settle (model: Model) (effects: HostEffect list) =
+            match effects with
+            | [] -> model
+            | Http r :: rest -> let m, more = engine.Update (Msg.Browser(HttpCompleted(fake.Execute r))) model in settle m (rest @ more)
+            | _ :: rest -> settle model rest
+        let send msg model = let m, fx = engine.Update msg model in settle m fx
+        let connect () =
+            let m0, _ = engine.Init(Route "#/")
+            send (Msg.Connection(ConnectionInput.ConnectSubmitted(fake.WriteConnection.Repository, fake.WriteConnection.Credential))) m0
+        let id = InvestigationId(Guid.NewGuid())
+        let ref = { Address = address; Id = id }
+        let start =
+            { CommandId = CommandIds.at DateTimeOffset.UtcNow
+              Investigation = id
+              ExpectedVersion = None
+              Command = Core(StartInvestigation { Title = (NonEmptyText.create "Save once").Value; ObservationId = Guid.NewGuid(); Original = (NonEmptyText.create "Twice?").Value }) }
+        let started = connect () |> send (Msg.CreateRequested(writable, start)) |> send (Msg.SessionInput(ref, SaveInput.SaveRequested))
+        Assert.True((match started.Sessions[ref].State with SaveState.Saved _ -> true | _ -> false), "the start did not save")
+        let hypothesis =
+            { CommandId = CommandIds.at (DateTimeOffset.UtcNow.AddSeconds 1.0)
+              Investigation = id
+              ExpectedVersion = Some(AggregateVersion 1L)
+              Command = Core(RecordHypothesis { HypothesisId = HypothesisId(Guid.NewGuid()); Statement = (NonEmptyText.create "Only once").Value; Mechanism = None }) }
+        let recorded = send (Msg.DomainCommand hypothesis) started
+        // Another writer moves the head (an unrelated path), so this save rebases before it commits.
+        fake.CommitAsOtherWriter("another writer", [ "workspaces/demo/elsewhere/note.txt", Some(Text.Encoding.UTF8.GetBytes "x") ]) |> ignore
+        let saved = send (Msg.SessionInput(ref, SaveInput.SaveRequested)) recorded
+        Assert.True((match saved.Sessions[ref].State with SaveState.Saved _ -> true | _ -> false), sprintf "the hypothesis save ended %A" saved.Sessions[ref].State)
+        let savedAgain = send (Msg.SessionInput(ref, SaveInput.SaveRequested)) saved
+        Assert.True((match savedAgain.Sessions[ref].State with SaveState.Saved _ -> true | _ -> false))
+        // What this tab shows and what a fresh tab reads back from GitHub: one hypothesis, one hypothesis event.
+        let count (i: Investigation) =
+            i.Hypotheses.Count, i.Timeline |> List.filter (fun e -> match e.Payload with CoreEvent(HypothesisRecorded _) -> true | _ -> false) |> List.length
+        match Update.investigationOf backend savedAgain ref with
+        | Ok(Some i) -> Assert.Equal((1, 1), count i)
+        | other -> Assert.Fail(sprintf "%A" other)
+        let fresh = connect ()
+        match fresh.Loads |> Map.tryFind ref with
+        | Some(Loaded v) -> Assert.Equal((1, 1), count v.Investigation)
+        | other -> Assert.Fail(sprintf "the fresh tab did not load it: %A" other)

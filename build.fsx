@@ -322,15 +322,18 @@ let private envValue (name: string) = Environment.GetEnvironmentVariable name |>
 let deploySettings () : Result<Causa.Build.DeployConnection.Settings option, string> =
     if Causa.Build.DeployConnection.enabled envValue then Causa.Build.DeployConnection.settings envValue else Ok None
 
-/// Only the deploy build writes deploy-connection.json: the connection when the four secrets are set, else the schema
-/// alone. Other builds write nothing, and the app shows the Connect form.
+/// Every build writes deploy-connection.json, so the app's same-origin read never 404s. Only the deploy build reads
+/// the four secrets and can put the connection in it; every other build writes the schema alone (no connection), and
+/// the app shows the Connect form.
 let deployConnection () =
     if Causa.Build.DeployConnection.enabled envValue then
         deploySettings ()
         |> Result.map (fun s ->
             File.WriteAllText(Path.Combine(dist, Causa.Build.DeployConnection.FileName), Causa.Build.DeployConnection.render s)
             printfn "build: %s written (%s)" Causa.Build.DeployConnection.FileName (match s with Some c -> string c | None -> "no connection"))
-    else Ok()
+    else
+        File.WriteAllText(Path.Combine(dist, Causa.Build.DeployConnection.FileName), Causa.Build.DeployConnection.render None)
+        Ok()
 
 /// The build scans its own output: any GitHub token literal fails it, except the one deploy key in the root
 /// deploy-connection.json of the deploy build. Findings name the file, never the value.

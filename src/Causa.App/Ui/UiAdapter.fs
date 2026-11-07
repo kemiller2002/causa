@@ -633,15 +633,42 @@ module UiAdapter =
           Cancel = Available
           Submission = s.Local.Submission }
 
-    /// One card per listed investigation (UI-001, UI-022): title and place as stored (Data Visible); lifecycle and
-    /// counts are not claimed before the investigation is opened and replayed.
+    let private lifecycleText (l: Lifecycle) =
+        match l with
+        | Lifecycle.Draft -> "Draft"
+        | Lifecycle.Active -> "Active"
+        | Lifecycle.AwaitingEvidence -> "Awaiting evidence"
+        | Lifecycle.AwaitingVerification -> "Awaiting verification"
+        | Lifecycle.Resolved -> "Resolved"
+        | Lifecycle.Closed -> "Closed"
+        | Lifecycle.Archived -> "Archived"
+
+    /// What a card claims about an investigation once the kernel has replayed it (Data Understood at its version):
+    /// lifecycle, last activity and counts. Before it is loaded, or when its load failed, nothing is claimed (UI-022:
+    /// unknown is never shown as zero).
+    let projectedSummary (i: Investigation) =
+        let at v = AsProjected(Understood.projected i.Version v)
+        let lastActivity =
+            i.Timeline |> List.tryLast |> Option.map (fun e -> e.Provenance.OccurredAt) |> Option.defaultValue i.CreatedAt
+        let unresolved =
+            i.Contradictions
+            |> Map.filter (fun _ c -> c.State <> ContradictionState.ContradictionResolved && c.State <> ContradictionState.ContradictionAcceptedResidual && c.State <> ContradictionState.ContradictionSuperseded)
+            |> Map.count
+        at (lifecycleText i.Lifecycle),
+        lastActivity,
+        at { Hypotheses = Known i.Hypotheses.Count; Evidence = Known i.Evidence.Count; UnresolvedContradictions = Known unresolved }
+
+    /// One card per listed investigation (UI-001, UI-022): title and place as stored (Data Visible); lifecycle, last
+    /// activity and counts as the kernel projects them once the investigation is loaded, never claimed before.
     let summaries (model: Model) (listing: Listing) : InvestigationSummary list =
         listing.Investigations
         |> List.map (fun i ->
-            let loadedTitle =
+            let loaded =
                 match model.Loads |> Map.tryFind i.Ref with
-                | Some(Loaded v) -> Some(NonEmptyText.value v.Investigation.Title)
+                | Some(Loaded v) -> Some v.Investigation
                 | _ -> None
+            let loadedTitle = loaded |> Option.map (fun v -> NonEmptyText.value v.Title)
+            let projected = loaded |> Option.map projectedSummary
             let (Workspace workspace) = i.Ref.Address.Workspace
             let catalog = i.Ref.Address.Role = WorkspaceRole.Catalog
             let route =
@@ -651,9 +678,9 @@ module UiAdapter =
                 )
             { Ref = i.Ref
               Title = loadedTitle |> Option.orElse i.Title |> Option.defaultValue (let (InvestigationId g) = i.Ref.Id in g.ToString "D")
-              Status = None
-              LastActivity = None
-              Counts = None
+              Status = projected |> Option.map (fun (st, _, _) -> st)
+              LastActivity = projected |> Option.map (fun (_, last, _) -> last)
+              Counts = projected |> Option.map (fun (_, _, counts) -> counts)
               Copy = (if catalog then FrozenDemonstration else WorkingCopy)
               Href = Navigation.format route })
 
@@ -667,6 +694,11 @@ module UiAdapter =
             | Connected _, [] when s.Model.ListingsInFlight.IsEmpty ->
                 Failed(UiFailure.ProviderError "The investigations could not be listed."), ScreenFailed(UiFailure.ProviderError "The investigations could not be listed.")
             | Connected _, [] -> Waiting "Listing investigations", ScreenLoading
+            // Every card waits until its investigation is loaded or its load failed, so no card says "Not known" for
+            // data that is only in flight (UI-022); a failed load then shows its card with nothing claimed.
+            | Connected _, _ when not s.Model.ListingsInFlight.IsEmpty
+                                  || listings |> List.exists (fun l -> l.Investigations |> List.exists (fun i -> match s.Model.Loads.TryFind i.Ref with Some(LoadState.Loading _) -> true | _ -> false)) ->
+                Waiting "Loading investigations", ScreenLoading
             | Connected _, _ ->
                 let all = listings |> List.collect (summaries s.Model)
                 let (CommitOid commit) = (List.head listings).ReadAt
@@ -727,16 +759,6 @@ module UiAdapter =
           Save = saveAvailability
           Conflict = None
           NotSaved = notSaved }
-
-    let private lifecycleText (l: Lifecycle) =
-        match l with
-        | Lifecycle.Draft -> "Draft"
-        | Lifecycle.Active -> "Active"
-        | Lifecycle.AwaitingEvidence -> "Awaiting evidence"
-        | Lifecycle.AwaitingVerification -> "Awaiting verification"
-        | Lifecycle.Resolved -> "Resolved"
-        | Lifecycle.Closed -> "Closed"
-        | Lifecycle.Archived -> "Archived"
 
     /// The frame of an investigation the kernel projected (UI-013: every value at one version).
     let frameOf (target: RouteTarget) (section: Section) (ref: InvestigationRef) (i: Investigation) : WorkspaceFrame =

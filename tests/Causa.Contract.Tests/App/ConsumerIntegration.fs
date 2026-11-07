@@ -221,3 +221,47 @@ type ListingFailure() =
         | ListScreen l -> Assert.Equal(Failed UiFailure.ProviderRateLimited, l.Investigations)
         | other -> Assert.Fail(sprintf "%A" other)
         Assert.Contains(s.Local.Announcements, fun (_, t) -> t.Contains "rate limit")
+
+/// A listed card shows what the kernel projects once the investigation is loaded, and claims nothing before (UI-022).
+type ListedSummaries() =
+    [<Fact>]
+    member _.``a loaded card holds the real lifecycle, activity and counts; an unloaded one holds none``() =
+        let address = WorkspaceAddress.catalog (Workspace "workspaces/demo/demonstration-v1")
+        let loadedId = InvestigationId(Guid.Parse "6b1c6f0e-2f7a-4a52-9a8e-0d8d6f1e3c12")
+        let otherId = InvestigationId(Guid.Parse "6b1c6f0e-2f7a-4a52-9a8e-0d8d6f1e3c13")
+        let start =
+            { CommandId = CommandIds.at Fixture.at
+              Investigation = loadedId
+              ExpectedVersion = None
+              Command = Core(StartInvestigation { Title = (NonEmptyText.create "Loaded case").Value; ObservationId = Guid.NewGuid(); Original = (NonEmptyText.create "It broke.").Value }) }
+        let hypothesis =
+            { CommandId = CommandIds.at (Fixture.at.AddMinutes 1.0)
+              Investigation = loadedId
+              ExpectedVersion = Some(AggregateVersion 1L)
+              Command = Core(RecordHypothesis { HypothesisId = HypothesisId(Guid.NewGuid()); Statement = (NonEmptyText.create "A cause").Value; Mechanism = None }) }
+        let investigation =
+            [ start; hypothesis ] |> List.fold (fun acc c -> acc |> Result.bind (fun st -> Update.apply Fixture.backend st c |> Result.map Some)) (Ok None)
+            |> function Ok(Some i) -> i | other -> failwithf "%A" other
+        let loadedRef = { Address = address; Id = loadedId }
+        let otherRef = { Address = address; Id = otherId }
+        let listing =
+            { Address = address
+              ReadAt = CommitOid "c"
+              Investigations =
+                [ { Ref = loadedRef; Path = RepoPath "p1"; Title = Some "Loaded case"; ExpectedStateSha256 = None }
+                  { Ref = otherRef; Path = RepoPath "p2"; Title = Some "Not yet loaded"; ExpectedStateSha256 = None } ] }
+        let verified = { Investigation = investigation; History = investigation.Timeline; ReadAt = CommitOid "c"; Address = address; Bytes = { Manifest = [||]; Events = [||]; Snapshot = [||] } }
+        let model0, _ = Fixture.engine.Init(Route "#/")
+        let model = { model0 with Loads = Map.ofList [ loadedRef, Loaded verified; otherRef, LoadState.Loading(RequestId 9L, LoadHead) ] }
+        match UiAdapter.summaries model listing with
+        | [ loaded; other ] ->
+            match loaded.Status, loaded.Counts with
+            | Some(AsProjected s), Some(AsProjected c) ->
+                Assert.Equal("Draft", Understood.value s)
+                Assert.Equal({ Hypotheses = Known 1; Evidence = Known 0; UnresolvedContradictions = Known 0 }, Understood.value c)
+            | st, c -> Assert.Fail(sprintf "loaded card: %A %A" st c)
+            Assert.Equal(Some(Fixture.at.AddMinutes 1.0), loaded.LastActivity)
+            Assert.Equal(None, other.Status)
+            Assert.Equal(None, other.Counts)
+            Assert.Equal(None, other.LastActivity)
+        | other -> Assert.Fail(sprintf "%A" other)

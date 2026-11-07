@@ -364,11 +364,10 @@ module Update =
                             match (listerOf backend |> Option.get).InterpretList ctx target step outcome with
                             | ListingComplete listing ->
                                 let model = { model with ListingsInFlight = inFlight; Listings = model.Listings |> Map.add listing.Address listing }
-                                // A working copy's investigations are opened so the list can show their titles (J1-05).
-                                if listing.Address.Role = WorkspaceRole.WorkingCopy then
-                                    listing.Investigations
-                                    |> List.fold (fun (m, acc) i -> let m2, fx = openInvestigation backend i.Ref m in m2, acc @ fx) (model, [])
-                                else model, []
+                                // Every listed investigation is opened, so its card shows its title (J1-05), lifecycle and counts
+                                // (UI-001, UI-022). A catalog lists a handful; each open is one load (head, then its files).
+                                listing.Investigations
+                                |> List.fold (fun (m, acc) i -> let m2, fx = openInvestigation backend i.Ref m in m2, acc @ fx) (model, [])
                             | ListingNextRequest(next, request) ->
                                 { model with
                                     ListingsInFlight = inFlight |> Map.add request.Id (target, next)

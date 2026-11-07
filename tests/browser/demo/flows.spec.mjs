@@ -53,15 +53,37 @@ const primary = (page) => page.getByRole('navigation', { name: 'Primary', exact:
 const connectedText = (page) => page.getByText(/^Connected to/).first();
 const connectButton = (page) => page.getByRole('button', { name: 'Connect data repository', exact: true });
 
-/// Waits until the site is either connected or showing its Connect form; reports which.
+/// Whether the site's build carries a deploy connection (only its presence is read, never its key).
+const hasDeployConnection = async (page) =>
+  page.evaluate(async () => {
+    try {
+      const r = await fetch(new URL('deploy-connection.json', location.href), { cache: 'no-store' });
+      return r.ok && !!(await r.json())?.connection;
+    } catch {
+      return false;
+    }
+  });
+/// Waits until the site is connected or settled on its Connect form. With a deploy connection the form may show for a
+/// moment before the app connects, so the form counts only after 20 s without a connection.
 const connectionMode = async (page) => {
   await expect(connectedText(page).or(connectButton(page)).first(), 'neither "Connected to …" nor the Connect form appeared within 30 s').toBeVisible({ timeout: 30000 });
-  return (await connectedText(page).isVisible()) ? 'connected' : 'form';
+  if (await connectedText(page).isVisible()) return 'connected';
+  try {
+    await expect(connectedText(page)).toBeVisible({ timeout: 20000 });
+    return 'connected';
+  } catch {
+    return 'form';
+  }
+};
+const connectionProblem = async (page) => {
+  const refused = page.getByText(/refused the access token|could not connect|not connected/i).first();
+  return (await refused.isVisible()) ? (await refused.innerText()).replace(/\s+/g, ' ').trim() : '';
 };
 /// Connected to the data repository: by the deploy key, or with DEMO_* credentials when the site shows its form.
 const ensureConnected = async (page) => {
   await open(page, '#/');
   if ((await connectionMode(page)) === 'connected') return;
+  if (await hasDeployConnection(page)) throw new Error(`NOT CONNECTED: the site has a deploy connection but shows its Connect form: ${(await connectionProblem(page)) || 'no reason shown'}`);
   if (!CREDS.token) throw new Error('NOT CONNECTED: the site shows its Connect form (no deploy key) and DEMO_OWNER/DEMO_REPO/DEMO_BRANCH/DEMO_TOKEN are not set');
   await page.getByLabel('Repository owner', { exact: true }).fill(CREDS.owner);
   await page.getByLabel('Repository', { exact: true }).fill(CREDS.repo);
@@ -77,7 +99,8 @@ const failureIfShown = async (page, what) => {
   await page.waitForTimeout(1500);
   if (await failure.isVisible()) throw new Error(`${what} shows a failure: ${(await failure.innerText()).replace(/\s+/g, ' ').trim().slice(0, 300)}`);
 };
-const cards = (page) => page.locator('[data-requirement-id="INV-039"] article');
+/// The listed investigations, black-box: the list items of the main region that hold a link (the card title).
+const cards = (page) => page.getByRole('main').getByRole('listitem').filter({ has: page.getByRole('link') });
 const newInvestigation = (page) => page.getByRole('link', { name: /new investigation/i }).or(page.getByRole('button', { name: /new investigation/i })).first();
 const field = (page, name) => page.getByLabel(name, { exact: true });
 
@@ -140,6 +163,7 @@ test('3. The connection state', async ({ browser }) => {
     await expect(cards(page).or(page.getByText(/no investigations/i)).first(), 'connected, but neither investigations nor an empty list are shown').toBeVisible({ timeout: 30000 });
     note(`${text}; ${await cards(page).count()} investigations listed`);
   } else {
+    if (await hasDeployConnection(page)) throw new Error(`the site has a deploy connection but shows its Connect form: ${(await connectionProblem(page)) || 'no reason shown'}`);
     for (const name of ['Repository owner', 'Repository', 'Branch', 'Access token']) await expect(field(page, name), `the Connect form has no ${name}`).toBeVisible();
     await expect(connectButton(page)).toBeEnabled();
     note('no deploy key: the Connect form is shown');
@@ -210,7 +234,12 @@ test('6. Start, Save, and reopen in a fresh context', async ({ browser }) => {
     throw new Error(`Save is disabled: ${why || 'no reason shown'}`);
   }
   await save.click();
-  await expect(status, 'Save did not reach Saved within 60 s').toHaveText(/^\s*Saved\s*$/, { timeout: 60000 });
+  try {
+    await expect(status).toHaveText(/^\s*Saved\s*$/, { timeout: 60000 });
+  } catch {
+    const why = await status.evaluate((el) => (el.getAttribute('aria-describedby') || '').split(/\s+/).map((i) => document.getElementById(i)?.textContent || '').join(' ').replace(/\s+/g, ' ').trim());
+    throw new Error(`Save did not reach Saved within 60 s: the status is "${(await status.innerText()).trim()}"${why ? ` (${why})` : ''}`);
+  }
   const fresh = await freshPage(browser);
   await ensureConnected(fresh);
   await expect(fresh.getByRole('link', { name: v.title, exact: true }), 'the saved investigation is not listed in a fresh context').toBeVisible({ timeout: 30000 });

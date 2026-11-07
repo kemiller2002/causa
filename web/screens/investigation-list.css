@@ -32,3 +32,8 @@
 .causa-panel p, .causa-panel .ef-field__description, .causa-lead { color: var(--ef-color-text-primary); }
 /* The Connect card's heading reads as a card title, not a page title. */
 .causa-connect h2 { font-size: var(--ef-type-size-h3); margin: 0; }
+/* A loaded card: the lifecycle as a Forma status lozenge carrying its word, the date as a time element; a value the
+   list does not know reads as plain secondary words, never as a status. */
+.causa-card__status { margin: 0; }
+.causa-card__unknown { color: var(--ef-color-text-primary); font-style: italic; }
+.causa-card .ef-facts dd { overflow-wrap: anywhere; }

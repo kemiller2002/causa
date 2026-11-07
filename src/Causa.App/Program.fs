@@ -125,7 +125,8 @@ let config: AdapterConfig =
       SessionLocal = backend.Persistence.IsNone && backend.Provider.IsNone
       ValidateStart = Causa.App.Views.StartScreen.validate
       InvestigationOf = Update.investigationOf backend
-      CanSave = backend.Persistence.IsSome }
+      CanSave = backend.Persistence.IsSome
+      WorkingCopy = backend.WorkingCopy }
 
 let engine = Update.engine backend
 let ui = UiAdapter.backend config engine

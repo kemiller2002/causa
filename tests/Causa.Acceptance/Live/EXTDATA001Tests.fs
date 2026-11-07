@@ -103,7 +103,8 @@ module AppDrive =
           SessionLocal = false
           ValidateStart = Causa.App.Views.StartScreen.validate
           InvestigationOf = Update.investigationOf backend
-          CanSave = false }
+          CanSave = false
+          WorkingCopy = None }
 
     let ui = Causa.App.Ui.UiAdapter.backend config engine
 

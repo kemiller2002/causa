@@ -36,7 +36,8 @@ module private Fixture =
           SessionLocal = true
           ValidateStart = Causa.App.Views.StartScreen.validate
           InvestigationOf = Update.investigationOf backend
-          CanSave = false }
+          CanSave = false
+          WorkingCopy = None }
 
     let engine = Update.engine backend
     let ui = UiAdapter.backend config engine
@@ -119,3 +120,38 @@ type ConsumerIntegration() =
         let after = send "{\"kind\":\"Event\",\"event\":{\"kind\":\"Event\",\"name\":\"INV-004\"}}"
         // The browser build writes to a data repository: before Connect, Start is refused with the reason, nothing created.
         Assert.True(after.GetProperty("start.refused").GetBoolean())
+
+/// A listing that fails shows the list as unavailable with the reason and a Retry, never the empty state.
+type ListingFailure() =
+    let backend =
+        { Fixture.backend with Provider = Some { Connector = GitHubConnect.connector; Lister = GitHubLister.lister } }
+    let engine = Update.engine backend
+    let config = { Fixture.config with SessionLocal = false; InvestigationOf = Update.investigationOf backend }
+    let ui = UiAdapter.backend config engine
+
+    /// Answers the repository read, then a 403 rate limit for everything else.
+    let execute (r: HttpRequest) : HttpOutcome =
+        if r.Url.EndsWith "/repos/o/r" then Answered(r.Id, 200, [], """{"full_name":"o/r","permissions":{"push":true}}""")
+        else Answered(r.Id, 403, [ "x-ratelimit-remaining", "0"; "x-ratelimit-reset", "1893456000" ], """{"message":"API rate limit exceeded for user."}""")
+
+    let rec settle (s: AdapterState) (effects: HostEffect list) =
+        match effects with
+        | [] -> s
+        | Http r :: rest -> let s2, more = UiAdapter.browser engine (HttpCompleted(execute r)) s in settle s2 (rest @ more)
+        | _ :: rest -> settle s rest
+
+    [<Fact>]
+    member _.``a rate-limited listing is unavailable, with the reason and a Retry, never empty``() =
+        let s0 = fst (ui.Init InvestigationsRoute)
+        let s1 = { s0 with Local = { s0.Local with Credential = Some(Credential.create "t"); Form = { Owner = "o"; Repository = "r"; Branch = "main"; CredentialEntered = true } } }
+        let s2, fx = ui.Dispatch (UiIntent.Activate(Actions.connect, None)) s1
+        let s = settle s2 fx
+        Assert.Equal(Connected true, s.Model.Connection)
+        let view = View.bindings (ui.Project s)
+        let flag k = match view.TryFind k with Some(BindingValue.Flag f) -> f | _ -> false
+        Assert.False(flag "list.empty", "the empty state was shown for a failed listing")
+        Assert.True(flag "list.retry-offered", "no Retry for a failed listing")
+        match (ui.Project s).Screen with
+        | ListScreen l -> Assert.Equal(Failed UiFailure.ProviderRateLimited, l.Investigations)
+        | other -> Assert.Fail(sprintf "%A" other)
+        Assert.Contains(s.Local.Announcements, fun (_, t) -> t.Contains "rate limit")

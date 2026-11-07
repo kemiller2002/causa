@@ -1,0 +1,41 @@
+/* Owner: ui-2 (WI-INV-WORKSPACE, reassigned). investigation-workspace frame and save state. Reads published Forma
+   --ef-* tokens (and the Causa theme variables with a Forma fallback, as the other screens do); declares none. */
+.causa-workspace__header { align-items: flex-start; gap: var(--ef-layout-stack-space); flex-wrap: wrap; }
+.causa-workspace__header .causa-screen__title { overflow-wrap: anywhere; }
+.causa-save { align-items: center; flex-wrap: wrap; }
+.causa-save__state { margin: 0; min-block-size: var(--ef-layout-target-min); }
+.causa-save__detail { margin: 0; color: var(--ef-color-text-primary); }
+.causa-save__detail:empty { display: none; }
+.causa-sections__list { list-style: none; padding: 0; margin: 0; flex-wrap: wrap; }
+.causa-sections__link {
+  padding-inline: var(--ef-primitive-space-2);
+  border-block-end: var(--ef-primitive-space-1) solid transparent;
+  color: var(--ef-color-text-primary);
+}
+/* The current section is marked by weight and an underline as well as aria-current, never by colour alone. */
+.causa-sections__link[aria-current="page"] {
+  font-weight: 600;
+  border-block-end-color: var(--causa-teal-strong, var(--ef-color-accent-primary));
+}
+.causa-workspace__facts { margin: 0; }
+.causa-workspace__identifier { font-family: var(--ef-type-family-mono); overflow-wrap: anywhere; }
+.causa-workspace__statement h2 {
+  margin: 0 0 var(--ef-primitive-space-2);
+  font-size: var(--ef-type-size-h4);
+  line-height: var(--ef-type-leading-heading);
+  max-inline-size: none;
+}
+.causa-workspace__statement { max-inline-size: none; }
+/* The problem statement and question are shown exactly as entered: line breaks kept, long words wrapped. */
+.causa-verbatim { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; max-inline-size: var(--ef-layout-measure); }
+.causa-stored__events { padding-inline-start: var(--ef-layout-stack-space); }
+/* The record title sits in Forma's record header at the h2 scale, so a long investigation title stays readable
+   beside its save state instead of filling the screen. */
+.causa-workspace__header h1.causa-screen__title {
+  font-size: var(--ef-type-size-h3);
+  line-height: var(--ef-type-leading-heading);
+  margin: 0;
+  max-inline-size: var(--ef-layout-measure);
+}
+.causa-workspace__title { display: flex; flex-direction: column; gap: var(--ef-primitive-space-2); }
+.causa-workspace__title .causa-copy-kind { margin: 0; }

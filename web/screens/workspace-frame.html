@@ -1,0 +1,101 @@
+<!-- Owner: ui-2 (WI-INV-WORKSPACE, reassigned). investigation-workspace (#/investigations/{id}): the record header with
+     the investigation's title, its save state (Forma status lozenge with the state's word; INV-016, INV-043) and Save
+     (INV-015); the investigation sections the backend lists (INV-042); identifier, creation time (INV-007) and state
+     (INV-018); the original problem statement (INV-008) and the primary investigative question (INV-023), as entered.
+     Bindings: Views/Workspace/Frame.fs, Views/SaveIndicator.fs, Views/Workspace/StoredRecord.fs. -->
+<template data-if="screen.investigation-workspace">
+  <div class="ef-container ef-stack causa-screen causa-workspace" data-screen="investigation-workspace">
+
+    <template data-if="workspace.loading">
+      <p class="causa-loading" role="status"><span class="ef-spinner" aria-hidden="true"></span> <span data-text="workspace.loading-text"></span></p>
+    </template>
+
+    <template data-if="workspace.failed">
+      <div class="ef-alert ef-fault-inline causa-failure" role="alert">
+        <p class="ef-alert__title" data-text="workspace.failure-what"></p>
+        <p data-text="workspace.failure-preserved"></p>
+        <p data-text="workspace.failure-next"></p>
+        <template data-if="workspace.retry-offered"><button class="ef-button" type="button" data-event="UIA-RETRY-LOAD">Try again</button></template>
+      </div>
+    </template>
+
+    <template data-if="workspace.frame-present">
+      <div class="ef-stack causa-workspace__body">
+      <header class="ef-record-header causa-workspace__header">
+        <div class="ef-record-header__main">
+          <div class="causa-workspace__title">
+            <p class="ef-record-header__type causa-copy-kind" data-bind-data-copy="workspace.copy-kind"><span class="ef-badge" data-text="workspace.copy-tag"></span> <span data-text="workspace.copy"></span></p>
+            <h1 class="causa-screen__title" data-text="workspace.title"></h1>
+          </div>
+        </div>
+        <template data-if="save.present">
+          <div class="ef-record-header__actions ef-cluster causa-save" data-requirement-id="INV-043">
+            <p class="ef-status-lozenge causa-save__state" role="status" aria-label="Save state" data-requirement-id="INV-016" data-bind-data-state="save.state" data-text="save.label"></p>
+            <template data-if="save.offered">
+              <button class="ef-button causa-action-primary" type="button" data-requirement-id="INV-015" data-event="INV-015" data-bind-disabled="save.disabled">Save</button>
+            </template>
+            <template data-if="save.retry-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-RETRY">Retry</button></template>
+            <template data-if="save.check-again-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-CHECK-AGAIN">Check again</button></template>
+            <template data-if="save.reconnect-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-RECONNECT">Reconnect</button></template>
+          </div>
+        </template>
+      </header>
+
+      <template data-if="save.present">
+        <div class="ef-stack causa-save__details">
+        <p class="causa-save__detail" data-text="save.text"></p>
+        <template data-if="save.last-saved-present"><p class="causa-save__detail">Last saved: <span data-text="save.last-saved"></span></p></template>
+        <template data-if="save.conflict-present"><p class="causa-save__detail" role="alert" data-text="save.conflict"></p></template>
+        <p class="causa-save__detail" data-text="save.unavailable"></p>
+        </div>
+      </template>
+
+      <template data-if="workspace.sections-present">
+        <nav class="causa-sections" aria-label="Investigation sections" data-requirement-id="INV-042">
+          <ul class="ef-cluster causa-sections__list">
+            <template data-each="workspace.sections" data-key="key">
+              <li><a class="causa-sections__link" data-bind-href="href" data-bind-aria-current="current" data-text="label"></a></li>
+            </template>
+          </ul>
+        </nav>
+      </template>
+
+      <dl class="ef-key-value-list causa-workspace__facts">
+        <div><dt>Investigation identifier</dt><dd class="causa-workspace__identifier" data-text="workspace.identifier"></dd></div>
+        <div><dt>Created</dt><dd data-requirement-id="INV-007" data-text="workspace.created"></dd></div>
+        <div><dt>State</dt><dd data-requirement-id="INV-018" data-text="workspace.state"></dd></div>
+      </dl>
+
+      <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-problem">
+        <h2 id="causa-ws-problem">Problem statement</h2>
+        <p class="causa-verbatim" data-requirement-id="INV-008" data-text="workspace.problem"></p>
+      </section>
+
+      <template data-if="workspace.question-present">
+        <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-question">
+          <h2 id="causa-ws-question">Primary investigative question</h2>
+          <p class="causa-verbatim" data-requirement-id="INV-023" data-text="workspace.question"></p>
+        </section>
+      </template>
+      </div>
+    </template>
+
+    <template data-if="stored.present">
+      <section class="ef-section causa-panel" aria-labelledby="causa-ws-stored">
+        <h1 class="causa-screen__title" data-text="stored.title"></h1>
+        <h2 id="causa-ws-stored">As stored in the data repository</h2>
+        <p>Causa could not interpret this investigation, so it is shown exactly as stored. Nothing was changed.</p>
+        <dl class="ef-key-value-list">
+          <div><dt>Created</dt><dd data-text="stored.created"></dd></div>
+          <div><dt>Last updated</dt><dd data-text="stored.updated"></dd></div>
+          <div><dt>Recorded changes</dt><dd data-text="stored.count"></dd></div>
+        </dl>
+        <ol class="ef-stack causa-stored__events">
+          <template data-each="stored.events" data-key="key">
+            <li><span data-text="when"></span> · <span data-text="kind"></span> · <span data-text="who"></span></li>
+          </template>
+        </ol>
+      </section>
+    </template>
+  </div>
+</template>

@@ -485,3 +485,141 @@ module Conformance =
           CreatedCommits: CommitOid list }
         member r.Passed = List.isEmpty (failures r.Probes)
         member r.IsLiveVerification = r.Mode = "live-github" && r.Passed && not (List.isEmpty r.CreatedCommits)
+
+// ---- T18 acceptance helpers: the repository checkout, the application's load path and the pinned catalog -------------
+
+/// The repository checkout the tests run from: the directory that holds Causa.slnx.
+[<RequireQualifiedAccess>]
+module Repo =
+    let root () : string =
+        let rec up (dir: string) =
+            if IO.File.Exists(IO.Path.Combine(dir, "Causa.slnx")) then dir
+            else
+                match IO.Path.GetDirectoryName dir with
+                | null -> failwithf "no Causa.slnx above %s" AppContext.BaseDirectory
+                | parent when parent = dir -> failwithf "no Causa.slnx above %s" AppContext.BaseDirectory
+                | parent -> up parent
+        up (AppContext.BaseDirectory.TrimEnd(IO.Path.DirectorySeparatorChar))
+
+    let path (relative: string) = IO.Path.Combine(root (), relative)
+    let exists (relative: string) = IO.File.Exists(path relative)
+    let read (relative: string) = IO.File.ReadAllText(path relative)
+
+/// Fail-closed reasons for a test whose subject is not built yet: never a pass.
+[<RequireQualifiedAccess>]
+module Blocked =
+    let codec (detail: string) : 'a =
+        raise (InvalidOperationException("BLOCKED: storage codec not wired (IF41-STORAGE): " + detail))
+
+/// Opening an investigation exactly as the application does: SM-LOAD of SaveMachines.machine, whose one request is
+/// executed by whichever provider adapter is given (the stateful fake or real GitHub). This is the one parsing,
+/// validation and reconstruction path for fixture and real data (PF-002, PF-004-O1).
+[<RequireQualifiedAccess>]
+module AppLoad =
+    let context (connection: ConnectionContext) : RequestContext =
+        { Connection = connection; NextId = RequestId 1L; MutationInFlightElsewhere = false; Now = DateTimeOffset.UtcNow }
+
+    let load (execute: Execute) (connection: ConnectionContext) (target: InvestigationRef) : LoadState =
+        let m = SaveMachines.machine
+        let ctx = context connection
+        match m.StepLoad ctx NotLoaded (LoadInput.OpenRequested target) with
+        | Error f -> failwithf "SM-LOAD refused OpenRequested: %A" f
+        | Ok(loading, effects) ->
+            let request = effects |> List.pick (function Send r -> Some r | _ -> None)
+            match m.InterpretLoad ctx loading (execute request) with
+            | LoadEvent input ->
+                match m.StepLoad ctx loading input with
+                | Ok(state, _) -> state
+                | Error f -> failwithf "SM-LOAD refused %A: %A" input f
+            | LoadNextRequest(state, _) -> failwithf "SM-LOAD asked for a second read from %A" state
+
+    let private notWired (failures: VerificationFailure list) =
+        failures |> List.exists (function ReaderStage("CODEC-NOT-WIRED", _, _, _) -> true | _ -> false)
+
+    /// The verified investigation, or the test fails: BLOCKED while the codec is not wired, FAIL with the typed cause
+    /// otherwise.
+    let requireVerified (what: string) (state: LoadState) : VerifiedInvestigation =
+        match state with
+        | Loaded v -> v
+        | LoadFailed(Unverifiable failures) when notWired failures -> Blocked.codec (sprintf "%s answered CODEC-NOT-WIRED" what)
+        | other -> failwithf "%s did not verify: %A" what other
+
+    /// Fails closed with BLOCKED when the application's load path has no codec: a file set in a working copy of the
+    /// stateful fake is opened through SaveMachines.machine; CODEC-NOT-WIRED there means no investigation can verify.
+    let requireCodec () : unit =
+        let fake = StatefulFake()
+        let address = (WorkspaceAddress.workingCopy [] "t18-codec-probe").Value
+        let id = Causa.Domain.InvestigationId(Guid "00000000-0000-4000-8000-000000000018")
+        let (RepoPath prefix) = Writes.prefixOf address id
+        fake.CommitAsOtherWriter("seed", [ for n in Writes.fileNames -> prefix + "/" + n, Some(Encoding.UTF8.GetBytes "{}\n") ]) |> ignore
+        match load fake.Execute fake.ReadConnection { Address = address; Id = id } with
+        | LoadFailed(Unverifiable failures) when notWired failures -> Blocked.codec "SaveMachines.machine verifies with noCodec"
+        | _ -> ()
+
+/// The catalog the live tests are pinned to (PF-014-O1): causa-data catalog/active.json -> demonstration-v1 1.0.0,
+/// with the four case ids and the digests and versions its manifest records.
+[<RequireQualifiedAccess>]
+module PinnedCatalog =
+    type Case =
+        { Key: string
+          Id: Guid
+          EventsSha256: string
+          ExpectedVersion: int
+          ExpectedStateSha256: string
+          ExpectedLifecycle: string }
+
+    let activePath = "catalog/active.json"
+    let catalogId = "causa-demonstration"
+    let catalogVersion = "1.0.0"
+    let manifestPath = "catalog/demonstration-v1/manifest.json"
+    let workspace = Workspace "workspaces/demo/demonstration-v1"
+    /// The retained, immutable v1.0.0 compatibility dataset: the fixture manifest with expected error outcomes.
+    let compatibilityManifestPath = "fixtures/v1.0.0/manifest.json"
+
+    let cases =
+        [ { Key = "apollo-1"; Id = Guid "c6b26614-fc43-5013-a15c-cf95942ee07b"
+            EventsSha256 = "c97bc96c4c48ad9ca53268b4fe66637e211c3627ebb3cbe667a1a6f1066ab3a6"; ExpectedVersion = 432
+            ExpectedStateSha256 = "67af9c9f05db07d67279f84bb185600f12604b5af67a3954c337581dfdd6552f"; ExpectedLifecycle = "awaitingVerification" }
+          { Key = "apollo-11"; Id = Guid "e3adbee5-5096-5a10-bbfb-cecda86a154b"
+            EventsSha256 = "e533fe7fc251a4d0d7f520838735f14373da5b9783682715dae12a7a2dff04c9"; ExpectedVersion = 431
+            ExpectedStateSha256 = "b82ac9ce37f218fbb53709945bd83283b06bc85e8cb4e4121bd1eaf1dc914f92"; ExpectedLifecycle = "awaitingEvidence" }
+          { Key = "challenger-sts-51l"; Id = Guid "1784da3c-7141-59ee-a495-1d5d44bf2284"
+            EventsSha256 = "e3b442f0ff3ea178c4d81d4964cef5deda4d104cc426785f7da5a78e9bed9c25"; ExpectedVersion = 452
+            ExpectedStateSha256 = "296bdf273968cf15a8526126a242852738cc5fa811bc853f6467fb3e3c67a7e8"; ExpectedLifecycle = "active" }
+          { Key = "burned-out-lightbulb"; Id = Guid "fc3f71a9-4c14-5a31-8196-7ce17a7041c1"
+            EventsSha256 = "2de5e17b1f870cbcb8f6de032af455c5aed3d18be0a1c1fee85b198b92e02a1b"; ExpectedVersion = 48
+            ExpectedStateSha256 = "40d11a632a97c1f94ff4fa48af94a373e5a2c7e9feadfc42bca9d891532a36bc"; ExpectedLifecycle = "resolved" } ]
+
+    let address = WorkspaceAddress.catalog workspace
+    let target (c: Case) : InvestigationRef = { Address = address; Id = Causa.Domain.InvestigationId c.Id }
+    let filePath (c: Case) (name: string) =
+        let (RepoPath p) = Writes.prefixOf address (Causa.Domain.InvestigationId c.Id)
+        RepoPath(p + "/" + name)
+
+    let sha256 (bytes: byte[]) = Convert.ToHexString(SHA256.HashData bytes).ToLowerInvariant()
+
+    /// One case's three stored files, read through a port at one commit.
+    let readFiles (port: ProviderPort) (at: CommitOid) (c: Case) : Result<FileSet, ProviderError> =
+        let read name = port.ReadFile at (filePath c name)
+        match read "manifest.json", read "events.ndjson", read "snapshot.json" with
+        | Ok m, Ok e, Ok s -> Ok { Manifest = m; Events = e; Snapshot = s }
+        | Error e, _, _
+        | _, Error e, _
+        | _, _, Error e -> Error e
+
+    /// The events of a file set, one JSON document per line.
+    let events (files: FileSet) : Json option list =
+        (Encoding.UTF8.GetString files.Events).Split('\n', StringSplitOptions.RemoveEmptyEntries) |> Array.map Json.parse |> List.ofArray
+
+    /// A stateful fake whose branch holds exactly these bytes at the case's path: fixture data identical to real data.
+    let seed (fake: StatefulFake) (c: Case) (files: FileSet) : CommitOid =
+        let (RepoPath p) = Writes.prefixOf address (Causa.Domain.InvestigationId c.Id)
+        fake.CommitAsOtherWriter(
+            "seed " + c.Key,
+            [ p + "/manifest.json", Some files.Manifest; p + "/events.ndjson", Some files.Events; p + "/snapshot.json", Some files.Snapshot ])
+
+    /// A live read that must succeed, or the test fails with the typed cause.
+    let ok (what: string) (r: Result<'a, ProviderError>) : 'a =
+        match r with
+        | Ok v -> v
+        | Error e -> failwithf "%s failed: %A" what e

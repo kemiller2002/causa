@@ -163,7 +163,9 @@ module SMSAVE =
         let s, effects = go { unknown with Mutations = 1 } SaveInput.ReconcileNothingWrittenHeadUnchanged
         Assert.Equal("Saving", name s)
         Assert.Equal(2, s.Mutations)
-        Assert.Contains("causa-write-marker: " + (let (Causa.Domain.InvestigationId g) = investigation in g.ToString()) + "/2", defaultArg (List.exactlyOne (sends effects)).Body "")
+        Assert.Contains(Writes.markerText (Writes.marker s), defaultArg (List.exactlyOne (sends effects)).Body "")
+        Assert.NotEqual(Writes.marker { s with Mutations = 1 }, Writes.marker s)
+        Assert.Equal(Writes.tabSession, (Writes.marker s).Session)
 
     [<Fact>]
     let ``T-S25`` () = Assert.Equal("SaveFailed", name (fst (go { unknown with Mutations = 4 } SaveInput.ReconcileNothingWrittenHeadUnchanged)))

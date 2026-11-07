@@ -30,6 +30,13 @@ html { color-scheme: light; }
 .causa-main {
   flex: 1 1 auto;
   min-width: 0;
+  /* Forma's page gutter, so content never sits flush against the edge on a phone (CR-6). */
+  padding-inline: var(--ef-layout-gutter);
+}
+
+/* The page title uses Forma's second heading size: the display size dwarfs the content beside it (CR-6). */
+.causa-main h1 {
+  font-size: var(--ef-type-size-h2);
 }
 
 .causa-main:focus {
@@ -57,7 +64,13 @@ html { color-scheme: light; }
 
 .causa-masthead .ef-navigation-shell__persistent {
   grid-auto-flow: column;
+  grid-auto-columns: max-content;
   justify-content: start;
+}
+
+/* Whole words in the masthead navigation at every width (CR-6). */
+.causa-masthead .ef-navigation-shell a[href] {
+  white-space: nowrap;
 }
 
 .causa-masthead .ef-navigation-shell__compact > summary {
@@ -91,4 +104,14 @@ html { color-scheme: light; }
   align-items: center;
   gap: var(--ef-space-2);
   color: var(--causa-navy);
+}
+
+/* Touch targets in the collapsed masthead navigation are at least Forma's minimum in both dimensions, at every width
+   (UI-011-O1, FL-01; change request CR-5 from T16). */
+.causa-masthead .ef-navigation-shell__compact > summary,
+.causa-masthead .ef-navigation-shell a[href] {
+  min-inline-size: var(--ef-layout-target-min);
+  min-block-size: var(--ef-layout-target-min);
+  box-sizing: border-box;
+  flex-shrink: 0;
 }

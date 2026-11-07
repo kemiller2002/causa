@@ -8,21 +8,42 @@
 //   dist/vendor/limen/     the published Limen package's dist/ (@echelon-foundry/limen, package-lock pinned)
 //   dist/_framework/       the published .NET WebAssembly engine (src/Causa.Host)
 //
-// Options: --skip-engine leaves out the engine publish (a shell-only build for quick local checks; never used by CI or
-// the deploy workflow). Exit code 0 only when every step succeeded; a failed step names itself and stops the build.
+//   dist/provenance.json   build provenance (AR-011): the commit (the deployed SHA), the CI run, tool versions, the
+//                          digest of every build input, the pinned dependency set and the fixtures
+//
+// Options:
+//   --skip-engine          leave out the engine publish (a shell-only build for quick local checks; never used by CI or
+//                          the deploy workflow)
+//   --out <dir>            write the site to <dir> instead of dist/
+//   --provenance-only      write only <out>/provenance.json
+//   --compare <a> <b>      compare two provenance files: prints whether a re-run differs reproducibly (its inputs
+//                          changed), only by environment drift (tools, OS, runner), or not at all (AR-011-O2)
+// Exit code 0 only when every step succeeded; a failed step names itself and stops the build.
 
 open System
 open System.Diagnostics
 open System.IO
+open System.Runtime.InteropServices
+open System.Security.Cryptography
+open System.Text.Json
 open System.Text.RegularExpressions
 
 type Step = { Name: string; Run: unit -> Result<unit, string> }
 
 let root = __SOURCE_DIRECTORY__
 let path (parts: string list) = Path.Combine(Array.ofList (root :: parts))
-let dist = path [ "dist" ]
-let args = fsi.CommandLineArgs |> Array.skip 1 |> Set.ofArray
+let argv = fsi.CommandLineArgs |> Array.skip 1 |> List.ofArray
+let args = Set.ofList argv
 let skipEngine = args.Contains "--skip-engine"
+let provenanceOnly = args.Contains "--provenance-only"
+
+let rec optionValue (name: string) (rest: string list) =
+    match rest with
+    | n :: v :: _ when n = name -> Some v
+    | _ :: tail -> optionValue name tail
+    | [] -> None
+
+let dist = optionValue "--out" argv |> Option.map Path.GetFullPath |> Option.defaultValue (path [ "dist" ])
 
 let screensMarker = "<!-- causa:screens -->"
 let screenStylesMarker = "<!-- causa:screen-styles -->"
@@ -104,8 +125,159 @@ let engine () =
         requireDirectory framework "the engine publish wrote no _framework"
         |> Result.map (fun () -> copyDirectory framework (Path.Combine(dist, "_framework"))))
 
+
+// ---- Provenance (AR-011) ------------------------------------------------------------------------------------------
+// Two parts. "reproducible" holds only what the repository determines: the commit, the digest of every tracked build
+// input, the pinned dependency set and the fixtures; the same commit always gives the same part. "environment" holds
+// what the machine determines: tool versions, OS, CI run, time. A re-run whose reproducible part differs changed its
+// inputs; one whose only differences are environmental is environment drift.
+
+let capture (file: string) (arguments: string list) : string option =
+    try
+        let info = ProcessStartInfo(file, arguments, WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true)
+        use p = Process.Start info
+        let out = p.StandardOutput.ReadToEnd().Trim()
+        p.WaitForExit()
+        if p.ExitCode = 0 && out <> "" then Some out else None
+    with _ -> None
+
+let sha256File (file: string) =
+    use stream = File.OpenRead file
+    SHA256.HashData(stream) |> Convert.ToHexString |> fun s -> s.ToLowerInvariant()
+
+let sha256Text (text: string) =
+    SHA256.HashData(Text.Encoding.UTF8.GetBytes text) |> Convert.ToHexString |> fun s -> s.ToLowerInvariant()
+
+let env (name: string) = Environment.GetEnvironmentVariable name |> Option.ofObj |> Option.filter ((<>) "")
+
+/// The tracked files a build reads (git ls-files: untracked local files never enter the provenance).
+let buildInputs () =
+    let pathspecs =
+        [ "build.fsx"; "global.json"; "Directory.Build.props"; "Directory.Packages.props"; "Causa.slnx"; "package.json"
+          "package-lock.json"; ".echelon/dependency-lock.json"; ".echelon/release-selection.json"; "web"; "src/Causa.Domain"
+          "src/Causa.Persistence"; "src/Causa.App"; "src/Causa.Host" ]
+    capture "git" ("ls-files" :: "--" :: pathspecs)
+    |> Option.map (fun out -> out.Split('\n', StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim()) |> Array.sortWith (fun a b -> String.CompareOrdinal(a, b)) |> List.ofArray)
+    |> Option.defaultValue []
+    |> List.filter (fun f -> File.Exists(path [ f ]))
+    |> List.map (fun f -> f, sha256File (path [ f ]))
+
+let fixtureFiles () =
+    capture "git" [ "ls-files"; "--"; "tests/Causa.TestSupport"; "tests/fixtures" ]
+    |> Option.map (fun out -> out.Split('\n', StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun s -> s.Trim()) |> Array.sortWith (fun a b -> String.CompareOrdinal(a, b)) |> List.ofArray)
+    |> Option.defaultValue []
+    |> List.filter (fun f -> File.Exists(path [ f ]) && not (f.EndsWith ".fsproj"))
+    |> List.map (fun f -> f, sha256File (path [ f ]))
+
+/// The locked dependency set as id -> "version tag commit digest" (from .echelon/dependency-lock.json).
+let pinnedDependencies () =
+    let file = path [ ".echelon"; "dependency-lock.json" ]
+    if not (File.Exists file) then []
+    else
+        use doc = JsonDocument.Parse(File.ReadAllText file)
+        let str (e: JsonElement) (name: string) =
+            match e.TryGetProperty name with
+            | true, v when v.ValueKind = JsonValueKind.String -> v.GetString() |> Option.ofObj |> Option.defaultValue ""
+            | _ -> ""
+        let digest (e: JsonElement) =
+            match e.TryGetProperty "packageDigest" with
+            | true, d when d.ValueKind = JsonValueKind.Object -> str d "sha256"
+            | _ -> str e "sha256"
+        [ for s in doc.RootElement.GetProperty("systems").EnumerateArray() ->
+              str s "id", String.Join(" ", [ str s "version"; str s "tag"; str s "commit"; digest s ] |> List.filter ((<>) "")) ]
+
+let commit () = env "GITHUB_SHA" |> Option.orElse (capture "git" [ "rev-parse"; "HEAD" ]) |> Option.defaultValue "unknown"
+
+let provenanceJson () : string =
+    let inputs = buildInputs ()
+    let fixtures = fixtureFiles ()
+    let treeDigest (files: (string * string) list) = files |> List.map (fun (f, h) -> f + " " + h) |> String.concat "\n" |> sha256Text
+    let sha = commit ()
+    let options = JsonWriterOptions(Indented = true)
+    use stream = new MemoryStream()
+    (
+        use w = new Utf8JsonWriter(stream, options)
+        let obj (name: string) (entries: (string * string) list) =
+            w.WriteStartObject name
+            for k, v in entries do w.WriteString(k, v)
+            w.WriteEndObject()
+        w.WriteStartObject()
+        w.WriteString("schema", "causa.build-provenance/1")
+        w.WriteStartObject "reproducible"
+        w.WriteString("commit", sha)
+        w.WriteString("deployedSha", sha)
+        w.WriteString("inputsDigest", treeDigest inputs)
+        obj "inputs" inputs
+        obj "dependencies" (pinnedDependencies ())
+        w.WriteStartObject "fixtures"
+        w.WriteString("digest", treeDigest fixtures)
+        obj "files" fixtures
+        w.WriteStartArray "seeds"
+        w.WriteEndArray()
+        w.WriteString("seedPolicy", "no randomized fixture exists yet; a property or generated fixture records its seed here")
+        w.WriteEndObject()
+        w.WriteEndObject()
+        w.WriteStartObject "environment"
+        obj
+            "tools"
+            [ "dotnet", capture "dotnet" [ "--version" ] |> Option.defaultValue "unavailable"
+              "node", capture "node" [ "--version" ] |> Option.defaultValue "unavailable"
+              "npm", capture "npm" [ "--version" ] |> Option.defaultValue "unavailable"
+              "git", capture "git" [ "--version" ] |> Option.defaultValue "unavailable" ]
+        obj
+            "machine"
+            [ "os", RuntimeInformation.OSDescription
+              "architecture", RuntimeInformation.OSArchitecture.ToString()
+              "runtime", RuntimeInformation.FrameworkDescription ]
+        obj
+            "ci"
+            [ "runId", env "GITHUB_RUN_ID" |> Option.defaultValue "local"
+              "runAttempt", env "GITHUB_RUN_ATTEMPT" |> Option.defaultValue "local"
+              "workflow", env "GITHUB_WORKFLOW" |> Option.defaultValue "local"
+              "repository", env "GITHUB_REPOSITORY" |> Option.defaultValue "local" ]
+        w.WriteString("builtAt", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+        w.WriteEndObject()
+        w.WriteEndObject()
+    )
+    Text.Encoding.UTF8.GetString(stream.ToArray())
+
+let provenance () =
+    Directory.CreateDirectory dist |> ignore
+    File.WriteAllText(Path.Combine(dist, "provenance.json"), provenanceJson ())
+    Ok()
+
+/// Pure over two parsed provenance documents: the leaf paths that differ in each part.
+let rec leaves (prefix: string) (e: JsonElement) : (string * string) list =
+    match e.ValueKind with
+    | JsonValueKind.Object -> [ for p in e.EnumerateObject() do yield! leaves (prefix + "/" + p.Name) p.Value ]
+    | JsonValueKind.Array -> [ for i, v in Seq.indexed (e.EnumerateArray()) do yield! leaves (sprintf "%s/%d" prefix i) v ]
+    | _ -> [ (prefix, e.ToString()) ]
+
+let differences (part: string) (a: JsonElement) (b: JsonElement) =
+    let get (e: JsonElement) =
+        match e.TryGetProperty part with
+        | true, v -> leaves "" v |> Map.ofList
+        | _ -> Map.empty
+    let ma, mb = get a, get b
+    Set.union (ma |> Map.keys |> Set.ofSeq) (mb |> Map.keys |> Set.ofSeq)
+    |> Set.filter (fun k -> ma.TryFind k <> mb.TryFind k)
+    |> Set.toList
+
+let compare (fileA: string) (fileB: string) =
+    use a = JsonDocument.Parse(File.ReadAllText fileA)
+    use b = JsonDocument.Parse(File.ReadAllText fileB)
+    let inputs = differences "reproducible" a.RootElement b.RootElement
+    let environment = differences "environment" a.RootElement b.RootElement |> List.filter ((<>) "/builtAt")
+    let verdict =
+        match inputs, environment with
+        | [], [] -> "identical"
+        | [], _ -> "environment-drift"
+        | _ -> "reproducible-difference"
+    let quoted (xs: string list) = xs |> List.map (fun x -> "\"" + x + "\"") |> String.concat ", "
+    printfn "{\"verdict\": \"%s\", \"reproducible\": [%s], \"environment\": [%s]}" verdict (quoted inputs) (quoted environment)
+
 let requireSite () =
-    [ "index.html"; "causa.css"; "causa-theme.css"; "causa-icon.svg"; "boundary.js"; "vendor/forma/all.css"; "vendor/limen/index.js" ]
+    [ "index.html"; "causa.css"; "causa-theme.css"; "causa-icon.svg"; "boundary.js"; "vendor/forma/all.css"; "vendor/limen/index.js"; "provenance.json" ]
     @ (if skipEngine then [] else [ "_framework/dotnet.js" ])
     |> List.filter (fun f -> not (File.Exists(Path.Combine(dist, f))))
     |> function
@@ -113,15 +285,22 @@ let requireSite () =
         | missing -> Error(sprintf "dist/ lacks %s" (String.Join(", ", missing)))
 
 let steps =
+  if provenanceOnly then
+    [ { Name = "write provenance"; Run = provenance } ]
+  else
     [ { Name = "clean dist/"; Run = clean }
       { Name = "compose index.html"; Run = index }
       { Name = "copy web assets"; Run = webAssets }
       { Name = "vendor Forma"; Run = vendor "design-system" "forma" }
       { Name = "vendor Limen"; Run = vendor "limen" "limen" }
       if not skipEngine then { Name = "publish the engine"; Run = engine }
+      { Name = "write provenance"; Run = provenance }
       { Name = "check the site"; Run = requireSite } ]
 
 let result =
+  match argv with
+  | "--compare" :: a :: b :: _ -> compare a b; Ok()
+  | _ ->
     steps
     |> List.fold
         (fun state step ->
@@ -132,5 +311,5 @@ let result =
         (Ok())
 
 match result with
-| Ok() -> printfn "build: dist/ written"; exit 0
+| Ok() -> (if not (args.Contains "--compare") then printfn "build: %s written" dist); exit 0
 | Error e -> eprintfn "build FAILED at %s" e; exit 1

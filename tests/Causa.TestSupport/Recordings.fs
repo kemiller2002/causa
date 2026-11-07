@@ -107,6 +107,9 @@ module Recordings =
           { Form = "rest-404-connect-hidden"; ObservedIn = kd; Operation = Operation.Connect; Status = 404; Headers = rest
             Body = """{"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/repos#get-a-repository","status":"404"}"""
             ExpectedClass = GhPermission }
+          { Form = "rest-repo-fine-grained-no-permissions"; ObservedIn = "live preview, owner's fine-grained token (2026-11-07): 200 with no permissions and no x-oauth-scopes"; Operation = Operation.Connect; Status = 200; Headers = rest
+            Body = """{"id":1,"name":"causa-test","full_name":"causa-test-owner/causa-test","private":true,"default_branch":"main"}"""
+            ExpectedClass = Success }
           { Form = "rest-compare-diverged"; ObservedIn = kd; Operation = Operation.Compare expectedHead; Status = 200; Headers = rest
             Body = sprintf """{"status":"diverged","ahead_by":1,"behind_by":2,"total_commits":1,"commits":[{"sha":"%s","commit":{"message":"other"}}]}""" oidA
             ExpectedClass = GhHistoryRewritten }

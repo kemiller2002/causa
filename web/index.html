@@ -8,8 +8,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Causa</title>
+  <title data-text="page-title">Causa</title>
+  <link rel="icon" href="causa-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="vendor/forma/all.css">
+  <link rel="stylesheet" href="causa-theme.css">
   <link rel="stylesheet" href="causa.css">
   <!-- causa:screen-styles -->
   <script type="importmap">
@@ -21,9 +23,29 @@
   <div class="ef-site causa-site">
     <a class="ef-skip-link" href="#causa-main">Skip to main content</a>
 
+    <!-- Persistent masthead and primary navigation, outside <main>, so it survives screen changes (UI-029-O1,
+         UI-011-O4; change request CR-1 from T16). -->
+    <header class="ef-site-header causa-masthead">
+      <div class="ef-site-header__inner">
+        <div class="ef-site-header__identity">
+          <a class="ef-site-header__brand" href="#/"><span class="ef-site-header__mark" aria-hidden="true">C</span><span class="ef-site-header__name">Causa</span></a>
+        </div>
+        <nav class="ef-site-nav causa-primary" aria-label="Primary" data-requirement-id="INV-041">
+          <ul class="ef-site-nav__list">
+            <li><a class="ef-site-nav__link" href="#/" data-bind-aria-current="nav.investigations.current">Investigations</a></li>
+            <li><a class="ef-site-nav__link" href="#/administration" data-bind-aria-current="nav.administration.current">Administration</a></li>
+            <li><a class="ef-site-nav__link" href="#/settings" data-bind-aria-current="nav.settings.current">Settings</a></li>
+          </ul>
+        </nav>
+      </div>
+      <template data-if="context.present">
+        <p class="causa-context" aria-label="Current investigation"><a data-bind-href="context.href" data-text="context.title"></a> <span class="ef-badge" data-text="context.tag"></span> <span data-text="context.copy"></span></p>
+      </template>
+    </header>
+
     <!-- Loading shell: visible from the first paint until the engine has rendered its first view. -->
     <section class="ef-skeleton causa-boot" id="causa-boot" aria-busy="true" aria-labelledby="causa-boot-title">
-      <h1 class="causa-boot__title" id="causa-boot-title">Causa</h1>
+      <h1 class="causa-boot__title" id="causa-boot-title"><img class="causa-boot__mark" src="causa-icon.svg" alt="Causa logo" width="40" height="40"> Causa</h1>
       <p role="status" id="causa-boot-status">Loading Causa…</p>
       <div class="ef-skeleton__line ef-skeleton__line--title" aria-hidden="true"></div>
       <div class="ef-skeleton__line" aria-hidden="true"></div>
@@ -51,8 +73,8 @@
       <!-- causa:screens -->
     </main>
 
-    <p class="ef-visually-hidden" id="causa-live-polite" aria-live="polite"></p>
-    <p class="ef-visually-hidden" id="causa-live-assertive" aria-live="assertive"></p>
+    <p class="ef-visually-hidden" id="causa-live-polite" aria-live="polite" data-text="announce.polite"></p>
+    <p class="ef-visually-hidden" id="causa-live-assertive" aria-live="assertive" data-text="announce.assertive"></p>
   </div>
 </body>
 </html>

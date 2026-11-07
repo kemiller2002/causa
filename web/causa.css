@@ -44,3 +44,38 @@ html { color-scheme: light; }
     padding: var(--ef-space-3);
   }
 }
+
+/* Causa identity (UI-016) on the shared shell, through the theme's custom properties only (web/causa-theme.css). */
+.causa-masthead {
+  background: var(--causa-navy);
+  color: var(--causa-on-navy);
+}
+
+.causa-masthead a {
+  color: var(--causa-on-navy);
+}
+
+.causa-masthead .ef-site-nav__link[aria-current="page"] {
+  box-shadow: inset 0 calc(-1 * var(--ef-space-1)) 0 var(--causa-teal);
+}
+
+.causa-context {
+  margin: 0;
+  padding: var(--ef-space-2) var(--ef-space-4);
+  color: var(--causa-navy-mist);
+}
+
+.causa-context a {
+  color: var(--causa-on-navy);
+}
+
+.causa-site {
+  background: var(--causa-ivory);
+}
+
+.causa-boot__title {
+  display: flex;
+  align-items: center;
+  gap: var(--ef-space-2);
+  color: var(--causa-navy);
+}

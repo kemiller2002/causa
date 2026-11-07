@@ -268,7 +268,8 @@ module WorkspaceAnalysis =
         let has s =
             match s with
             | Overview -> true
-            | CausalAnalysis -> not i.Relationships.IsEmpty
+            // The causal graph also for a working copy once it holds a hypothesis (a fresh investigation's graph).
+            | CausalAnalysis -> not i.Relationships.IsEmpty || (offered && not i.Hypotheses.IsEmpty)
             | EvidenceSection -> not i.Evidence.IsEmpty
             // Hypotheses also when one can be recorded here (an editable working copy).
             | HypothesesSection -> not i.Hypotheses.IsEmpty || offered

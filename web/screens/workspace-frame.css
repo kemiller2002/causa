@@ -39,3 +39,6 @@
 }
 .causa-workspace__title { display: flex; flex-direction: column; gap: var(--ef-primitive-space-2); }
 .causa-workspace__title .causa-copy-kind { margin: 0; }
+/* A failure reads as one block of sentences: Forma's alert grid gets a single body (Limen also renders one root). */
+.causa-workspace__failure { display: block; }
+.causa-workspace__failure-body p { margin: 0; color: var(--ef-color-text-primary); max-inline-size: var(--ef-layout-measure); }

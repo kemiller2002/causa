@@ -39,6 +39,8 @@ module WorkspaceFrame =
             [ ScreenStates.bindings "workspace" (ScreenStates.ofRemote (fun _ -> false) view.Frame) (ScreenStates.activity view.Frame)
               Bind.ofList
                   [ Bind.flag "workspace.frame-present" frame.IsSome
+                    // Without a frame (loading, failed) the screen still has its heading, from the shell's title.
+                    Bind.flag "workspace.frame-absent" frame.IsNone
                     Bind.text "workspace.title" (text (fun f -> if f.Title.Trim() = "" then "Untitled investigation" else f.Title))
                     Bind.text "workspace.identifier" (text (fun f -> f.Identifier))
                     Bind.text "workspace.problem" (text (fun f -> shown f.ProblemStatement))

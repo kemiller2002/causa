@@ -154,3 +154,48 @@
 }
 .causa-editor__status { margin: 0; color: var(--ef-color-text-primary); font-weight: var(--ef-type-weight-strong, 600); }
 .causa-editor__status:empty { display: none; }
+
+/* ---- Causal graph, phone first: one native <details> per hypothesis, its evidence as cards with a connector bar
+   whose line style and word carry the assessment (never colour alone). Forma --ef-* tokens only. */
+.causa-focus__list, .causa-focus__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ef-primitive-space-2); }
+.causa-focus__panel { min-inline-size: 0; }
+.causa-focus__details { border: 1px solid var(--ef-color-border-subtle); background: var(--ef-color-surface-primary); }
+.causa-focus__summary {
+  min-block-size: var(--ef-layout-target-min);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ef-primitive-space-1) var(--ef-primitive-space-2);
+  padding: var(--ef-primitive-space-2);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.causa-focus__title { font-weight: var(--ef-type-weight-strong, 600); color: var(--ef-color-text-primary); }
+.causa-focus__counts { color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
+.causa-focus__cards { padding: 0 var(--ef-primitive-space-2) var(--ef-primitive-space-2); }
+.causa-focus__card {
+  padding: var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-layout-stack-space);
+  border-inline-start: 4px solid var(--ef-color-text-secondary);
+  background: var(--ef-color-surface-secondary);
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
+}
+.causa-focus__card[data-kind="supports"] { border-inline-start: 4px solid var(--ef-color-status-success); }
+.causa-focus__card[data-kind="contradicts"] { border-inline-start: 4px dashed var(--ef-color-status-warning); }
+.causa-focus__card[data-kind="other"] { border-inline-start: 4px dotted var(--ef-color-text-secondary); }
+.causa-focus__word { margin: 0; font-weight: var(--ef-type-weight-strong, 600); color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
+.causa-focus__text {
+  margin: 0;
+  color: var(--ef-color-text-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+.causa-focus__full > summary { min-block-size: var(--ef-layout-target-min); display: flex; align-items: center; cursor: pointer; }
+.causa-graph__full-view { border: 1px solid var(--ef-color-border-subtle); min-inline-size: 0; }
+.causa-graph__full-view > .causa-graph { padding: var(--ef-primitive-space-2); }
+/* A flex summary loses the native disclosure marker: draw one (decorative; the summary's state is announced). */
+.causa-focus__summary::before { content: "▸"; color: var(--ef-color-text-primary); }
+details[open] > .causa-focus__summary::before { content: "▾"; }

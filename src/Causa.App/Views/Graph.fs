@@ -38,17 +38,31 @@ type GraphEdge =
       Kind: EdgeKind
       Word: string
       Path: string
-      LabelX: float
-      LabelY: float
       Title: string }
+
+/// One word beside an evidence card: each kind once, with its count when several lines of that kind leave the card.
+type EdgeLabel = { Key: string; Evidence: string; Text: string; X: float; Y: float }
 
 type GraphLayout =
     { Width: float
       Height: float
       Nodes: GraphNode list
       Edges: GraphEdge list
+      Labels: EdgeLabel list
       /// Evidence on record that no current assessment links to a hypothesis: listed in the summary, not drawn.
       UnlinkedEvidence: int }
+
+/// The phone view of the graph: one panel per hypothesis, its evidence listed under it (no app state: a native
+/// <details> per panel is the picker).
+type FocusCard = { Key: string; EvidenceText: string; Kind: EdgeKind; Word: string; Long: bool }
+
+type FocusPanel =
+    { Key: string
+      Title: string
+      Supports: int
+      Contradicts: int
+      Others: int
+      Cards: FocusCard list }
 
 module CausalGraph =
     let nodeWidth = 240.0
@@ -81,6 +95,22 @@ module CausalGraph =
         | CatalogKind Supports -> EdgeKind.SupportsEdge
         | CatalogKind Contradicts -> EdgeKind.ContradictsEdge
         | _ -> EdgeKind.OtherEdge
+
+    /// The words beside each evidence card: one per kind, "Supports ×2" when two lines of that kind leave the card,
+    /// stacked down the card's right edge in the order the kinds first appear (never the same word twice).
+    let labelsOf (nodes: Map<string, GraphNode>) (edges: GraphEdge list) : EdgeLabel list =
+        edges
+        |> List.groupBy (fun e -> e.From)
+        |> List.collect (fun (from, es) ->
+            let n = nodes[from]
+            es
+            |> List.groupBy (fun e -> e.Word)
+            |> List.mapi (fun k (word, same) ->
+                { Key = sprintf "%s:%s" from word
+                  Evidence = from
+                  Text = (if same.Length > 1 then sprintf "%s ×%d" word same.Length else word)
+                  X = n.X + n.Width + 8.0
+                  Y = n.Y + 10.0 + float k * 12.0 }))
 
     /// The layout of a projection. Hypotheses keep the projection's order; linked evidence is ordered by the mean row of
     /// the hypotheses it bears on (fewer crossings), ties kept in the projection's order; conclusions keep theirs.
@@ -121,12 +151,6 @@ module CausalGraph =
             a.Conclusions |> List.mapi (fun i c -> node GraphColumn.ConclusionColumn a.Conclusions.Length i ("conclusion:" + c.Id) c.Statement)
         let nodes = evidenceNodes @ hypothesisNodes @ conclusionNodes
         let byKey = nodes |> List.map (fun n -> n.Key, n) |> Map.ofList
-        // Each evidence's lines are numbered so their words stack beside the node instead of on top of each other.
-        let ordinal =
-            links
-            |> List.groupBy (fun l -> l.Evidence.Id)
-            |> List.collect (fun (_, ls) -> ls |> List.mapi (fun k l -> l.Id, k))
-            |> Map.ofList
         let edges =
             links
             |> List.choose (fun l ->
@@ -143,18 +167,93 @@ module CausalGraph =
                           Kind = edgeKind l.Kind
                           Word = word
                           Path = sprintf "M %s %s C %s %s, %s %s, %s %s" (f x1) (f y1) (f mx) (f y1) (f mx) (f y2) (f x2) (f y2)
-                          // Near the evidence end, where each line is still apart from the others.
-                          LabelX = x1 + 8.0
-                          LabelY = e.Y + 10.0 + float (ordinal |> Map.tryFind l.Id |> Option.defaultValue 0) * 12.0
                           Title = sprintf "%s %s %s" e.FullText (word.ToLowerInvariant()) h.FullText }
                 | _ -> None)
+        let labels = labelsOf byKey edges
         let rows = [ evidenceNodes.Length; hypothesisNodes.Length; conclusionNodes.Length ] |> List.max
         let columns = if conclusionNodes.IsEmpty then 2.0 else 3.0
         { Width = 2.0 * margin + columns * nodeWidth + (columns - 1.0) * columnGap
           Height = rowY (max rows 1) + margin
           Nodes = nodes
           Edges = edges
+          Labels = labels
           UnlinkedEvidence = a.Evidence.Length - linked.Length }
+
+    /// Panels most-supported first, then by title, then in the projection's order; within a panel supporting cards
+    /// first, then contradicting, then the rest, each in the projection's order. Every current assessment appears in
+    /// exactly one panel, its hypothesis's.
+    let focus (a: AnalysisProjection) : FocusPanel list =
+        let links = a.Relationships |> List.filter (fun l -> l.Current)
+        let evidenceText =
+            a.Evidence
+            |> List.map (fun e -> e.Id, (match e.Label with Some l -> l + ": " + e.Content | None -> e.Content))
+            |> Map.ofList
+        let rank k =
+            match k with
+            | EdgeKind.SupportsEdge -> 0
+            | EdgeKind.ContradictsEdge -> 1
+            | EdgeKind.OtherEdge -> 2
+        a.Hypotheses
+        |> List.mapi (fun order h ->
+            let cards =
+                links
+                |> List.filter (fun l -> l.Hypothesis.Id = h.Id)
+                |> List.mapi (fun i l -> i, l)
+                |> List.sortBy (fun (i, l) -> rank (edgeKind l.Kind), i)
+                |> List.map (fun (_, l) ->
+                    let text = evidenceText |> Map.tryFind l.Evidence.Id |> Option.defaultValue l.EvidenceLabel
+                    { Key = l.Id; EvidenceText = text; Kind = edgeKind l.Kind; Word = SectionData.kindText l.Kind; Long = text.Length > 280 })
+            let n k = cards |> List.filter (fun c -> c.Kind = k) |> List.length
+            order,
+            { Key = h.Id
+              Title = h.Statement
+              Supports = n EdgeKind.SupportsEdge
+              Contradicts = n EdgeKind.ContradictsEdge
+              Others = n EdgeKind.OtherEdge
+              Cards = cards })
+        |> List.sortBy (fun (order, p) -> -p.Supports, p.Title, order)
+        |> List.map snd
+
+    /// "5 supporting · 2 contradicting · 1 other", zeros left out.
+    let counts (p: FocusPanel) =
+        [ p.Supports, "supporting"; p.Contradicts, "contradicting"; p.Others, "other" ]
+        |> List.filter (fun (n, _) -> n > 0)
+        |> List.map (fun (n, w) -> sprintf "%d %s" n w)
+        |> function
+            | [] -> "No evidence assessed yet"
+            | parts -> String.concat " · " parts
+
+    /// How many panels the fragment has slots for; further hypotheses are named in the relationship index.
+    let focusSlots = 16
+
+    let private kindName k =
+        match k with
+        | EdgeKind.SupportsEdge -> "supports"
+        | EdgeKind.ContradictsEdge -> "contradicts"
+        | EdgeKind.OtherEdge -> "other"
+
+    let focusBindings (view: WorkspaceView) : Bindings =
+        let panels = SectionData.analysis view.Section |> Option.map focus |> Option.defaultValue []
+        Bind.ofList
+            [ yield Bind.flag "focus.present" (not panels.IsEmpty)
+              yield Bind.flag "focus.more-present" (panels.Length > focusSlots)
+              yield Bind.text "focus.more" (sprintf "%d more hypotheses are listed in the relationship index below." (max 0 (panels.Length - focusSlots)))
+              for k in 1..focusSlots do
+                  let p = panels |> List.tryItem (k - 1)
+                  let key = sprintf "focus.p%d" k
+                  yield Bind.flag (key + ".present") p.IsSome
+                  yield Bind.text (key + ".title") (p |> Option.map (fun p -> p.Title) |> Option.defaultValue "")
+                  yield Bind.text (key + ".counts") (p |> Option.map counts |> Option.defaultValue "")
+                  yield Bind.flag (key + ".empty") (p |> Option.exists (fun p -> p.Cards.IsEmpty))
+                  yield
+                      Bind.items
+                          (key + ".items")
+                          [ for c in (p |> Option.map (fun p -> p.Cards) |> Option.defaultValue []) ->
+                                [ Bind.cellText "key" c.Key
+                                  Bind.cellText "kind" (kindName c.Kind)
+                                  Bind.cellText "word" c.Word
+                                  Bind.cellText "text" c.EvidenceText
+                                  Bind.cellFlag "long" c.Long ] ] ]
 
     let summary (g: GraphLayout) =
         let count c = g.Nodes |> List.filter (fun n -> n.Column = c) |> List.length
@@ -186,7 +285,7 @@ module CausalGraph =
     let bindings (view: WorkspaceView) : Bindings =
         let g = SectionData.analysis view.Section |> Option.map layout
         let present = g |> Option.exists (fun g -> not g.Edges.IsEmpty || g.Nodes.Length > 0)
-        let g = g |> Option.defaultValue { Width = 0.0; Height = 0.0; Nodes = []; Edges = []; UnlinkedEvidence = 0 }
+        let g = g |> Option.defaultValue { Width = 0.0; Height = 0.0; Nodes = []; Edges = []; Labels = []; UnlinkedEvidence = 0 }
         let heads =
             [ GraphColumn.EvidenceColumn, "Evidence"; GraphColumn.HypothesisColumn, "Hypotheses"; GraphColumn.ConclusionColumn, "Conclusions" ]
             |> List.filter (fun (c, _) -> g.Nodes |> List.exists (fun n -> n.Column = c))
@@ -221,7 +320,15 @@ module CausalGraph =
                         [ Bind.cellText "key" e.Key
                           Bind.cellText "cls" ("causa-graph__edge causa-graph__edge--" + edgeName e.Kind)
                           Bind.cellText "d" e.Path
-                          Bind.cellText "lx" (f e.LabelX)
-                          Bind.cellText "ly" (f e.LabelY)
                           Bind.cellText "word" e.Word
-                          Bind.cellText "title" e.Title ] ] ]
+                          Bind.cellText "title" e.Title ] ]
+              Bind.items
+                  "graph.labels"
+                  [ for l in g.Labels ->
+                        [ Bind.cellText "key" l.Key
+                          Bind.cellText "text" l.Text
+                          Bind.cellText "x" (f l.X)
+                          Bind.cellText "y" (f l.Y) ] ] ]
+
+    /// Both graph views' bindings.
+    let allBindings (view: WorkspaceView) : Bindings = Bind.merge [ bindings view; focusBindings view ]

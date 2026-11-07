@@ -143,28 +143,71 @@ test('Apollo 11 causal graph draws every assessment and keeps its relationship i
   const nav = page.getByRole('navigation', { name: 'Investigation sections' });
   await nav.getByRole('link', { name: 'Causal Analysis', exact: true }).click();
   await expect(nav.getByRole('link', { name: 'Causal Analysis', exact: true })).toHaveAttribute('aria-current', 'page');
+  // The full graph sits behind "Show full graph".
+  await page.locator('summary', { hasText: 'Show full graph' }).click();
   const picture = page.getByRole('img', { name: /^Causal graph:/ });
   await expect(picture).toBeAttached({ timeout: 20000 });
   const summary = await picture.getAttribute('aria-label');
   const assessments = Number(summary.match(/by (\d+) assessments/)[1]);
   expect(assessments).toBeGreaterThan(0);
   const figure = page.locator('figure.causa-graph');
+  await expect(figure).toBeVisible();
   await expect(figure.locator('path.causa-graph__edge')).toHaveCount(assessments);
-  await expect(figure.locator('text.causa-graph__word')).toHaveCount(assessments);
+  // One word per kind beside each evidence card, with its count: the counts add up to every assessment.
+  const counted = (await figure.locator('text.causa-graph__word').allTextContents()).map((w) => { const m = w.match(/×(\d+)$/); return m ? Number(m[1]) : 1; });
+  expect(counted.reduce((a, b) => a + b, 0)).toBe(assessments);
   const hypotheses = Number(summary.match(/to (\d+) hypotheses/)[1]);
   await expect(figure.locator('rect.causa-graph__node--hypothesis')).toHaveCount(hypotheses);
   // The textual equivalent: every assessment listed as text, the same number.
-  const index = page.locator('main section.causa-section').filter({ has: page.getByRole('heading', { name: 'Relationship index' }) }).locator('li');
+  const index = page.locator('main section.causa-section li.causa-relationship');
   await expect(index).toHaveCount(assessments);
   // The words are on the picture, so colour is never the only cue.
   const words = await figure.locator('text.causa-graph__word').allTextContents();
-  expect(words.every((w) => /^(Supports|Contradicts|Consistent with|Inconclusive|\w+)$/.test(w.trim()))).toBe(true);
+  expect(words.every((w) => /^[A-Z][a-z ]+( ×\d+)?$/.test(w.trim())), `unexpected words: ${words}`).toBe(true);
   // The graph scrolls inside its own box; the page never scrolls sideways.
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   await page.setViewportSize({ width: 1280, height: 900 });
   await figure.scrollIntoViewIfNeeded();
   await figure.screenshot({ path: process.env.CAUSA_GRAPH_SHOT || test.info().outputPath('apollo-11-graph.png') });
+  expect(errors, 'page errors').toEqual([]);
+  await context.close();
+});
+
+
+// The phone view: one panel per hypothesis, the first open with its evidence cards, the full graph collapsed, and
+// nothing wider than the screen.
+test('Challenger causal analysis at 390 px: panels by hypothesis, the full graph collapsed', async ({ browser }) => {
+  const { context, page, errors } = await connected(browser, { width: 390, height: 844 });
+  await page.getByRole('link', { name: CASES[2].title }).first().click();
+  const nav = page.getByRole('navigation', { name: 'Investigation sections' });
+  await nav.getByRole('link', { name: 'Causal Analysis', exact: true }).click();
+  await expect(nav.getByRole('link', { name: 'Causal Analysis', exact: true })).toHaveAttribute('aria-current', 'page');
+  const panels = page.locator('details.causa-focus__details');
+  await expect(panels.first()).toBeVisible({ timeout: 20000 });
+  expect(await panels.count()).toBeGreaterThan(1);
+  await expect(panels.first()).toHaveAttribute('open', '');
+  expect(await panels.nth(1).getAttribute('open')).toBeNull();
+  const cards = panels.first().locator('li.causa-focus__card');
+  expect(await cards.count()).toBeGreaterThan(0);
+  await expect(cards.first()).toBeVisible();
+  await expect(cards.first().locator('.causa-focus__word')).toHaveText(/^(Supports|Contradicts|Consistent with|Inconclusive|[A-Z][a-z]+)$/);
+  // Most supported first: the summaries' supporting counts never increase.
+  const supporting = (await page.locator('.causa-focus__counts').allTextContents()).map((t) => Number((t.match(/(\d+) supporting/) || [0, 0])[1]));
+  expect(supporting).toEqual([...supporting].sort((a, b) => b - a));
+  // Every summary is a full-size target.
+  for (const box of await page.locator('summary.causa-focus__summary').evaluateAll((ss) => ss.filter((x) => x.offsetParent).map((x) => x.getBoundingClientRect().height)))
+    expect(box).toBeGreaterThanOrEqual(44);
+  // The full graph is collapsed: its picture is not shown.
+  await expect(page.locator('figure.causa-graph')).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 'horizontal overflow at 390 px').toBeLessThanOrEqual(0);
+  // Opening another panel shows its cards.
+  await panels.nth(1).locator('summary.causa-focus__summary').click();
+  await expect(panels.nth(1).locator('li.causa-focus__card').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await panels.nth(1).locator('summary.causa-focus__summary').click();
+  await page.locator('section.causa-focus').evaluate((e) => e.scrollIntoView({ block: 'start' }));
+  await page.screenshot({ path: process.env.CAUSA_FOCUS_SHOT || test.info().outputPath('challenger-390.png') });
   expect(errors, 'page errors').toEqual([]);
   await context.close();
 });

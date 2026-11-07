@@ -53,3 +53,19 @@ module SMLOAD =
         let loading = Loading(RequestId 5L, LoadHead)
         Assert.Equal(LoadEvent(LoadInput.SupersededReply(RequestId 6L)), machine.InterpretLoad ctx loading (Answered(RequestId 6L, 200, [], "{}")))
         Assert.Equal(LoadEvent(LoadInput.LoadRejected(ProviderFailed AuthenticationFailed)), machine.InterpretLoad ctx loading (Answered(RequestId 5L, 401, [], """{"message":"Bad credentials"}""")))
+
+    [<Fact>]
+    let EveryIllegalPairFailsClosed () =
+        let legal =
+            set [ "NotLoaded", "OpenRequested"; "Loading", "LoadVerified"; "Loading", "LoadRejected"; "Loading", "SupersededReply"; "Loaded", "WentOffline"
+                  "Loaded", "RefreshRequested"; "Loaded", "SupersededReply"; "LoadFailed", "OpenRequested"; "UnavailableOffline", "WentOnline" ]
+        let states = [ NotLoaded; Loading(RequestId 1L, LoadHead); Loaded(verified c2); LoadFailed(ProviderFailed AuthenticationFailed); UnavailableOffline ]
+        let inputs =
+            [ LoadInput.OpenRequested target; LoadInput.LoadVerified(verified c2); LoadInput.LoadRejected(ProviderFailed AuthenticationFailed); LoadInput.WentOffline
+              LoadInput.WentOnline; LoadInput.RefreshRequested; LoadInput.SupersededReply(RequestId 2L) ]
+        for st in states do
+            for i in inputs do
+                if not (legal.Contains(LoadMachine.stateName st, LoadMachine.inputName i)) then
+                    match machine.StepLoad ctx st i with
+                    | Error f -> Assert.Equal("SM-LOAD", f.Machine)
+                    | Ok(st', _) -> failwithf "illegal (%s, %s) reached %s" (LoadMachine.stateName st) (LoadMachine.inputName i) (LoadMachine.stateName st')

@@ -239,3 +239,46 @@ module SMSAVE =
         let done' = drive s1 (List.exactlyOne (sends effects)) 2L
         Assert.Equal("Saved", name done')
         Assert.Equal(fake.Head(), done'.BaseHead)
+
+    /// Every pair outside the 50 legal pairs fails closed with SaveFault naming the machine, state and input, and the
+    /// session unchanged (invalidTransition rule; 139 illegal pairs).
+    [<Fact>]
+    let EveryIllegalPairFailsClosed () =
+        let legal =
+            set [ "Saved", "Edit"; "Saved", "WentOffline"; "Saved", "WentOnline"; "Unsaved", "Edit"; "Unsaved", "SaveRequested"; "Unsaved", "WentOffline"
+                  "Unsaved", "WentOnline"; "Unsaved", "QueuedSaveStarted"; "Saving", "Edit"; "Saving", "MutationSent"; "Saving", "ReadBackMatched"
+                  "Saving", "ReadBackMismatched"; "Saving", "StaleHeadUnrelated"; "Saving", "StaleHeadSameInvestigation"; "Saving", "ProviderRefused"
+                  "Saving", "CredentialRefused"; "Saving", "AnswerLost"; "Saving", "FailedBeforeSending"; "Saving", "WentOffline"; "Saving", "WentOnline"
+                  "Saving", "SupersededReply"; "Saving", "RebaseReadFailed"; "Saving", "ReadBackReadFailed"; "Offline", "Edit"; "Offline", "SaveRequested"
+                  "Offline", "WentOffline"; "Offline", "WentOnline"; "Offline", "QueuedSaveStarted"; "Conflict", "Edit"; "Conflict", "WentOffline"
+                  "Conflict", "WentOnline"; "Conflict", "ConflictResolvedReapplied"; "Conflict", "ConflictResolvedDiscarded"; "UnknownOutcome", "Edit"
+                  "UnknownOutcome", "StaleHeadSameInvestigation"; "UnknownOutcome", "ReconcileMarkerBytesMatch"; "UnknownOutcome", "ReconcileMarkerBytesDiffer"
+                  "UnknownOutcome", "ReconcileNothingWrittenHeadUnchanged"; "UnknownOutcome", "ReconcileNothingWrittenHeadMoved"
+                  "UnknownOutcome", "ReconcileHistoryRewritten"; "UnknownOutcome", "ReconcileReadFailed"; "UnknownOutcome", "ReconcileReadsSpent"
+                  "UnknownOutcome", "CheckAgain"; "UnknownOutcome", "WentOffline"; "UnknownOutcome", "WentOnline"; "UnknownOutcome", "SupersededReply"
+                  "SaveFailed", "Edit"; "SaveFailed", "SaveRequested"; "SaveFailed", "WentOffline"; "SaveFailed", "WentOnline" ]
+        let states =
+            [ SaveState.Saved(Confirmed(confirmation b1)); SaveState.Unsaved; SaveState.Saving; SaveState.Offline; SaveState.Conflict(Reviewable(verified c2))
+              SaveState.UnknownOutcome 3; SaveState.SaveFailed RepositoryKeptChanging ]
+        let inputs =
+            [ SaveInput.Edit(command 3); SaveInput.SaveRequested; SaveInput.MutationSent(RequestId 7L); SaveInput.ReadBackMatched(confirmation c2)
+              SaveInput.ReadBackMismatched c2; SaveInput.StaleHeadUnrelated c3; SaveInput.StaleHeadSameInvestigation c3; SaveInput.ProviderRefused(PermissionDenied "write")
+              SaveInput.CredentialRefused; SaveInput.AnswerLost; SaveInput.FailedBeforeSending; SaveInput.ReconcileMarkerBytesMatch(confirmation c2)
+              SaveInput.ReconcileMarkerBytesDiffer c2; SaveInput.ReconcileNothingWrittenHeadUnchanged; SaveInput.ReconcileNothingWrittenHeadMoved c3
+              SaveInput.ReconcileHistoryRewritten; SaveInput.ReconcileReadFailed; SaveInput.ReconcileReadsSpent; SaveInput.CheckAgain; SaveInput.WentOffline
+              SaveInput.WentOnline; SaveInput.ConflictResolvedReapplied []; SaveInput.ConflictResolvedDiscarded(verified c2); SaveInput.SupersededReply(RequestId 999L)
+              SaveInput.QueuedSaveStarted; SaveInput.RebaseReadFailed; SaveInput.ReadBackReadFailed ]
+        let mutable illegal = 0
+        for st in states do
+            for input in inputs do
+                let s = session st |> awaiting MutationAnswer
+                let pair = SaveSession.stateName st, SaveSession.inputName input
+                if not (legal.Contains pair) then
+                    illegal <- illegal + 1
+                    match machine.Step ctx s input with
+                    | Error f ->
+                        Assert.Equal("SM-SAVE", f.Machine)
+                        Assert.Equal(fst pair, f.State)
+                        Assert.Equal(snd pair, f.Input)
+                    | Ok(s', _) -> failwithf "illegal %A reached %s" pair (SaveSession.stateName s'.State)
+        Assert.Equal(139, illegal)

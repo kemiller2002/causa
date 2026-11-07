@@ -63,6 +63,12 @@ const openInvestigation = async (page, tag) => {
 test.describe.configure({ timeout: 300_000 });
 
 const SCREENS = ['#/', '#/administration', '#/settings', '#/no-such-page'];
+// Activates a primary destination as a user would at any width: through Forma's collapsed Menu when it is collapsed.
+const navTo = async (page, name) => {
+  if (!(await primary(page).getByRole('link', { name, exact: true }).isVisible().catch(() => false)))
+    await page.locator('.ef-navigation-shell__compact > summary').filter({ visible: true }).first().click();
+  await primary(page).getByRole('link', { name, exact: true }).click();
+};
 
 test.describe('UI-011', () => {
   test('UI-011-O1', async ({ page }) => {
@@ -198,7 +204,7 @@ test.describe('UI-011', () => {
     await open(page, '#/administration');
     await page.evaluate(() => window.scrollTo(0, Math.max(0, document.scrollingElement.scrollHeight - innerHeight)));
     const y = await page.evaluate(() => scrollY);
-    await primary(page).getByRole('link', { name: 'Settings', exact: true }).click();
+    await navTo(page, 'Settings');
     await expect(page.locator('main h1')).toHaveText('Settings');
     await page.goBack();
     await expect(page.locator('main h1')).toHaveText('Administration');

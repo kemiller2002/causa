@@ -653,3 +653,53 @@ module AppList =
                 | ListingNextRequest(next, r) -> go (n + 1L) next r
                 | ListingFailed f -> Error f
         go 1L first request
+
+/// The verification plan as the repository carries it (.echelon/obligations.json): obligations with their priority,
+/// and the tests bound to them with their suite.
+[<RequireQualifiedAccess>]
+module Plan =
+    type BoundTest = { Id: string; Suite: string; Obligations: string list }
+    type PlanObligation = { Id: string; Requirement: string; Priority: string; Criterion: string }
+    type PlanSuite = { Id: string; Command: string; DependsOn: string list }
+
+    let private doc () = Json.parse (Repo.read ".echelon/obligations.json")
+    let private strs (j: Json option) = j |> Json.items |> List.choose (Some >> Json.text)
+
+    let tests () : BoundTest list =
+        doc () |> Json.field "tests" |> Json.items |> List.map Some
+        |> List.map (fun t -> { Id = t |> Json.field "id" |> Json.text |> Option.defaultValue ""; Suite = t |> Json.field "suite" |> Json.text |> Option.defaultValue ""; Obligations = t |> Json.field "obligations" |> strs })
+
+    let obligations () : PlanObligation list =
+        doc () |> Json.field "obligations" |> Json.items |> List.map Some
+        |> List.map (fun o ->
+            { Id = o |> Json.field "id" |> Json.text |> Option.defaultValue ""
+              Requirement = o |> Json.field "requirement" |> Json.text |> Option.defaultValue ""
+              Priority = o |> Json.field "priority" |> Json.text |> Option.defaultValue ""
+              Criterion = o |> Json.field "criterion" |> Json.text |> Option.defaultValue "" })
+
+    let suites () : PlanSuite list =
+        doc () |> Json.field "suites" |> Json.items |> List.map Some
+        |> List.map (fun s -> { Id = s |> Json.field "id" |> Json.text |> Option.defaultValue ""; Command = s |> Json.field "command" |> Json.text |> Option.defaultValue ""; DependsOn = s |> Json.field "dependsOn" |> strs })
+
+    let rec private isFact (t: Type | null) =
+        match t with
+        | null -> false
+        | t -> t.FullName = "Xunit.FactAttribute" || isFact t.BaseType
+
+    /// The xunit Fact (or Theory) attribute of a method, if it is a test.
+    let factOf (m: Reflection.MethodInfo) : obj option = m.GetCustomAttributes(true) |> Array.tryFind (fun a -> isFact (a.GetType()))
+
+    /// Every xunit test method of an assembly as its dotnet test identity (dotnet:<namespace>.<class>.<method>).
+    let identities (assembly: Reflection.Assembly) : (string * Reflection.MethodInfo) list =
+        [ for t in assembly.GetTypes() do
+              for m in t.GetMethods() do
+                  if (factOf m).IsSome then
+                      yield sprintf "dotnet:%s.%s" (string t.FullName) m.Name, m ]
+
+    /// The Skip reason of a test, if it is skipped.
+    let skipOf (m: Reflection.MethodInfo) : string option =
+        factOf m
+        |> Option.bind (fun a ->
+            match a.GetType().GetProperty "Skip" with
+            | null -> None
+            | p -> p.GetValue a |> Option.ofObj |> Option.map string |> Option.filter (String.IsNullOrEmpty >> not))

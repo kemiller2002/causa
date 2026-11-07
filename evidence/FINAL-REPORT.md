@@ -144,7 +144,7 @@ These decisions are the owner's, given in chat. **None is written as an owner re
 - **P18 extension:** also when the refusals include DEPENDENCY_NOT_INTEGRATED on P18-merged dependencies. Decided by the owner in chat; not yet recorded.
 - **P19 = A:** the primary question is persisted as an informational unknown. Decided by the owner in chat; not yet recorded. See Indy-init#195.
 - **Preview deploy, and option A:** demonstrate from the integration branch, and show it in draft PR #6, which is not to be merged.
-- **Option C (about 21:05Z):** "C: merge PR #6 as implementer-verified". The integration branch is merged into main, labelled **implementer-verified, not governed-accepted**. The conditions were CI green on the head, a local build of the exact merge result, and all non-live tests passing. Decided by the owner in chat; not yet recorded. See section 2a.
+- **Option C (about 21:05Z):** "C: merge PR #6 as implementer-verified". The integration branch is merged into main, labelled **implementer-verified, not governed-accepted**. The conditions were CI green on the head, a local build of the exact merge result, and all non-live tests passing. Decided by the owner in chat; not yet recorded. **PR #6 merge decided by the owner at about 21:05Z; not completed by the deadline** (see Final state).
 
 ## 8. Failures and corrective actions (including the coordinator's own)
 
@@ -184,4 +184,17 @@ These decisions are the owner's, given in chat. **None is written as an owner re
 
 ## Final state
 
-_(updated at the stop; see below)_
+Written at 21:23Z.
+
+- **Governed verdict:** unchanged from the first line. No governed acceptance; the ledger reports 0 of 203 mandatory requirements integrated (CONTINUE_REQUIRED).
+- **main:** `78591f4`, with all five workflows green. It holds setup, T10, T11 and the deploy-scan fix, plus this report when PR #7 merges.
+- **PR #6 (option C, the integration branch as implementer-verified):** **decided by the owner at about 21:05Z; not completed by the deadline.**
+  - PR #6 conflicted with main, so CI had never run on it. Main was merged into `slice/SL-T20` with a merge commit, `c0a67eb`. One conflict, in `tests/Causa.App.Tests/Causa.App.Tests.fsproj`, was resolved by keeping both sides. The tree is identical to the demo build `f28fd9e`.
+  - Conditions met on `c0a67eb`: a local Release build (0 warnings, 0 errors), `npm run build`, and every non-live test (App 52, Domain 14, Contract 31, Persistence 71, Invariants 7, Acceptance 71, all passed). Causa CI, Echelon foundations and Praxis validation are green.
+  - Condition not met in time: **Build and test** (the browser job) was still running at the 21:22Z cut-off. Rather than merge without it, the coordinator left PR #6 open, ready for review and unmerged.
+- **Informational Verification gate on `f28fd9e`** (run 42411774511, dispatched with mode=development, so deterministic suites only and no live suites): **still in progress at the time of writing**. It started at 20:35Z and was still in its suites step at 21:23Z, so no executable count is reported. https://github.com/kemiller2002/causa/actions/runs/42411774511
+- **The live demo** stays at `f28fd9e`. The owner disabled the Pages deploy workflow at about 21:01Z.
+- **Open PRs:**
+  - #4 (SL-T18): gate REFUSED, 49 of 66 executable obligations verified.
+  - #6 (integration build): option C, not completed.
+- **Stop:** at 22:00Z the coordinator runs the stop decision and reports its result as it stands. It is expected to be CONTINUE_REQUIRED.

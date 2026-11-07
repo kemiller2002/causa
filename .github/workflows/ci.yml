@@ -4,6 +4,9 @@
 # The npm tree is installed (npm ci, from package-lock.json) before the tests: the release-set gate (VER-008) checks the
 # installed artifacts against the lock, and the cross-system tests (VER-006) run the engine's output through Limen's
 # own codec. Without it those tests fail as BLOCKED; they never pass vacuously.
+# This job has no secrets, so it runs every suite except the live ones (Causa.Acceptance.Live, Causa.Invariants.Live):
+# those need the test repository's credentials and run in the governed Verification gate (SU-DOTNET-LIVE), so a
+# missing credential or a provider outage cannot fail this job (PF-012-O2, PF-017-O2).
 name: Causa CI
 
 on:
@@ -38,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          output=$(dotnet test Causa.slnx -c Release --no-build 2>&1)
+          output=$(dotnet test Causa.slnx -c Release --no-build --filter "FullyQualifiedName!~Causa.Acceptance.Live.&FullyQualifiedName!~Causa.Invariants.Live." 2>&1)
           status=$?
           echo "$output"
           if [ "$status" -ne 0 ]; then exit "$status"; fi

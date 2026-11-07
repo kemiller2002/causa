@@ -14,6 +14,10 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: 0,
+  // The governed gate reads Playwright's JSON results from $CAUSA_PLAYWRIGHT_JSON (catalog acceptance); locally, list.
+  reporter: process.env.CAUSA_PLAYWRIGHT_JSON
+    ? [["list"], ["json", { outputFile: process.env.CAUSA_PLAYWRIGHT_JSON }]]
+    : [["list"]],
   use: { baseURL: origin, trace: "retain-on-failure" },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"], launchOptions: preinstalledChromium } },

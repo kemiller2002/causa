@@ -55,8 +55,21 @@ html { color-scheme: light; }
   color: var(--causa-on-navy);
 }
 
-.causa-masthead .ef-site-nav__link[aria-current="page"] {
+.causa-masthead .ef-navigation-shell__persistent {
+  grid-auto-flow: column;
+  justify-content: start;
+}
+
+.causa-masthead .ef-navigation-shell__compact > summary {
+  color: var(--causa-on-navy);
+}
+
+/* The current page is marked without relying on colour: forced-colours mode drops the box-shadow, the underline and
+   weight remain (UI-016-O13). */
+.causa-masthead .causa-primary a[aria-current="page"] {
   box-shadow: inset 0 calc(-1 * var(--ef-space-1)) 0 var(--causa-teal);
+  text-decoration: underline;
+  font-weight: var(--ef-type-weight-strong);
 }
 
 .causa-context {

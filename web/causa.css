@@ -92,3 +92,13 @@ html { color-scheme: light; }
   gap: var(--ef-space-2);
   color: var(--causa-navy);
 }
+
+/* Touch targets in the collapsed masthead navigation are at least Forma's minimum in both dimensions, at every width
+   (UI-011-O1, FL-01; change request CR-5 from T16). */
+.causa-masthead .ef-navigation-shell__compact > summary,
+.causa-masthead .ef-navigation-shell a[href] {
+  min-inline-size: var(--ef-layout-target-min);
+  min-block-size: var(--ef-layout-target-min);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}

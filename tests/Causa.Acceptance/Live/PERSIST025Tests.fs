@@ -88,13 +88,9 @@ type PERSIST025Tests(fixture: LiveFixture<PERSIST025Tests>) =
             { Mode = "fake"; Probes = Conformance.run (Conformance.overFake (StatefulFake()) prefix) ignore; CreatedCommits = [ CommitOid "x" ] }
         Assert.True(fakeReport.Passed)
         Assert.False(fakeReport.IsLiveVerification)
-        let saved = Environment.GetEnvironmentVariable "CAUSA_WRITE_TOKEN"
-        try
-            Environment.SetEnvironmentVariable("CAUSA_WRITE_TOKEN", null)
+        LiveEnv.withVariables [ "CAUSA_WRITE_TOKEN", None ] (fun () ->
             let blocked = Assert.Throws<InvalidOperationException>(fun () -> (new LiveRun("PERSIST025Blocked") :> IDisposable).Dispose())
-            Assert.StartsWith("BLOCKED: no credential", blocked.Message)
-        finally
-            Environment.SetEnvironmentVariable("CAUSA_WRITE_TOKEN", saved)
+            Assert.StartsWith("BLOCKED: no credential", blocked.Message))
         // And the live run itself is live verification only from real commits.
         let live = fixture.Run
         let probes = Conformance.run (Conformance.overLive live) live.Created

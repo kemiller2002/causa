@@ -251,7 +251,9 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
             | Some _ ->
                 let head = s.Commits[s.Branches[b]]
                 let missing = changes |> List.exists (fun (p, bytes) -> bytes.IsNone && not (head.Tree.ContainsKey p))
-                if missing || List.isEmpty changes then s, recorded id "graphql-unprocessable", false
+                // real GitHub refuses the deletion of an absent path as NOT_FOUND (gate run 42402357707)
+                if missing then s, recorded id "graphql-not-found-deleted-path", false
+                elif List.isEmpty changes then s, recorded id "graphql-unprocessable", false
                 else
                     let s2, c = apply s b message changes
                     s2, recordedWith id "graphql-commit-created" [ recordedOidA, c.Oid; "2026-11-07T17:00:00Z", c.CommittedAt.ToString("yyyy-MM-ddTHH:mm:ssZ") ], true
@@ -485,7 +487,8 @@ module Conformance =
           probe "read back the committed bytes" "ok:true" (match readBack with Ok b -> sprintf "ok:%b" b | e -> kind e)
           probe "read a missing file at a commit" "NotFound" (match head1 with Ok h -> kind (adapter.Reader.ReadFile h (file adapter.Prefix "missing.json")) | e -> kind e)
           probe "commit with the read credential" "PermissionDenied" (kind permission)
-          probe "delete a file that does not exist" "ValidationFailed" (kind validation)
+          // real GitHub answers NOT_FOUND (gate run 42402357707), not a validation error
+          probe "delete a file that does not exist" "NotFound" (kind validation)
           probe "a path outside the prefix is refused before sending" "ValidationFailed" (kind outside)
           probe "compare the expected head with the new head" "ok:ahead:true" (match compare with Ok(s, has) -> sprintf "ok:%s:%b" s has | e -> kind e) ]
 

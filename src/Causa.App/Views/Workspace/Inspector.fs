@@ -21,9 +21,17 @@ module ContentEditors =
     let private errorsFor (fields: FieldId list) (errors: ValidationError list) =
         errors |> List.filter (fun e -> List.contains e.Field fields)
 
-    let private form (prefix: string) (available: Availability) (fields: (string * FieldId) list) (drafts: EditorDrafts) =
+    /// After a record the form is empty again and the change is unsaved: say where the item went and what keeps it
+    /// (the owner recorded a hypothesis twice when the form looked unchanged). Stated from the state, not an event.
+    let statusLine (noun: string) (unsaved: bool) (draftsEmpty: bool) (recorded: int) =
+        if unsaved && draftsEmpty && recorded > 0 then
+            sprintf "Recorded %s are listed above. Your changes are not saved yet: select Save to keep them." noun
+        else ""
+
+    let private form (prefix: string) (status: string) (available: Availability) (fields: (string * FieldId) list) (drafts: EditorDrafts) =
         let errs = errorsFor (List.map snd fields) drafts.Errors
-        [ yield Bind.flag (prefix + ".offered") (match available with NotOffered -> false | _ -> true)
+        [ yield Bind.text (prefix + ".status") status
+          yield Bind.flag (prefix + ".offered") (match available with NotOffered -> false | _ -> true)
           yield Bind.flag (prefix + ".disabled") (match available with Available -> false | _ -> true)
           yield Bind.text (prefix + ".unavailable") (match available with Unavailable r -> r | _ -> "")
           for name, f in fields do
@@ -37,6 +45,15 @@ module ContentEditors =
     let bindings (view: WorkspaceView) : Bindings =
         let actions =
             SectionData.analysis view.Section |> Option.map (fun a -> a.Actions) |> Option.defaultValue Map.empty
+        let a = SectionData.analysis view.Section
+        let unsaved = view.Save |> Option.exists (fun sv -> sv.Kind = UnsavedKind)
+        let empty (fs: FieldId list) = fs |> List.forall (fun f -> view.Drafts.Values |> Map.tryFind f |> Option.forall (fun v -> v.Trim() = ""))
+        let count f = a |> Option.map f |> Option.defaultValue 0
+        // The start's own observation is the problem statement; only recorded ones count.
+        let observations = count (fun a -> max 0 (a.Observations.Length - 1))
+        let hypotheses = count (fun a -> a.Hypotheses.Length)
+        let obsStatus = statusLine "observations" unsaved (empty [ observationText; observationSource ]) observations
+        let hypStatus = statusLine "hypotheses" unsaved (empty [ hypothesisStatement; hypothesisExplanation ]) hypotheses
         Bind.ofList(
-            form "editor.observation" (availability actions recordObservation) [ "text", observationText; "source", observationSource ] view.Drafts
-            @ form "editor.hypothesis" (availability actions recordHypothesis) [ "statement", hypothesisStatement; "explanation", hypothesisExplanation ] view.Drafts)
+            form "editor.observation" obsStatus (availability actions recordObservation) [ "text", observationText; "source", observationSource ] view.Drafts
+            @ form "editor.hypothesis" hypStatus (availability actions recordHypothesis) [ "statement", hypothesisStatement; "explanation", hypothesisExplanation ] view.Drafts)

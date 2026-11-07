@@ -13,14 +13,8 @@ type PF020Tests(fixture: LiveFixture<PF020Tests>) =
     let fakeProbes () = Conformance.run (Conformance.overFake (StatefulFake()) prefix) ignore
 
     let withoutCredentials (f: unit -> 'a) : 'a =
-        let saved = [ "CAUSA_GITHUB_TOKEN"; "CAUSA_WRITE_TOKEN" ] |> List.map (fun v -> v, Environment.GetEnvironmentVariable v)
-        try
-            for (v, _) in saved do
-                Environment.SetEnvironmentVariable(v, null)
-            f ()
-        finally
-            for (v, value) in saved do
-                Environment.SetEnvironmentVariable(v, value)
+        // flow-local: the process environment is never changed (a concurrent live test keeps its credentials)
+        LiveEnv.withVariables [ "CAUSA_GITHUB_TOKEN", None; "CAUSA_WRITE_TOKEN", None ] f
 
     interface IClassFixture<LiveFixture<PF020Tests>>
 

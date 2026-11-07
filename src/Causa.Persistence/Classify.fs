@@ -201,11 +201,12 @@ module Classify =
         | Operation.ReadCommit -> "read commit"
         | Operation.Compare _ -> "compare"
 
-    let private notFoundWhat =
-        function
+    let private notFoundWhat (operation: Operation) (e: AnswerEvidence) =
+        match operation with
         | Operation.ReadFile(RepoPath p) -> p
         | Operation.ReadHead -> "branch"
-        | Operation.Mutation _ -> "branch"
+        // GraphQL NOT_FOUND on the mutation names what is missing (a branch, or a path to delete): keep GitHub's words
+        | Operation.Mutation _ -> e.Messages |> List.tryHead |> Option.defaultValue "branch"
         | op -> operationName op
 
     let private validationMessages (e: AnswerEvidence) =
@@ -228,14 +229,14 @@ module Classify =
             | Operation.Connect, 404 -> GhPermission, Error(PermissionDenied(operationName operation))
             | _, 422 -> GhValidation, Error(ValidationFailed(validationMessages e))
             | Operation.Compare expected, 404 -> GhHistoryRewritten, Error(HistoryRewritten expected)
-            | _, 404 -> GhNotFound, Error(NotFound(notFoundWhat operation))
+            | _, 404 -> GhNotFound, Error(NotFound(notFoundWhat operation e))
             | _, s when s >= 200 && s < 300 ->
                 match e.Body with
                 | None -> GhMalformed, Error(Malformed "the answer body is not JSON")
                 | Some _ when not (List.isEmpty e.GraphQlTypes) || not (List.isEmpty (items (prop "errors" e.Body))) ->
                     let types = e.GraphQlTypes
                     if List.contains "FORBIDDEN" types then GhPermission, Error(PermissionDenied(operationName operation))
-                    elif List.contains "NOT_FOUND" types then GhNotFound, Error(NotFound(notFoundWhat operation))
+                    elif List.contains "NOT_FOUND" types then GhNotFound, Error(NotFound(notFoundWhat operation e))
                     elif types |> List.exists (fun t -> t = "UNPROCESSABLE" || t = "INVALID" || t = "ARGUMENT_ERROR" || t = "BAD_REQUEST") then
                         GhValidation, Error(ValidationFailed(validationMessages e))
                     elif types |> List.exists (fun t -> not (recognisedGraphQl.Contains t)) || List.isEmpty types then

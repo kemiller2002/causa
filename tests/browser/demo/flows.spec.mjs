@@ -238,3 +238,34 @@ test('7. A catalog investigation renders', async ({ browser }) => {
   noProblems(page);
   note(`opened "${title}"`);
 });
+
+test('8. The connection status never shows any part of a GitHub token', async ({ browser }) => {
+  const page = await freshPage(browser);
+  await open(page, '#/');
+  const mode = await connectionMode(page).catch(() => 'unknown');
+  // What the user can read about the connection: the connection line or the Connect region with its state and errors.
+  const statusText = mode === 'connected'
+    ? await connectedText(page).innerText()
+    : await page.getByRole('region', { name: /connect data repository/i }).or(page.locator('main')).first().innerText();
+  const tokenShapes = /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{4,}|github_pat_[A-Za-z0-9_]{4,}/;
+  expect(statusText, 'the connection status shows a GitHub token').not.toMatch(tokenShapes);
+  // The deployed key itself (public in deploy-connection.json by design) appears nowhere in the page, its address, its
+  // title or web storage, not even a fragment of eight or more characters.
+  const deployed = await page.evaluate(async () => {
+    try {
+      const r = await fetch(new URL('deploy-connection.json', location.href), { cache: 'no-store' });
+      return r.ok ? (await r.json())?.connection?.key || '' : '';
+    } catch {
+      return '';
+    }
+  });
+  const seen = await page.evaluate(() => [document.documentElement.outerHTML, location.href, document.title, ...Object.values(localStorage), ...Object.values(sessionStorage)].join('\n'));
+  expect(seen, 'the page carries a GitHub token').not.toMatch(tokenShapes);
+  if (deployed) {
+    const fragments = [];
+    for (let i = 0; i + 8 <= deployed.length; i += 4) fragments.push(deployed.slice(i, i + 8));
+    const leaked = fragments.filter((f) => seen.includes(f));
+    expect(leaked.length, `${leaked.length} fragments of the deploy key appear in the page`).toBe(0);
+    note(`deploy key present; none of its ${fragments.length} fragments shown (mode: ${mode})`);
+  } else note(`no deploy key in this build (mode: ${mode})`);
+});

@@ -12,9 +12,9 @@
 .causa-connect__form input { inline-size: 100%; min-block-size: var(--ef-layout-target-min); box-sizing: border-box; }
 /* Primary investigation actions: the accent (teal identity) with its inverse text (UI-016-O4). */
 .causa-action-primary {
-  background: var(--ef-color-accent-primary);
-  border-color: var(--ef-color-accent-primary);
-  color: var(--ef-color-text-inverse);
+  background: var(--causa-teal-strong, var(--ef-color-accent-primary));
+  border-color: var(--causa-teal-strong, var(--ef-color-accent-primary));
+  color: var(--causa-on-teal, var(--ef-color-text-inverse));
   min-block-size: var(--ef-layout-target-min);
 }
 .causa-cards { list-style: none; padding: 0; margin: 0; }
@@ -22,8 +22,8 @@
 /* Frozen demonstration versus writable copy: told apart in words (the tag and sentence) and by a border, never by
    colour alone (UI-014-O3, UI-016-O13). */
 .causa-card[data-copy="frozen"] { border-inline-start: var(--ef-primitive-space-1) solid var(--ef-color-status-info); }
-.causa-card[data-copy="working"] { border-inline-start: var(--ef-primitive-space-1) solid var(--ef-color-accent-primary); }
+.causa-card[data-copy="working"] { border-inline-start: var(--ef-primitive-space-1) solid var(--causa-teal, var(--ef-color-accent-primary)); }
 .causa-copy-kind { margin: 0; }
-.causa-tone[data-tone="critical"] { color: var(--ef-color-status-danger); }
+.causa-tone[data-tone="critical"] { color: var(--causa-coral-strong, var(--ef-color-status-danger)); }
 .causa-tone[data-tone="attention"] { color: var(--ef-color-status-warning); }
 .causa-loading { display: flex; gap: var(--ef-primitive-space-2); align-items: center; }

@@ -294,3 +294,9 @@ let dispatch (message: string) : string =
     | _ -> ()
     state <- Some next
     render (ui.Project next) effects firstLoad (navigation before next.Local.Route inbound)
+
+/// A fresh tab: what a page reload gives the host (used by the host tests; the browser reloads the page instead).
+let reset () =
+    state <- None
+    pending <- Map.empty
+    page <- ""

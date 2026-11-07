@@ -20,6 +20,8 @@
 //                          changed), only by environment drift (tools, OS, runner), or not at all (AR-011-O2)
 // Exit code 0 only when every step succeeded; a failed step names itself and stops the build.
 
+#load "build/DeployConnection.fs"
+
 open System
 open System.Diagnostics
 open System.IO
@@ -276,6 +278,37 @@ let compare (fileA: string) (fileB: string) =
     let quoted (xs: string list) = xs |> List.map (fun x -> "\"" + x + "\"") |> String.concat ", "
     printfn "{\"verdict\": \"%s\", \"reproducible\": [%s], \"environment\": [%s]}" verdict (quoted inputs) (quoted environment)
 
+// ---- Deploy connection and credential scan (EXT-DATA-004-O5, TEST-DEPLOY-KEY sections 2 and 5) ---------------------
+
+let private envValue (name: string) = Environment.GetEnvironmentVariable name |> Option.ofObj
+
+/// The deploy build's connection; every other build has none and reads no secret.
+let deploySettings () : Result<Causa.Build.DeployConnection.Settings option, string> =
+    if Causa.Build.DeployConnection.enabled envValue then Causa.Build.DeployConnection.settings envValue else Ok None
+
+/// Only the deploy build writes deploy-connection.json: the connection when the four secrets are set, else the schema
+/// alone. Other builds write nothing, and the app shows the Connect form.
+let deployConnection () =
+    if Causa.Build.DeployConnection.enabled envValue then
+        deploySettings ()
+        |> Result.map (fun s ->
+            File.WriteAllText(Path.Combine(dist, Causa.Build.DeployConnection.FileName), Causa.Build.DeployConnection.render s)
+            printfn "build: %s written (%s)" Causa.Build.DeployConnection.FileName (match s with Some c -> string c | None -> "no connection"))
+    else Ok()
+
+/// The build scans its own output: any GitHub token literal fails it, except the one deploy key in the root
+/// deploy-connection.json of the deploy build. Findings name the file, never the value.
+let scanSite () =
+    deploySettings ()
+    |> Result.bind (fun settings ->
+        let files =
+            Directory.GetFiles(dist, "*", SearchOption.AllDirectories)
+            |> Array.map (fun f -> Path.GetRelativePath(dist, f).Replace('\\', '/'), File.ReadAllBytes f)
+            |> List.ofArray
+        match Causa.Build.DeployConnection.scan files settings with
+        | [] -> Ok()
+        | findings -> Error(findings |> List.map (fun f -> sprintf "%s: %s" f.File f.Reason) |> String.concat "; "))
+
 let requireSite () =
     [ "index.html"; "causa.css"; "causa-theme.css"; "causa-icon.svg"; "boundary.js"; "vendor/forma/all.css"; "vendor/limen/index.js"; "provenance.json" ]
     @ (if skipEngine then [] else [ "_framework/dotnet.js" ])
@@ -295,6 +328,8 @@ let steps =
       { Name = "vendor Limen"; Run = vendor "limen" "limen" }
       if not skipEngine then { Name = "publish the engine"; Run = engine }
       { Name = "write provenance"; Run = provenance }
+      { Name = "deploy connection"; Run = deployConnection }
+      { Name = "scan the site for credentials"; Run = scanSite }
       { Name = "check the site"; Run = requireSite } ]
 
 let result =

@@ -339,5 +339,33 @@
     }
   ],
   "prereleaseApprovals": [],
-  "waivers": []
+  "waivers": [],
+  "run": {
+    "id": "indy-init-competition-2026-11-07",
+    "frozenAt": "2026-11-07T16:10:50Z",
+    "frozenBy": "evidence/t0/t0.json (T0) and evidence/t0/stack-drift.json (READY, 55 PASS)",
+    "rule": "The lock is fixed for this run (DEP-CURRENT-006, VER-004-O2): an upstream release published during the run is recorded as drift in freshnessChecks and never changes .echelon/dependency-lock.json mid-run."
+  },
+  "refreshPolicy": "Re-resolve the newest stable releases and re-verify the set at the next rehearsal or competition run, or at an owner-authorized refresh (VER-004-O3, DEP-CURRENT-006): a new run writes a new lock, a new freshnessChecks list and a new previousRun diff.",
+  "previousRun": {
+    "id": "rehearsal-010 (echelon-current 1.37.0 upgrade lock, ODR-ESU-01)",
+    "lock": "kemiller2002/Indy-init@dae2347d26d0fb7dccc36484033515bbbaa31675:docs/optimization/echelon-stack-upgrade/lock/dependency-lock.json",
+    "lockSha256": "43f0ac62e149d06624d1d8e0de7eca572f5b8323a1938314792c399a90e44149",
+    "releaseSet": "echelon-current 1.37.0 (registry 575240233d1fc32b57cfa827ea1031b68609fc58), unchanged",
+    "changes": [
+      {
+        "system": "conditor",
+        "previous": "0.10.20",
+        "current": "0.10.21",
+        "reason": "ODR-COMP-P14 A: the indy-init preset pins forma-workflow 1.2.0 and carries the test-deploy-key secrets step"
+      },
+      {
+        "system": "forma-workflow",
+        "previous": null,
+        "current": "1.2.0",
+        "reason": "added: installed by Conditor v0.10.21's indy-init preset (ODR-COMP-P14 A)"
+      }
+    ],
+    "unchanged": "every other system of the previous lock has the same version"
+  }
 }

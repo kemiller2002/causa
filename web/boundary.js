@@ -81,4 +81,22 @@ const start = async () => {
 
 shell.retry.addEventListener("click", () => { void start(); });
 
+// Scroll context on Back and Forward (UI-011-O4): each history entry keeps its own scroll position, saved into
+// history.state as the user scrolls and restored once the kernel has rendered the route the browser popped. Only the
+// browser's own scroll offset is kept: no application state.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+let scrollSave;
+window.addEventListener("scroll", () => {
+  clearTimeout(scrollSave);
+  scrollSave = setTimeout(() => {
+    history.replaceState({ ...(history.state ?? {}), causaScrollY: window.scrollY }, "");
+  }, 100);
+}, { passive: true });
+window.addEventListener("popstate", (event) => {
+  const y = event.state?.causaScrollY;
+  if (typeof y !== "number") return;
+  // The kernel renders the popped route on the same popstate; restore after its view has been applied.
+  requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+});
+
 void start();

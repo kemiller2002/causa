@@ -457,3 +457,29 @@ module Reapply =
             | other -> state, accepted, refused @ [ { Command = cmd; Reason = reason other } ]
         let _, accepted, refused = commands |> List.fold folder (remote.Investigation, [], [])
         accepted, refused
+
+/// The transitions whose guard is "known offline" (state-machine-contracts.json T-S02, T-S05, T-S52, T-S55, T-S57;
+/// SM-LOAD T-L02). RequestContext carries no network state, so the machines take the online branch; an engine that
+/// knows the tab is offline (SM-NETWORK Offline) steps these pairs here instead. Nothing is sent from any of them.
+[<RequireQualifiedAccess>]
+module KnownOffline =
+
+    let private offline (s: InvestigationSession) =
+        { s with State = SaveState.Offline; Unsaved = s.Unsaved @ s.AfterInFlight; AfterInFlight = []; Outstanding = None },
+        [ Announce(Assertive, "Offline: your changes exist only in this tab and cannot be saved until the connection returns.") ]
+
+    /// Some offline transition for the pairs that have one; None means the pair has no offline branch, so step it
+    /// with SaveMachine.Step as usual.
+    let step (s: InvestigationSession) (input: SaveInput) : (InvestigationSession * SaveEffect list) option =
+        match s.State, input with
+        | SaveState.Saved _, SaveInput.Edit c -> Some(offline { s with Unsaved = s.Unsaved @ [ c ] })
+        | SaveState.Unsaved, (SaveInput.SaveRequested | SaveInput.QueuedSaveStarted) -> Some(offline s)
+        | SaveState.SaveFailed _, SaveInput.SaveRequested -> Some(offline s)
+        | SaveState.Saving, SaveInput.RebaseReadFailed when s.Outstanding.IsSome -> Some(offline s)
+        | _ -> None
+
+    /// T-L02: an investigation opened while the tab is known offline is unavailable offline (never empty or missing).
+    let open' (state: LoadState) : (LoadState * SaveEffect list) option =
+        match state with
+        | NotLoaded -> Some(UnavailableOffline, [ Announce(Polite, "This investigation is unavailable offline; it opens when the connection returns.") ])
+        | _ -> None

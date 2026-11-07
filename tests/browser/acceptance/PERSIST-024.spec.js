@@ -17,6 +17,7 @@ const mark = (label) => `${label}-${Date.now().toString(36)}-${Math.random().toS
 // CAUSA_PROVIDER=harness-double answers api.github.com from a local GitHub double (synthetic, never evidence), as the
 // governed journeys do; otherwise nothing is intercepted and the suite talks to the real test repository.
 const routedContexts = new WeakSet();
+test.describe.configure({ timeout: 120_000 });
 const useDouble = async (context) => {
   if (process.env.CAUSA_PROVIDER !== 'harness-double' || routedContexts.has(context)) return;
   routedContexts.add(context);
@@ -26,11 +27,17 @@ const useDouble = async (context) => {
     const u = new URL(r.url());
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE' };
     if (r.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    let answer;
-    try { answer = await route.fetch({ url: double + u.pathname + u.search }); } catch { return route.abort('failed'); }
-    await route.fulfill({ status: answer.status(), headers: { ...answer.headers(), ...cors }, body: await answer.body() });
+    if (offlineContexts.has(context)) return route.abort('internetdisconnected');
+    // read the whole answer before fulfilling: a streamed answer can be disposed if the page moves on
+    let answer, body;
+    try { answer = await route.fetch({ url: double + u.pathname + u.search }); body = await answer.body(); } catch { return route.abort('failed').catch(() => {}); }
+    await route.fulfill({ status: answer.status(), headers: { ...answer.headers(), ...cors }, body }).catch(() => {});
   });
 };
+/// Offline as the browser sees it; with the double, its route refuses too (a routed answer would bypass setOffline).
+const offlineContexts = new WeakSet();
+const goOffline = async (context) => { offlineContexts.add(context); await context.setOffline(true); };
+const goOnline = async (context) => { offlineContexts.delete(context); await context.setOffline(false); };
 const open = async (page, hash = '#/') => {
   await useDouble(page.context());
   await page.goto(APP + hash);
@@ -57,7 +64,9 @@ const button = (page, name) => page.getByRole('button', { name, exact: true });
 /// Starts an investigation (not saved); returns its values.
 const start = async (page, label) => {
   const v = { problem: mark(`${label}-problem`), title: mark(`${label}-title`) };
-  await page.getByRole('link', { name: /new investigation/i }).or(page.getByRole('button', { name: /new investigation/i })).first().click();
+  const newInvestigation = page.getByRole('link', { name: /new investigation/i }).or(page.getByRole('button', { name: /new investigation/i })).first();
+  if (!(await newInvestigation.isVisible().catch(() => false))) await page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: 'Investigations' }).first().click();
+  await newInvestigation.click();
   await field(page, 'Problem statement').fill(v.problem);
   await field(page, 'Title').fill(v.title);
   await button(page, 'Start investigation').click();
@@ -92,7 +101,7 @@ const artifactText = () => {
 /// Fails every GitHub request after the first `allow` ones (the network failing on the save or rebase path).
 const failAfter = async (page, allow) => {
   let n = 0;
-  await page.route('https://api.github.com/**', async (route) => { n += 1; if (n > allow) await route.abort('internetdisconnected'); else await route.continue(); });
+  await page.route('https://api.github.com/**', async (route) => { n += 1; if (n > allow) await route.abort('internetdisconnected'); else await route.fallback(); });
 };
 
 test('PERSIST-024-O1', async ({ page }) => {

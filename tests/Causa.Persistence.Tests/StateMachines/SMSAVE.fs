@@ -373,3 +373,23 @@ module SMSAVE =
                 Assert.Equal(Causa.Domain.Materiality.Informational, u.Materiality)
             | other -> failwithf "%A" other
         | Error f -> failwithf "%A" f
+
+    /// The known-offline branches (T-S02, T-S05, T-S52, T-S55, T-S57, T-L02): Offline, nothing sent.
+    [<Fact>]
+    let KnownOfflineBranches () =
+        let check st input =
+            match KnownOffline.step (session st |> awaiting MutationAnswer) input with
+            | Some(s, effects) ->
+                Assert.Equal(SaveState.Offline, s.State)
+                Assert.Empty(sends effects)
+            | None -> failwithf "%A + %A has an offline branch" st input
+        check (SaveState.Saved(VerifiedAt(verified b1))) (SaveInput.Edit(command 2))
+        check SaveState.Unsaved SaveInput.SaveRequested
+        check SaveState.Unsaved SaveInput.QueuedSaveStarted
+        check (SaveState.SaveFailed RepositoryKeptChanging) SaveInput.SaveRequested
+        check SaveState.Saving SaveInput.RebaseReadFailed
+        Assert.True((KnownOffline.step (session SaveState.Unsaved) (SaveInput.Edit(command 2))).IsNone)
+        match KnownOffline.open' NotLoaded with
+        | Some(UnavailableOffline, effects) -> Assert.Empty(sends effects)
+        | other -> failwithf "%A" other
+        Assert.True((KnownOffline.open' (Loaded(verified c2))).IsNone)

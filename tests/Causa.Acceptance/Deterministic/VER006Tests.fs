@@ -158,6 +158,44 @@ type VER006Tests() =
                   if not importMap.Success then yield "index.html has no import map entry for Limen"
                   elif not (File.Exists(Path.Combine(out, importMap.Groups[1].Value))) then yield sprintf "the Limen import map target %s is missing" importMap.Groups[1].Value
                   if not (File.Exists(Path.Combine(out, "provenance.json"))) then yield "the build wrote no provenance.json" ]
+            // The build's provenance (AR-011): the commit it was built from, every input's digest, the locked set.
+            let provenance = Repo.json (Path.GetRelativePath(Repo.root, Path.Combine(out, "provenance.json")))
+            let reproducible = provenance |> Json.prop "reproducible"
+            let inputs = reproducible |> Option.bind (Json.prop "inputs") |> Option.map Json.entries |> Option.defaultValue []
+            let dependencies = reproducible |> Option.bind (Json.prop "dependencies") |> Option.map Json.entries |> Option.defaultValue []
+            Gate.noDefects
+                "the build provenance"
+                [ let commit = reproducible |> Option.map (Json.strOr "commit") |> Option.defaultValue ""
+                  if not (isSha commit) then yield sprintf "the provenance names no commit (%s)" commit
+                  if reproducible |> Option.map (Json.strOr "deployedSha") <> Some commit then yield "the deployed SHA is not the built commit"
+                  for f in [ "global.json"; "package-lock.json"; lockPath; "build.fsx" ] do
+                      match inputs |> List.tryFind (fun (k, _) -> k = f) with
+                      | Some(_, v) when v.GetString() = Repo.sha256 f -> ()
+                      | _ -> yield sprintf "the provenance does not record %s's digest" f
+                  for s in locked do
+                      if not (dependencies |> List.exists (fun (k, v) -> k = s.Id && (v.GetString() |> Option.ofObj |> Option.defaultValue "").StartsWith s.Version)) then
+                          yield sprintf "the provenance does not record %s %s" s.Id s.Version
+                  let ci = provenance |> Json.prop "environment" |> Option.bind (Json.prop "ci") |> Option.map (Json.strOr "runId") |> Option.defaultValue ""
+                  let expected = match Environment.GetEnvironmentVariable "GITHUB_RUN_ID" with | null | "" -> "local" | id -> id
+                  if ci <> expected then yield sprintf "the provenance records CI run %s, not %s" ci expected ]
+            // A re-run tells reproducible differences from environment drift.
+            let again = Tooling.tempDir ()
+            try
+                Tooling.build [ "--provenance-only"; "--out"; again ] |> ignore
+                let a, b = Path.Combine(out, "provenance.json"), Path.Combine(again, "provenance.json")
+                let verdict (x: string) (y: string) =
+                    let o = Tooling.build [ "--compare"; x; y ]
+                    let line = o.Out.Split('\n') |> Array.find (fun l -> l.StartsWith "{\"verdict\"")
+                    (Repo.json (Path.GetRelativePath(Repo.root, (let f = Path.Combine(again, "v.json") in File.WriteAllText(f, line); f)))) |> Json.strOr "verdict"
+                if verdict a b <> "identical" then failwith "two builds of the same tree are not reproducible"
+                let drifted = Path.Combine(again, "drifted.json")
+                File.WriteAllText(drifted, File.ReadAllText(b).Replace("\"runId\": \"", "\"runId\": \"other-"))
+                if verdict a drifted <> "environment-drift" then failwith "a different CI run is not classified as environment drift"
+                let changed = Path.Combine(again, "changed.json")
+                File.WriteAllText(changed, File.ReadAllText(b).Replace(Repo.sha256 "global.json", String('0', 64)))
+                if verdict a changed <> "reproducible-difference" then failwith "a changed input is not classified as a reproducible difference"
+            finally
+                Directory.Delete(again, true)
         finally
             Directory.Delete(out, true)
         let packageJson = Repo.json "package.json"

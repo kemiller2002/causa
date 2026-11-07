@@ -10,6 +10,8 @@ events in a GitHub repository that you own; Causa has no server of its own.
 Open **https://causa.echelonfoundry.com/**. It is a preview built from `slice/SL-T20` (frozen at `f28fd9e`) and is
 already connected to `kemiller2002/causa-data`.
 
+**Demo:** [video (2 min 19 s)](docs/demo/causa-demo.mp4) and [slide deck](docs/demo/causa-demo.html). Both show the app at phone width and how it was built with AI: the frozen specification, the agent lanes, testing, security and delivery. The recording uses the harness GitHub stand-in, seeded with the real catalog, because the recording browser cannot authenticate to GitHub.
+
 `main` holds only the governed slices T10 and T11 (the shell and the build). The full application is on
 `slice/SL-T20`; see draft PR #6.
 

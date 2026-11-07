@@ -84,8 +84,14 @@
                 <h3 class="ef-card__title"><a class="ef-card__link" data-bind-href="href" data-event="INV-040" data-text="title"></a></h3>
                 <p class="causa-copy-kind" data-bind-data-copy="copyKind"><span class="ef-badge causa-copy-tag" data-text="copyTag"></span> <span data-text="copy"></span></p>
                 <dl class="ef-facts">
-                  <div class="ef-facts__item"><dt>Status</dt><dd data-text="status"></dd></div>
-                  <div class="ef-facts__item"><dt>Last activity</dt><dd data-text="lastActivity"></dd></div>
+                  <div class="ef-facts__item"><dt>Status</dt><dd>
+                    <template data-if="statusKnown"><span class="ef-status-lozenge causa-card__status" data-bind-data-state="statusState" data-text="status"></span></template>
+                    <template data-if="statusUnknown"><span class="causa-card__unknown" data-text="status"></span></template>
+                  </dd></div>
+                  <div class="ef-facts__item"><dt>Last activity</dt><dd>
+                    <template data-if="lastActivityKnown"><time data-bind-datetime="lastActivityIso" data-text="lastActivity"></time></template>
+                    <template data-if="lastActivityUnknown"><span class="causa-card__unknown" data-text="lastActivity"></span></template>
+                  </dd></div>
                   <div class="ef-facts__item"><dt>Hypotheses</dt><dd data-text="hypotheses"></dd></div>
                   <div class="ef-facts__item"><dt>Evidence</dt><dd data-text="evidence"></dd></div>
                   <div class="ef-facts__item"><dt>Unresolved contradictions</dt><dd data-text="contradictions"></dd></div>

@@ -11,6 +11,8 @@
     <Compile Include="../../build/DeployConnection.fs" Link="Build/DeployConnection.fs" />
     <Compile Include="DeployConnectionTests.fs" />
     <Compile Include="DeployScanStepTests.fs" />
+    <Compile Include="../../tools/usage/UsageCore.fs" Link="Tools/UsageCore.fs" />
+    <Compile Include="UsageRecorderTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Causa.Domain/Causa.Domain.fsproj" />

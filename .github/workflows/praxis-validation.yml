@@ -26,11 +26,30 @@ jobs:
         with:
           fetch-depth: 0
       # ./praxis installs and runs the Praxis version this project pins; it
-      # needs only a POSIX shell and curl (no Node.js, npm or .NET).
-      - run: ./praxis registry check
-      - run: ./praxis validate
+      # needs only a POSIX shell and curl. .NET is here only for the tool-usage
+      # recorder (tools/usage/usage.fsx, docs/tool-usage.md), which runs
+      # ./praxis unchanged (same output, same exit code) and records the
+      # invocation. The records go to the runner's temporary directory, never
+      # into the checkout, and are uploaded as an artifact; nothing from CI is
+      # committed. A recording failure only warns.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet fsi tools/usage/usage.fsx -- run praxis -- registry check
         env:
+          CAUSA_TOOL_USAGE_DIR: ${{ runner.temp }}/tool-usage
+      - run: dotnet fsi tools/usage/usage.fsx -- run praxis -- validate
+        env:
+          CAUSA_TOOL_USAGE_DIR: ${{ runner.temp }}/tool-usage
           PRAXIS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
           # Compatibility: Praxis releases pinned from before the rename read
           # only the legacy name (DF-ROS-2026-A050).
           ROS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - name: Upload the tool-usage records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-usage-praxis-validation
+          path: ${{ runner.temp }}/tool-usage/
+          if-no-files-found: ignore
+          retention-days: 30

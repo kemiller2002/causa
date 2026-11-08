@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Causa demo deck</title>
+<style>
+  :root { --bg: #f2efe7; --ink: #1d232b; --muted: #4c5562; --navy: #15283f; --teal: #0a6670; --amber: #8a5a10; --card: #e8e4d9; --line: #c9c3b4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .deck { display: grid; gap: 24px; padding: 24px 16px; justify-items: center; }
+  .slide { width: min(1280px, 100%); aspect-ratio: 16 / 9; background: var(--bg); border: 1px solid var(--line); padding: 48px 64px; display: flex; flex-direction: column; overflow: hidden; }
+  .slide header { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 3px solid var(--navy); padding-bottom: 10px; margin-bottom: 22px; }
+  .slide h1 { font: 700 44px/1.1 Georgia, "Times New Roman", serif; margin: 0; color: var(--navy); }
+  .slide h2 { font: 700 34px/1.15 Georgia, "Times New Roman", serif; margin: 0; color: var(--navy); }
+  .tag { font: 600 14px/1 ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; flex: 1; min-height: 0; }
+  .card { background: var(--card); border-left: 6px solid var(--teal); padding: 14px 18px; }
+  .card.warn { border-left-color: var(--amber); }
+  .card h3 { margin: 0 0 6px; font-size: 19px; }
+  ul { margin: 0; padding-left: 22px; } li { margin: 4px 0; }
+  .big { font-size: 26px; line-height: 1.35; max-width: 60ch; }
+  .verdict { font: 700 26px/1.3 Georgia, serif; color: var(--amber); }
+  code { font: 15px ui-monospace, Menlo, monospace; background: #ddd8cb; padding: 1px 5px; }
+  .foot { margin-top: auto; font-size: 14px; color: var(--muted); }
+  a { color: var(--teal); }
+  .solo .slide { display: none; } .solo .slide.on { display: flex; border: 0; }
+  .solo .deck { padding: 0; } .solo { overflow: hidden; }
+  @media (max-width: 760px) { .slide { aspect-ratio: auto; padding: 24px 18px; } .cols { grid-template-columns: 1fr; } .slide h1 { font-size: 32px; } .big { font-size: 20px; } }
+</style>
+</head>
+<body>
+<main class="deck" aria-label="Causa demo slides">
+
+<section class="slide" aria-label="Slide 1: Causa">
+  <header><span class="tag">Indy Init competition · 7 November 2026</span><span class="tag">1 / 8</span></header>
+  <h1>Causa</h1>
+  <p class="big">A workspace for causal investigations: record what was observed, propose hypotheses, weigh the evidence for and against each one, and keep every change as history in your own GitHub repository.</p>
+  <p class="big">Built in one 420-minute window by Claude agents, working from a frozen requirements package, under a governed verification gate.</p>
+  <p class="foot">Live preview: <a href="https://causa.echelonfoundry.com/">causa.echelonfoundry.com</a> · Code: github.com/kemiller2002/causa · Demo build <code>f28fd9e</code> (branch <code>slice/SL-T20</code>)</p>
+</section>
+
+<section class="slide" aria-label="Slide 2: The application">
+  <header><h2>The application</h2><span class="tag">2 / 8</span></header>
+  <div class="cols">
+    <div class="card"><h3>What you can do</h3><ul>
+      <li>Connect to a GitHub data repository; the token stays in tab memory only</li>
+      <li>Browse the investigations: lifecycle, last activity and counts on each card</li>
+      <li>Open frozen catalog cases: Apollo 11, Apollo 1, Challenger, a light bulb</li>
+      <li>Start your own investigation, record observations and hypotheses, Save, reopen</li>
+      <li>Causal Analysis: each hypothesis with the evidence that supports or contradicts it</li>
+    </ul></div>
+    <div class="card"><h3>How it is made</h3><ul>
+      <li>F# compiled to .NET WebAssembly, written in a functional style: immutable data, pure functions, Result over exceptions</li>
+      <li>Limen 0.9.1 boundary, Forma 0.13 design tokens, phone-first layout</li>
+      <li>Storage: events in a GitHub repository (causa-storage 1.1.0 codec, RFC 8785 JSON)</li>
+      <li>Explicit state machines for save, conflict and load</li>
+    </ul></div>
+  </div>
+  <p class="foot">The video that goes with this deck shows these flows at phone width (390 px).</p>
+</section>
+
+<section class="slide" aria-label="Slide 3: How it was built with AI">
+  <header><h2>How it was built with AI</h2><span class="tag">3 / 8</span></header>
+  <div class="cols">
+    <div class="card"><h3>From a frozen specification</h3><ul>
+      <li>Requirements package v4.1.6, frozen, in <code>kemiller2002/Indy-init</code>: 31 work items, a slice manifest and test identities</li>
+      <li>A requirements compiler turns it into obligations; the gate checks each one by its exact test identity</li>
+      <li>Nothing in the package, the lock or the owner records was edited by the agents</li>
+    </ul></div>
+    <div class="card"><h3>One coordinator, several agent lanes</h3><ul>
+      <li>A Claude coordinator plans the work, routes merges and owns the PRs</li>
+      <li>Lanes for integration, UI, domain and persistence, each in its own git worktree and <code>slice/SL-…</code> branch</li>
+      <li>One owner per file (<code>agent-file-ownership.json</code>); a change needed in someone else's file goes back as a request</li>
+      <li>The owner steered by chat; family feedback on a phone became fixes within the hour</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="slide" aria-label="Slide 4: Testing">
+  <header><h2>Testing</h2><span class="tag">4 / 8</span></header>
+  <div class="cols">
+    <div class="card"><h3>At the demo build (implementer-run)</h3><ul>
+      <li>.NET suites, offline: App 52 · Domain 14 · Contract 31 · Persistence 71 · Invariants 7 · Acceptance 71</li>
+      <li>Playwright workspace spec: 12/12 in Chromium and in WebKit, at 1280 px and 390 px, including 44 px tap targets and a save-and-reload round trip</li>
+      <li>Demo flows 8/8 against a GitHub double seeded with the real catalog</li>
+      <li>A stateful GitHub fake built only from recorded answers; the GitHub error matrix is tested</li>
+    </ul></div>
+    <div class="card"><h3>Governed</h3><ul>
+      <li>Live tests hit the real GitHub API in the gate only; without credentials they fail as BLOCKED and never pass</li>
+      <li>Persistence slice T18 against real GitHub: 49 of 66 executable obligations verified (run 42404772168)</li>
+      <li>The gate also checks test integrity and that every test really asserts something (Dokimos)</li>
+      <li>Rule: no test skipped, weakened or deleted to get green</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="slide" aria-label="Slide 5: Security">
+  <header><h2>Security</h2><span class="tag">5 / 8</span></header>
+  <div class="cols">
+    <div class="card"><h3>In the application</h3><ul>
+      <li>The token is kept only in the tab's memory and is never saved</li>
+      <li>A test checks that none of 22 fragments of the deploy token ever appears in the UI</li>
+      <li>The app talks only to <code>https://api.github.com</code></li>
+      <li>Only the Limen capabilities in use ship; the build fails if a storage API is referenced</li>
+    </ul></div>
+    <div class="card"><h3>In delivery</h3><ul>
+      <li>The deploy scans the built site for credentials; a silent-exit bug under <code>bash -e -o pipefail</code> was fixed, with a test that runs the step verbatim</li>
+      <li>The gate's own token is read-only; live tests use short-lived app tokens, separate for read and write, revoked when the job ends</li>
+      <li>Agents kept to their sandbox: one denied workaround was reported, not retried</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="slide" aria-label="Slide 6: Delivery">
+  <header><h2>Delivery</h2><span class="tag">6 / 8</span></header>
+  <div class="cols">
+    <div class="card"><h3>Pipeline</h3><ul>
+      <li>On every PR: Verification gate, Causa CI, Build and test, Praxis validation, Echelon foundations</li>
+      <li>Merge commits only: green on the current head, up to date with main, never rebased or force-pushed</li>
+      <li>GitHub Pages deploy; <code>/provenance.json</code> names the exact commit served</li>
+    </ul></div>
+    <div class="card"><h3>What was shipped</h3><ul>
+      <li>main: setup, T10 and T11 (shell, build, CI), plus the deploy-scan fix; all workflows green</li>
+      <li>Preview: 9 successful deploys from the integration branch; from mid-afternoon on, each one was announced first and checked on the live site afterwards</li>
+      <li>Frozen for the demo at <code>f28fd9e</code></li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="slide" aria-label="Slide 7: Owner feedback in the loop">
+  <header><h2>Owner feedback in the loop</h2><span class="tag">7 / 8</span></header>
+  <ul class="big">
+    <li>"Status is unknown on the list": cards now load and show the real lifecycle and counts</li>
+    <li>"I don't see where to enter the information": a reopened investigation is now editable</li>
+    <li>The same hypothesis appeared twice: saved items are now listed above the form, with a "not saved yet" line</li>
+    <li>"It doesn't demo well on a phone": the graph is now one panel per hypothesis, with 44 px targets</li>
+  </ul>
+  <p class="foot">Each fix was tested, checked against the double and the live site, and deployed after the coordinator session was told.</p>
+</section>
+
+<section class="slide" aria-label="Slide 8: The honest result">
+  <header><h2>The honest result</h2><span class="tag">8 / 8</span></header>
+  <p class="verdict">Governed verdict: no governed acceptance. 0 of 203 mandatory requirements integrated (CONTINUE_REQUIRED).</p>
+  <ul class="big">
+    <li>The demo runs from the integration branch, not from main</li>
+    <li>Blocked by a cycle in the plan: slice T18's own test needs T20, and T20 needs T18. The process-evidence rules also point at another repository.</li>
+    <li>Owner decisions P17, P18 and P19 were made in chat and are not yet recorded</li>
+    <li>Full details: <code>evidence/FINAL-REPORT.md</code> and README "Known limitations"</li>
+  </ul>
+</section>
+
+</main>
+<script>
+  (() => {
+    const n = Number(new URLSearchParams(location.search).get('slide'));
+    if (!n) return;
+    document.body.classList.add('solo');
+    const s = document.querySelectorAll('.slide')[n - 1];
+    if (s) s.classList.add('on');
+  })();
+</script>
+</body>
+</html>

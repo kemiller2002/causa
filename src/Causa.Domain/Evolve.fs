@@ -325,6 +325,9 @@ module Evolve =
         | ProposalRejected(id, reason) ->
             Ok { s with Proposals = s.Proposals |> update id (fun x -> { x with State = ProposalState.ProposalRejected; Decision = Some reason }) }
         | ExtensionAttached ext -> Ok { s with Extensions = s.Extensions @ [ ext ] }
+        // causa-storage 1.2.0 section 4.4: the title, and an unknown's question only; history stays in the timeline.
+        | InvestigationTitleRevised t -> Ok { s with Title = t.Title }
+        | UnknownRevised r -> Ok { s with Unknowns = s.Unknowns |> update r.UnknownId (fun u -> { u with Question = r.Question }) }
 
     /// Applies one event. The first event must be InvestigationStarted at version 1; every later one must name the same
     /// investigation and carry the next version. Every event sets the version, even one that changes nothing else.

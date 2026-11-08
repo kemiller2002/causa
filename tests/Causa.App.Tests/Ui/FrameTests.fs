@@ -48,7 +48,7 @@ module FrameTests =
           Stored = NotRequested
           Section = OverviewSection NotRequested
           Drafts = { Values = Map.empty; Errors = []; OpenEditor = None }
-          Details = { Open = false; Form = { Title = ""; ProblemStatement = ""; Question = "" }; Errors = []; Edit = NotOffered; SaveDetails = NotOffered; Cancel = NotOffered }
+          Details = { Open = false; Form = { Title = ""; ProblemStatement = ""; Question = "" }; Errors = []; Edit = NotOffered; SaveDetails = NotOffered; Cancel = NotOffered; Status = "" }
           Save = Some(save UnsavedKind)
           State = ScreenReady }
 
@@ -373,3 +373,94 @@ module GraphEditorTests =
                       "Evidence relationship rationale"; "Conclusion statement"; "Conclusion strength"; "Residual uncertainty"
                       ">Record evidence</button>"; ">Link evidence to a hypothesis</button>"; ">Reassess</button>"; ">Record a conclusion</button>" ] do
             Assert.Contains(name, html)
+
+// The save-state dialog (Discard unsaved changes) and the list's connection line while offline.
+module SaveDialogAndOfflineTests =
+    let private save kind =
+        { Kind = kind
+          Indicator =
+            { InvestigationId = InvestigationId(Guid "3f2a8c1e-0b4d-4e6f-9a7b-1c2d3e4f5a6b")
+              Label = (let w, _, _ = Language.saveState kind in w)
+              Text = ""
+              Glyph = ""
+              Actions = []
+              Politeness = Causa.Persistence.Polite
+              LastSavedCommitTime = None }
+          Save = Available
+          Conflict = None
+          NotSaved = [ "Checkout failures" ] }
+
+    let private text (b: Bindings) key =
+        match Map.tryFind key b with
+        | Some(BindingValue.Text s) -> s
+        | other -> failwithf "%s is %A" key other
+
+    let private flag (b: Bindings) key =
+        match Map.tryFind key b with
+        | Some(BindingValue.Flag f) -> f
+        | other -> failwithf "%s is %A" key other
+
+    [<Fact>]
+    let ``the save-state dialog explains every state, with its word, and offers nothing destructive`` () =
+        let all = [ SavedKind; UnsavedKind; SavingKind; OfflineKind; ConflictKind; UnknownOutcomeKind; SaveFailedKind ]
+        for kind in all do
+            let b = SaveIndicator.bindings (Some(save kind))
+            let word, _, _ = Language.saveState kind
+            Assert.Equal(sprintf "Save state: %s" word, text b "save.dialog-title")
+            Assert.NotEqual<string>("", text b "save.dialog-explanation")
+        Assert.Equal("Every change in this investigation is saved in your data repository.", text (SaveIndicator.bindings (Some(save SavedKind))) "save.dialog-explanation")
+        Assert.Contains("Review", text (SaveIndicator.bindings (Some(save ConflictKind))) "save.dialog-explanation")
+
+    [<Fact>]
+    let ``the fragment declares the save-state dialog's invoker, offers no discard and reads only written bindings`` () =
+        let rec up (dir: DirectoryInfo | null) =
+            match dir with
+            | null -> failwith "repository root not found"
+            | d when File.Exists(Path.Combine(d.FullName, "Causa.slnx")) -> d.FullName
+            | d -> up d.Parent
+        let html = File.ReadAllText(Path.Combine(up (DirectoryInfo AppContext.BaseDirectory), "web", "screens", "workspace-frame.html"))
+        // Always enabled, always opening the dialog (Forma's dialog pattern: commandfor + show-modal).
+        Assert.Contains("type=\"button\" commandfor=\"causa-save-dialog\" command=\"show-modal\" aria-haspopup=\"dialog\">About saving</button>", html)
+        Assert.Contains("<dialog class=\"ef-dialog causa-save-dialog\" id=\"causa-save-dialog\"", html)
+        // PERSIST-024-O4: Discard only in a conflict, on request; no button here names it.
+        Assert.DoesNotMatch("(?i)<button[^>]*>[^<]*discard", html)
+        let written = SaveIndicator.bindings (Some(save UnsavedKind)) |> Map.toList |> List.map fst |> Set.ofList
+        let read =
+            Text.RegularExpressions.Regex.Matches(html, "data-(?:text|if|each|bind-[a-z-]+)=\"(save\\.[a-z.-]+)\"")
+            |> Seq.map (fun m -> m.Groups.[1].Value)
+            |> Set.ofSeq
+        Assert.Contains("save.dialog-title", read)
+        Assert.Empty(Set.difference read written)
+
+    let private connection offline =
+        { State = Connected true
+          Form = { Owner = "harness"; Repository = "causa-test"; Branch = "main"; CredentialEntered = true }
+          Errors = []
+          Connect = NotOffered
+          Disconnect = Available
+          Connected = Some "harness/causa-test on main"
+          WriteScope = Writable
+          Offline = offline }
+
+    [<Fact>]
+    let ``while the tab is offline the connection line says so instead of "can save changes"`` () =
+        let online = ConnectionScreen.bindings (connection false)
+        Assert.True(flag online "connection.online")
+        Assert.False(flag online "connection.offline")
+        Assert.Equal("This token can save changes", text online "connection.write-scope")
+        let offline = ConnectionScreen.bindings (connection true)
+        Assert.False(flag offline "connection.online")
+        Assert.True(flag offline "connection.offline")
+        Assert.Equal("Offline: changes stay in this tab until the connection returns.", text offline "connection.offline-text")
+        // Not connected: neither line.
+        let off = ConnectionScreen.bindings { connection true with State = Disconnected }
+        Assert.False(flag off "connection.online")
+        Assert.False(flag off "connection.offline")
+        let rec up (dir: DirectoryInfo | null) =
+            match dir with
+            | null -> failwith "repository root not found"
+            | d when File.Exists(Path.Combine(d.FullName, "Causa.slnx")) -> d.FullName
+            | d -> up d.Parent
+        let html = File.ReadAllText(Path.Combine(up (DirectoryInfo AppContext.BaseDirectory), "web", "screens", "investigation-list.html"))
+        Assert.Contains("<template data-if=\"connection.offline\">", html)
+        Assert.Contains("data-text=\"connection.offline-text\"", html)

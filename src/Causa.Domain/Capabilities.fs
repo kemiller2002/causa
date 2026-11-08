@@ -63,6 +63,14 @@ module Capabilities =
                   (needs (i.Evidence |> Map.exists (fun id _ -> Policies.isUsableEvidence i id)) "EVIDENCE.NONE" "No usable evidence has been admitted."
                    @ needs (not i.Hypotheses.IsEmpty) "HYPOTHESIS.NONE" "No hypothesis has been recorded."))
           cap "IdentifyUnknown" opened
+          cap "ReviseTitle" opened
+          cap
+              "ReviseUnknown"
+              (whenOpen
+                  (needs
+                      (i.Unknowns |> Map.exists (fun _ u -> u.State = UnknownState.Identified || u.State = UnknownState.Investigating))
+                      "UNKNOWN.NONE_OPEN"
+                      "No identified or investigating unknown to revise."))
           cap "RecordAssumption" opened
           cap "RecordContradiction" opened
           cap "RecordPrediction" (whenOpen (needs (not i.Hypotheses.IsEmpty) "HYPOTHESIS.NONE" "No hypothesis has been recorded."))

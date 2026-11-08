@@ -327,7 +327,8 @@ module SMSAVE =
         let events = fake.FileAt(fake.Head(), RepoPath(prefix + "/events.ndjson")) |> Option.map System.Text.Encoding.UTF8.GetString |> Option.get
         Assert.Contains(title, events)
         Assert.Contains(problem, events)
-        Assert.Contains("\"formatVersion\":\"1.1.0\"", events)
+        // Owner decision (causa-storage 1.2.0): new investigations are written in 1.2.0.
+        Assert.Contains("\"formatVersion\":\"1.2.0\"", events)
         // A fresh load reads and verifies what GitHub holds.
         let target : InvestigationRef = { Address = wc; Id = inv }
         match storage.StepLoad (c 10L) NotLoaded (LoadInput.OpenRequested target) with

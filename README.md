@@ -1,10 +1,116 @@
-# Causa T0
+# Causa
 
-This repository is a greenfield pilot running Praxis 3.25.0, Echelon Foundry's
-repository operating system. An older installation may also have `./ros`, a
-compatibility alias of `./praxis`.
+Causa is a workspace for causal investigations: you record what happened, the evidence, the hypotheses that could
+explain it and how they relate, and Causa shows the causal analysis. It is an F# .NET WebAssembly application built
+with Limen 0.9.1 (the browser kernel) and Forma 0.13.0 (the design tokens). Each investigation is stored as a history of
+events in a GitHub repository that you own; Causa has no server of its own.
 
-## Start here
+## Try it now
+
+Open **https://causa.echelonfoundry.com/**. It is a preview built from `slice/SL-T20` (frozen at `f28fd9e`) and is
+already connected to `kemiller2002/causa-data`.
+
+**Demo:** [video (2 min 19 s)](docs/demo/causa-demo.mp4) and [slide deck](docs/demo/causa-demo.html). Both show the app at phone width and how it was built with AI: the frozen specification, the agent lanes, testing, security and delivery. The recording uses the harness GitHub stand-in, seeded with the real catalog, because the recording browser cannot authenticate to GitHub.
+
+`main` holds only the governed slices T10 and T11 (the shell and the build). The full application is on
+`slice/SL-T20`; see draft PR #6.
+
+What to tap:
+
+- **A catalog case:** open *Apollo 11* or *Challenger* from the list, then the **Causal Analysis** section.
+- **Your own investigation:** **New investigation**, fill in the problem statement, **Start investigation**, **Save**.
+  Then record an observation and a hypothesis, **Save** again and reload the page: the investigation is still there.
+
+## Known limitations
+
+- **Not governed-accepted.** `main` holds only the shell and the build (T10 and T11, merged under the owner's P18 rule).
+  The full app runs from `slice/SL-T20`. The ledger reports 0 of 203 mandatory requirements integrated.
+- **You can record observations and hypotheses only.** Evidence, assessments, causes, corrective actions and conclusions
+  show for catalog cases but cannot be added yet.
+- **Catalog cases are frozen demonstrations**, read-only by design. Only your working copies are editable.
+- **No edit or delete** of a recorded item. The history is append-only, so a mistaken record stays, and there is no
+  duplicate check.
+- **One repository and branch per tab.** The token lives only in the tab's memory. The preview reconnects on reload with
+  its built-in connection; a local build shows the Connect form again.
+- **A new investigation is not added to the list in the tab that created it** until the tab connects again (for
+  example after a reload). Other tabs list it once they connect.
+- **Offline:** changes stay in the tab and Save is not sent until the connection is back. Closing or reloading the tab
+  loses unsaved changes; the app warns first.
+- **Basic conflict handling only.** If another writer changes the same investigation, the save stops as a conflict;
+  resolving it inside the app is not built yet.
+- **Tested in** Chromium at 1280 px and 390 px, with the catalog browser spec also run in WebKit.
+- **Live GitHub tests** run only in the governed gate, which has the credentials. Locally they fail closed as BLOCKED.
+- **Not built yet:** reports and print (Folio), the WDL work items, most of the INV work items, and the remaining UI
+  slices.
+
+## Run it locally
+
+Prerequisites: the .NET SDK 10.0.402 (pinned by `global.json`) and Node 22.
+
+```bash
+git checkout slice/SL-T20
+npm ci                 # the locked npm tree (Forma, Limen, Folio, Playwright)
+npm run build          # dotnet fsi build.fsx: writes the site to dist/ (no secrets needed)
+python3 -m http.server 4620 --bind 127.0.0.1 --directory dist   # or: node $INDY_INIT/verification/harness/serve.mjs dist 4620
+```
+
+Then open http://127.0.0.1:4620/. `dist/index.html` is the app, so serve `dist/` as the site root. A local build has no
+connection built in, so the Connect form is shown (see below).
+
+## Connect to your own data
+
+1. Create a GitHub repository you own. To get the catalog cases, copy `catalog/` and `templates/` from
+   `kemiller2002/causa-data` into it. An empty repository works too; it then holds only your own working copies.
+2. Create a fine-grained personal access token with **Contents: Read and write** on that repository only.
+3. In Causa, on the investigation list, enter the repository owner, repository, branch and token, then
+   **Connect data repository**.
+
+The token is kept only in the tab's memory. It is never saved or shown, so you enter it again in a new tab.
+
+## Tests
+
+`$INDY_INIT` is a checkout of the governed Indy-init repository (the harness lives there, not in this repository).
+
+### Offline checks (no secrets)
+
+Causa CI runs the first two lines: the build and `dotnet test` with the offline filter. Run the browser lines locally.
+
+```bash
+dotnet build Causa.slnx -c Release
+dotnet test Causa.slnx -c Release --filter "FullyQualifiedName!~Causa.Acceptance.Live.&FullyQualifiedName!~Causa.Invariants.Live."
+npx playwright test -c playwright.config.ts --project=chromium   # browser tests against the built dist/ (http://127.0.0.1:4321)
+npx playwright install webkit && npx playwright test -c playwright.config.ts --project=webkit
+```
+
+### Live suites (real GitHub)
+
+`CAUSA_PROVIDER=github` is the default, and the mode the governed gate sets. The app talks only to
+`https://api.github.com`. To run the live suites against the designated test repository:
+
+```bash
+CAUSA_PROVIDER=github CAUSA_GITHUB_TOKEN=... CAUSA_WRITE_TOKEN=... CAUSA_TEST_OWNER=... CAUSA_TEST_REPO=... CAUSA_TEST_BRANCH=... dotnet test Causa.slnx --filter "FullyQualifiedName~Causa.Acceptance.Live.|FullyQualifiedName~Causa.Invariants.Live."
+```
+
+Without the credentials the live tests fail as BLOCKED; they never pass.
+
+### Local fixture mode (harness double: offline, synthetic data, never evidence)
+
+`CAUSA_PROVIDER=harness-double` runs the UI against the harness GitHub double (`harness/causa-test`, branch `main`,
+token `harness-token`):
+
+```bash
+npm run build && node $INDY_INIT/verification/harness/github-double.mjs 4610 & node $INDY_INIT/verification/harness/serve.mjs dist 4620   # fixture-backed UI
+CAUSA_PROVIDER=harness-double CAUSA_DOUBLE_URL=http://127.0.0.1:4610 CAUSA_APP_URL=http://127.0.0.1:4620/ npx playwright test   # fixture mode journeys (run from $INDY_INIT/verification/journeys)
+```
+
+The provider suites' offline layer uses the stateful GitHub fake built from the recorded answers, with no network.
+
+## Repository operating system (Praxis)
+
+This repository is a greenfield pilot running Praxis 3.25.0, Echelon Foundry's repository operating system. An older
+installation may also have `./ros`, a compatibility alias of `./praxis`.
+
+### Start here
 
 1. Read [`AGENTS.md`](AGENTS.md) and [`BOOTSTRAP.md`](BOOTSTRAP.md).
 2. Complete [`PROJECT-CHARTER.md`](PROJECT-CHARTER.md).
@@ -12,7 +118,7 @@ compatibility alias of `./praxis`.
 4. Select the first bounded mission and its observable acceptance criteria.
 5. Record durable evidence, decisions, and handoffs as the work proceeds.
 
-## Local operating commands
+### Local operating commands
 
 ```bash
 ./praxis work begin --id TASK-001 --occurred-at TIMESTAMP --type task
@@ -23,57 +129,15 @@ compatibility alias of `./praxis`.
 ./praxis validate
 ```
 
-`work context` reports legal actions and completion evidence. Validation errors include repair instructions; use `./praxis validate --json` for machine-readable output. Complete work with explicit evidence paths as described in `docs/work-protocol.md`.
+`work context` reports legal actions and completion evidence. Validation errors include repair instructions; use
+`./praxis validate --json` for machine-readable output. Complete work with explicit evidence paths as described in
+`docs/work-protocol.md`.
 
-The installed snapshot is self-contained. It does not read from the source Praxis
-repository. `.ros/installation.json` records the package version and checksums
-of installed files.
+The installed snapshot is self-contained. It does not read from the source Praxis repository.
+`.ros/installation.json` records the package version and checksums of installed files.
 
-## Building, running and testing Causa
+### Pilot rule
 
-Causa is an F# .NET WebAssembly application (Limen 0.9.1, Forma 0.13.0) that keeps its investigations in a GitHub
-repository. The .NET SDK is pinned by `global.json` (10.0.402) and the npm tree by `package-lock.json`.
-
-```bash
-npm ci                                   # the locked npm tree (Forma, Limen, Folio, Playwright)
-npm run build                            # dotnet fsi build.fsx: writes the site to dist/ (no secrets needed)
-node $INDY_INIT/verification/harness/serve.mjs dist 4620   # serve it at http://127.0.0.1:4620/
-```
-
-### Provider modes
-
-- **Real GitHub:** `CAUSA_PROVIDER=github` (the default, and the mode the governed gate sets). The app talks only to
-  `https://api.github.com`; you connect with owner, repository, branch and a fine-grained token. To run the live suites
-  against the designated test repository:
-
-  ```bash
-  CAUSA_PROVIDER=github CAUSA_GITHUB_TOKEN=... CAUSA_WRITE_TOKEN=... CAUSA_TEST_OWNER=... CAUSA_TEST_REPO=... CAUSA_TEST_BRANCH=... dotnet test Causa.slnx --filter "FullyQualifiedName~Causa.Acceptance.Live.|FullyQualifiedName~Causa.Invariants.Live."
-  ```
-
-  Without the credentials the live tests fail as BLOCKED; they never pass.
-- **Local fixture mode (offline, synthetic data, never evidence):** `CAUSA_PROVIDER=harness-double` serves the
-  fixture-backed UI against the harness GitHub double (`harness/causa-test`, branch `main`, token `harness-token`):
-
-  ```bash
-  npm run build && node $INDY_INIT/verification/harness/github-double.mjs 4610 & node $INDY_INIT/verification/harness/serve.mjs dist 4620   # fixture-backed UI
-  CAUSA_PROVIDER=harness-double CAUSA_DOUBLE_URL=http://127.0.0.1:4610 CAUSA_APP_URL=http://127.0.0.1:4620/ npx playwright test   # fixture mode journeys (run from $INDY_INIT/verification/journeys)
-  ```
-
-  The provider suites' offline layer uses the stateful GitHub fake built from the recorded answers, with no network.
-
-### Offline checks (what Causa CI runs; no secrets)
-
-```bash
-dotnet build Causa.slnx -c Release
-dotnet test Causa.slnx -c Release --filter "FullyQualifiedName!~Causa.Acceptance.Live.&FullyQualifiedName!~Causa.Invariants.Live."
-npx playwright test --project=chromium && PLAYWRIGHT_BROWSERS_PATH=... npx playwright test --project=webkit
-```
-
-`$INDY_INIT` is a checkout of the governed Indy-init repository (the harness lives there, not in this repository).
-
-## Pilot rule
-
-The operating system is itself under evaluation. Do not infer that
-Causa T0 is a validated discipline, method, or product merely because
-the repository follows a rigorous process. Measure whether the process improves
-decisions, traceability, handoffs, and rework relative to the declared baseline.
+The operating system is itself under evaluation. Do not infer that Causa T0 is a validated discipline, method, or
+product merely because the repository follows a rigorous process. Measure whether the process improves decisions,
+traceability, handoffs, and rework relative to the declared baseline.

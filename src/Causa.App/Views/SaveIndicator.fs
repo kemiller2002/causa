@@ -29,6 +29,18 @@ module SaveIndicator =
 
     let private has action (save: SavePresentation) = List.contains action save.Indicator.Actions
 
+    /// The save-state dialog ("About saving"): what the current state means for the user's changes and what to do
+    /// next. It never offers to throw changes away: Discard exists only in a conflict, on request (PERSIST-024-O4).
+    let explain kind =
+        match kind with
+        | SavedKind -> "Every change in this investigation is saved in your data repository."
+        | UnsavedKind -> "Changes recorded in this tab are not saved yet. Select Save to keep them; they are lost if this tab closes first."
+        | SavingKind -> "A save is in progress. Keep this tab open until the state reads Saved."
+        | OfflineKind -> "You are offline. Your changes stay in this tab and can be saved when the connection returns."
+        | ConflictKind -> "Someone saved a newer version of this investigation. Review the conflict to choose which changes to keep."
+        | UnknownOutcomeKind -> "Causa is checking whether the last save reached your data repository. Select Check again to find out."
+        | SaveFailedKind -> "The last save did not complete. Your changes are still in this tab: select Retry."
+
     let bindings (save: SavePresentation option) : Bindings =
         match save with
         | None -> Bind.ofList [ Bind.flag "save.present" false ]
@@ -51,4 +63,6 @@ module SaveIndicator =
                   Bind.flag "save.conflict-present" s.Conflict.IsSome
                   Bind.text "save.conflict" (s.Conflict |> Option.map (fun c -> c.Explanation) |> Option.defaultValue "")
                   Bind.flag "save.not-saved-present" (not s.NotSaved.IsEmpty)
-                  Bind.items "save.not-saved" [ for n in s.NotSaved -> [ Bind.cellText "key" n; Bind.cellText "title" n ] ] ]
+                  Bind.items "save.not-saved" [ for n in s.NotSaved -> [ Bind.cellText "key" n; Bind.cellText "title" n ] ]
+                  Bind.text "save.dialog-title" (sprintf "Save state: %s" word)
+                  Bind.text "save.dialog-explanation" (explain s.Kind) ]

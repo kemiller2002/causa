@@ -3,10 +3,12 @@ namespace Causa.Persistence
 
 open Causa.Domain
 
-/// IF41-STORAGE: causa-storage v1.1.0 file sets (contract/v1.1.0/CONTRACT.md wins over docs/CAUSA-DATA-CONTRACT-v1.md).
-/// v4.1.6: a 1.0.0 investigation (every catalog case) is read exactly by the v1.0.0 rules and appended to only with
-/// events v1.0.0 can store; any other command is refused as CAUSA.UNREPRESENTABLE before anything is written (S-6 A).
-/// A new working-copy investigation is written in 1.1.0. Mixed versions in one investigation are refused.
+/// IF41-STORAGE: causa-storage v1.2.0 file sets (contract/v1.2.0/CONTRACT.md, then v1.1.0, win over
+/// docs/CAUSA-DATA-CONTRACT-v1.md). v4.1.6: a 1.0.0 investigation (every catalog case) is read exactly by the v1.0.0
+/// rules and appended to only with events v1.0.0 can store; a 1.1.0 investigation stays 1.1.0 and refuses an event
+/// that needs 1.2.0 (InvestigationTitleRevised, UnknownRevised); any such command is refused as CAUSA.UNREPRESENTABLE
+/// before anything is written (S-6 A). A new working-copy investigation is written in 1.2.0. Mixed versions in one
+/// investigation are refused.
 type CommitOid = CommitOid of string
 type RepoPath = RepoPath of string
 

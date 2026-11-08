@@ -76,13 +76,13 @@
 
       <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-problem">
         <h2 id="causa-ws-problem">Problem statement</h2>
-        <p class="causa-verbatim" data-requirement-id="INV-008" data-text="workspace.problem"></p>
+        <pre class="causa-verbatim" data-requirement-id="INV-008" data-text="workspace.problem"></pre>
       </section>
 
       <template data-if="workspace.question-present">
         <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-question">
           <h2 id="causa-ws-question">Primary investigative question</h2>
-          <p class="causa-verbatim" data-requirement-id="INV-023" data-text="workspace.question"></p>
+          <pre class="causa-verbatim" data-requirement-id="INV-023" data-text="workspace.question"></pre>
         </section>
       </template>
       </div>
@@ -118,7 +118,7 @@
                 <template data-each="conclusions.items" data-key="key">
                   <li class="ef-card causa-item causa-item--conclusion">
                     <p class="causa-item__meta"><span class="ef-badge causa-tag" data-tone="positive" data-text="strength"></span></p>
-                    <p class="causa-item__text" data-text="statement"></p>
+                    <pre class="causa-item__text" data-text="statement"></pre>
                     <template data-if="hasResidual">
                       <p class="causa-item__note"><strong>Residual uncertainty:</strong> <span data-text="residual"></span></p>
                     </template>
@@ -133,7 +133,7 @@
               <ul class="causa-list causa-list--compact">
                 <template data-each="overview.observations.items" data-key="key">
                   <li class="causa-item">
-                    <p class="causa-item__text" data-text="text"></p>
+                    <pre class="causa-item__text" data-text="text"></pre>
                     <template data-if="hasSource"><p class="causa-item__note">Source: <span data-text="source"></span></p></template>
                   </li>
                 </template>
@@ -144,7 +144,7 @@
                   <ul class="causa-list causa-list--compact">
                 <template data-each="overview.observations.more" data-key="key">
                   <li class="causa-item">
-                    <p class="causa-item__text" data-text="text"></p>
+                    <pre class="causa-item__text" data-text="text"></pre>
                     <template data-if="hasSource"><p class="causa-item__note">Source: <span data-text="source"></span></p></template>
                   </li>
                 </template>
@@ -192,10 +192,10 @@
               <template data-each="hypotheses.items" data-key="key">
                 <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
-                  <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="statement"></pre>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
-                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
+                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
                 </article></li>
               </template>
             </ul>
@@ -206,10 +206,10 @@
               <template data-each="hypotheses.more" data-key="key">
                 <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
-                  <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="statement"></pre>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
-                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
+                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
                 </article></li>
               </template>
             </ul>
@@ -257,14 +257,14 @@
                 <li class="causa-list__entry"><article class="ef-card causa-item">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-text="category"></span></p>
                   <h3 class="causa-item__title" data-text="label"></h3>
-                  <p class="causa-item__text" data-text="content"></p>
+                  <pre class="causa-item__text" data-text="content"></pre>
                   <dl class="ef-key-value-list causa-item__facts">
                     <div><dt>Source</dt><dd><span data-text="source"></span>
                       <template data-if="hasUrl"><a class="causa-item__link" data-bind-href="url" rel="noopener noreferrer" target="_blank">Open source</a></template></dd></div>
                     <div><dt>Captured</dt><dd data-text="captured"></dd></div>
                     <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
                   </dl>
-                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><p class="causa-item__text" data-text="assessments"></p></div></template>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><pre class="causa-item__text" data-text="assessments"></pre></div></template>
                 </article></li>
               </template>
             </ul>
@@ -276,14 +276,14 @@
                 <li class="causa-list__entry"><article class="ef-card causa-item">
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-text="category"></span></p>
                   <h3 class="causa-item__title" data-text="label"></h3>
-                  <p class="causa-item__text" data-text="content"></p>
+                  <pre class="causa-item__text" data-text="content"></pre>
                   <dl class="ef-key-value-list causa-item__facts">
                     <div><dt>Source</dt><dd><span data-text="source"></span>
                       <template data-if="hasUrl"><a class="causa-item__link" data-bind-href="url" rel="noopener noreferrer" target="_blank">Open source</a></template></dd></div>
                     <div><dt>Captured</dt><dd data-text="captured"></dd></div>
                     <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
                   </dl>
-                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><p class="causa-item__text" data-text="assessments"></p></div></template>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><pre class="causa-item__text" data-text="assessments"></pre></div></template>
                 </article></li>
               </template>
             </ul>
@@ -313,7 +313,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -330,7 +330,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -347,7 +347,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -364,7 +364,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -381,7 +381,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -398,7 +398,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -415,7 +415,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -432,7 +432,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -449,7 +449,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -466,7 +466,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -483,7 +483,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -500,7 +500,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -517,7 +517,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -534,7 +534,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -551,7 +551,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -568,7 +568,7 @@
                         <li class="causa-focus__card" data-bind-data-kind="kind">
                           <p class="causa-focus__word" data-text="word"></p>
                           <p class="causa-focus__text" data-text="text"></p>
-                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><p class="causa-item__text" data-text="text"></p></details></template>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
                         </li>
                       </template>
                     </ul>
@@ -612,7 +612,7 @@
                 <li class="ef-card causa-item causa-relationship" data-bind-data-tone="tone">
                   <p class="causa-item__text"><span class="causa-relationship__evidence" data-text="evidence"></span></p>
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="kind"></span></p>
-                  <p class="causa-item__text causa-item__text--lead" data-text="hypothesis"></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="hypothesis"></pre>
                   <template data-if="hasRationale"><p class="causa-item__note"><strong>Rationale:</strong> <span data-text="rationale"></span></p></template>
                 </li>
               </template>
@@ -625,7 +625,7 @@
                 <li class="ef-card causa-item causa-relationship" data-bind-data-tone="tone">
                   <p class="causa-item__text"><span class="causa-relationship__evidence" data-text="evidence"></span></p>
                   <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="kind"></span></p>
-                  <p class="causa-item__text causa-item__text--lead" data-text="hypothesis"></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="hypothesis"></pre>
                   <template data-if="hasRationale"><p class="causa-item__note"><strong>Rationale:</strong> <span data-text="rationale"></span></p></template>
                 </li>
               </template>
@@ -648,7 +648,7 @@
                   <span class="ef-timeline__marker" aria-hidden="true"></span>
                   <div class="ef-timeline__content">
                     <p class="ef-timeline__meta"><time data-bind-datetime="datetime" data-text="when"></time> <span data-text="actor"></span></p>
-                    <p class="causa-item__text" data-text="summary"></p>
+                    <pre class="causa-item__text" data-text="summary"></pre>
                   </div>
                 </li>
               </template>
@@ -662,7 +662,7 @@
                   <span class="ef-timeline__marker" aria-hidden="true"></span>
                   <div class="ef-timeline__content">
                     <p class="ef-timeline__meta"><time data-bind-datetime="datetime" data-text="when"></time> <span data-text="actor"></span></p>
-                    <p class="causa-item__text" data-text="summary"></p>
+                    <pre class="causa-item__text" data-text="summary"></pre>
                   </div>
                 </li>
               </template>

@@ -26,8 +26,9 @@
   max-inline-size: none;
 }
 .causa-workspace__statement { max-inline-size: none; }
-/* The problem statement and question are shown exactly as entered: line breaks kept, long words wrapped. */
-.causa-verbatim { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; max-inline-size: var(--ef-layout-measure); }
+/* The problem statement and question are shown exactly as entered: line breaks kept, long words wrapped. They are
+   <pre> elements (line breaks kept by the element itself) whose lines wrap (text-wrap) in the body's own font. */
+.causa-verbatim { text-wrap: wrap; overflow-wrap: anywhere; margin: 0; max-inline-size: var(--ef-layout-measure); font-family: inherit; font-size: inherit; }
 .causa-stored__events { padding-inline-start: var(--ef-layout-stack-space); }
 /* The record title sits in Forma's record header at the h2 scale, so a long investigation title stays readable
    beside its save state instead of filling the screen. */
@@ -71,7 +72,8 @@
 .causa-item[data-tone="attention"] { border-inline-start-color: var(--ef-color-status-warning); }
 .causa-item--conclusion { border-inline-start-color: var(--causa-teal, var(--ef-color-status-success)); }
 .causa-item__title { margin: 0; font-size: var(--ef-type-size-h4); max-inline-size: none; }
-.causa-item__text { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); white-space: pre-wrap; }
+/* A record's text keeps its line breaks (a <pre> whose lines wrap) and reads in the body's font. */
+.causa-item__text { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); text-wrap: wrap; overflow-wrap: anywhere; font-family: inherit; font-size: inherit; }
 .causa-item__text--lead { font-weight: var(--ef-type-weight-strong, 600); }
 .causa-item__note { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); }
 .causa-item__meta { margin: 0; color: var(--ef-color-text-primary); }

@@ -1,6 +1,6 @@
 // causa-storage 1.2.0 codec tests (contract/v1.2.0/CONTRACT.md in kemiller2002/causa-data): the 1.2.0 conformance
-// fixtures (fixtures/v1.2.0 at causa-data branch claude/indy-init-competition-launch-vtgdcj, embedded as gzip+base64 of
-// the exact bytes) read, round-trip byte for byte and refuse each negative with its codes; a 1.0.0 or 1.1.0
+// fixtures (fixtures/v1.2.0 of kemiller2002/causa-data at d6d6c86, branch claude/indy-init-competition-launch-vtgdcj,
+// not yet tagged causa-storage-v1.2.0; embedded as gzip+base64 of the exact bytes) read, round-trip byte for byte and refuse each negative with its codes; a 1.0.0 or 1.1.0
 // investigation cannot hold a 1.2.0 event (CAUSA.UNREPRESENTABLE); new investigations are written in 1.2.0.
 namespace Causa.Contract.Tests.Storage
 

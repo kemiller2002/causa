@@ -113,11 +113,22 @@
 .causa-editor { max-inline-size: var(--ef-layout-measure); }
 .causa-editor textarea, .causa-editor input:not([type="radio"]) { inline-size: 100%; box-sizing: border-box; min-block-size: var(--ef-layout-target-min); }
 /* Choice groups (relationship kind, evidence category, conclusion strength): the whole card is the radio's own target,
-   so the input covers its card (still invisible, Forma draws the mark) and the card's text is not a second target. */
+   so the input covers its card and the card's text is not a second target. The input paints nothing of its own
+   (appearance none, transparent; Forma's card draws the mark), but it is not hidden: its own focus ring, in Forma's
+   focus-ring token, is the card's ring, so the focused element and the visible ring are the same (WCAG 2.4.7, 2.4.13).
+   An outline, not a box-shadow: WebKit paints no box-shadow on a native radio. */
 .causa-choices { margin: 0; padding: 0; border: 0; min-inline-size: 0; }
 .causa-choices .ef-choice { cursor: default; min-block-size: var(--ef-layout-target-min); }
-.causa-choices .ef-choice input { inset: 0; inline-size: 100%; block-size: 100%; margin: 0; cursor: pointer; }
-.causa-choices .ef-choice:has(input:focus-visible) { outline: 3px solid var(--ef-color-focus-ring); outline-offset: 2px; }
+.causa-choices .ef-choice input {
+  inset: 0; inline-size: 100%; block-size: 100%; margin: 0; cursor: pointer;
+  opacity: 1; appearance: none; -webkit-appearance: none; background: transparent; border: 0; border-radius: 0;
+}
+.causa-choices .ef-choice input:focus-visible {
+  outline: var(--ef-primitive-focus-ring-width) solid var(--ef-color-focus-ring);
+  outline-offset: var(--ef-primitive-focus-ring-offset);
+  box-shadow: none;
+}
+.causa-choices .ef-choice:has(input:focus-visible) { outline: none; box-shadow: none; }
 .causa-choices .ef-choice__content { overflow-wrap: anywhere; }
 .causa-editor .ef-select__input { box-sizing: border-box; min-block-size: var(--ef-layout-target-min); }
 .causa-editor__actions { gap: var(--ef-primitive-space-2); }

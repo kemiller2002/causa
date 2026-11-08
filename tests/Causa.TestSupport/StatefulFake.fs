@@ -45,6 +45,8 @@ type FakeState =
       StaleForm: StaleForm
       /// Answer the repository read as GitHub does for a fine-grained token: no `permissions` object.
       FineGrained: bool
+      /// Answer compares without their `files` list (as the governed harness double does).
+      CompareWithoutFiles: bool
       Clock: DateTimeOffset
       /// Every request the fake received, in order (method, url; "Mutation" for createCommitOnBranch), with no credential.
       Received: (string * string) list
@@ -81,6 +83,7 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
           Faults = []
           StaleForm = ForbiddenMovedHead
           FineGrained = false
+          CompareWithoutFiles = false
           Clock = root.CommittedAt
           Received = []
           Sequence = 1 }
@@ -215,7 +218,7 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
                         let listed = after |> List.skip (min after.Length ((page - 1) * perPage)) |> List.truncate perPage
                         answerJson id 200 (Json.Object [ "status", Json.String(if after.IsEmpty then "identical" else "ahead"); "ahead_by", Json.Number(decimal after.Length); "behind_by", Json.Number 0M
                                                          "total_commits", Json.Number(decimal after.Length)
-                                                         "files", Json.Array changed
+                                                         "files", Json.Array(if s.CompareWithoutFiles then [] else changed)
                                                          "commits", Json.Array(listed |> List.map (fun o -> Json.Object [ "sha", Json.String o; "commit", Json.Object [ "message", Json.String s.Commits[o].Message ] ])) ])
             | _ -> recorded id "rest-404-file"
 
@@ -251,7 +254,9 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
             | Some _ ->
                 let head = s.Commits[s.Branches[b]]
                 let missing = changes |> List.exists (fun (p, bytes) -> bytes.IsNone && not (head.Tree.ContainsKey p))
-                if missing || List.isEmpty changes then s, recorded id "graphql-unprocessable", false
+                // real GitHub refuses the deletion of an absent path as NOT_FOUND (gate run 42402357707)
+                if missing then s, recorded id "graphql-not-found-deleted-path", false
+                elif List.isEmpty changes then s, recorded id "graphql-unprocessable", false
                 else
                     let s2, c = apply s b message changes
                     s2, recordedWith id "graphql-commit-created" [ recordedOidA, c.Oid; "2026-11-07T17:00:00Z", c.CommittedAt.ToString("yyyy-MM-ddTHH:mm:ssZ") ], true
@@ -389,6 +394,9 @@ type StatefulFake(owner: string, name: string, initialBranch: string, readToken:
 
     member _.UseStaleForm(form: StaleForm) = lock gate (fun () -> state <- { state with StaleForm = form })
 
+    /// Answer compares without their `files` list.
+    member _.CompareWithoutFiles() = lock gate (fun () -> state <- { state with CompareWithoutFiles = true })
+
     /// Answer as GitHub does for a fine-grained token (no `permissions` on the repository).
     member _.AnswerAsFineGrained() = lock gate (fun () -> state <- { state with FineGrained = true })
 
@@ -485,7 +493,8 @@ module Conformance =
           probe "read back the committed bytes" "ok:true" (match readBack with Ok b -> sprintf "ok:%b" b | e -> kind e)
           probe "read a missing file at a commit" "NotFound" (match head1 with Ok h -> kind (adapter.Reader.ReadFile h (file adapter.Prefix "missing.json")) | e -> kind e)
           probe "commit with the read credential" "PermissionDenied" (kind permission)
-          probe "delete a file that does not exist" "ValidationFailed" (kind validation)
+          // real GitHub answers NOT_FOUND (gate run 42402357707), not a validation error
+          probe "delete a file that does not exist" "NotFound" (kind validation)
           probe "a path outside the prefix is refused before sending" "ValidationFailed" (kind outside)
           probe "compare the expected head with the new head" "ok:ahead:true" (match compare with Ok(s, has) -> sprintf "ok:%s:%b" s has | e -> kind e) ]
 

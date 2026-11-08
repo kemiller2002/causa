@@ -37,17 +37,10 @@ module AR014Tests =
         // Neither live token falls back to the other: each is read only from its own variable.
         Assert.Equal("CAUSA_GITHUB_TOKEN", LiveEnv.tokenVariable LiveEnv.Read)
         Assert.Equal("CAUSA_WRITE_TOKEN", LiveEnv.tokenVariable LiveEnv.Write)
-        let saved = Environment.GetEnvironmentVariable "CAUSA_WRITE_TOKEN"
-        let savedRead = Environment.GetEnvironmentVariable "CAUSA_GITHUB_TOKEN"
-        try
-            Environment.SetEnvironmentVariable("CAUSA_WRITE_TOKEN", null)
-            Environment.SetEnvironmentVariable("CAUSA_GITHUB_TOKEN", "ar014-read-only-token")
+        LiveEnv.withVariables [ "CAUSA_WRITE_TOKEN", None; "CAUSA_GITHUB_TOKEN", Some "ar014-read-only-token" ] (fun () ->
             match LiveEnv.token LiveEnv.Write with
             | Error blocked -> Assert.StartsWith("BLOCKED: no credential", blocked)
-            | Ok _ -> failwith "the write token fell back to the read token"
-        finally
-            Environment.SetEnvironmentVariable("CAUSA_WRITE_TOKEN", saved)
-            Environment.SetEnvironmentVariable("CAUSA_GITHUB_TOKEN", savedRead)
+            | Ok _ -> failwith "the write token fell back to the read token")
 
     /// AR-014-O2: a secret is never echoed. The credential prints as "<credential>", travels only in the Authorization
     /// header of requests to api.github.com (never the URL or body), and the sanitized evidence of an exchange holds

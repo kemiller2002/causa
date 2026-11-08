@@ -15,14 +15,8 @@ type PF015Tests(fixture: LiveFixture<PF015Tests>) =
         Conformance.run (Conformance.overLive live) live.Created
 
     let withEnv (values: (string * string option) list) (f: unit -> 'a) : 'a =
-        let saved = values |> List.map (fun (v, _) -> v, Environment.GetEnvironmentVariable v)
-        try
-            for (v, value) in values do
-                Environment.SetEnvironmentVariable(v, Option.toObj value)
-            f ()
-        finally
-            for (v, value) in saved do
-                Environment.SetEnvironmentVariable(v, value)
+        // flow-local: the process environment is never changed (a concurrent live test keeps its credentials)
+        LiveEnv.withVariables values f
 
     /// Every request persistence can build, over one connection.
     let everyRequest (c: ConnectionContext) : HttpRequest list =

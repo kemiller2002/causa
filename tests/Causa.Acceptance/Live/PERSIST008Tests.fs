@@ -58,7 +58,9 @@ type PERSIST008Tests(fixture: LiveFixture<PERSIST008Tests>) =
         let byName n = (probes |> List.find (fun p -> p.Name = n)).Actual
         let causes =
             [ byName "read head with a bad credential"; byName "commit with the read credential"; byName "commit at a moved head"; byName "delete a file that does not exist" ]
-        Assert.Equal<string list>([ "AuthenticationFailed"; "PermissionDenied"; "StaleHead"; "ValidationFailed" ], causes)
+        // the four live answers are four distinct causes; an absent path's deletion is NOT_FOUND on real GitHub
+        // (gate run 42402357707), and validation's own forms are classified above from their recordings
+        Assert.Equal<string list>([ "AuthenticationFailed"; "PermissionDenied"; "StaleHead"; "NotFound" ], causes)
         Assert.Equal(4, causes |> List.distinct |> List.length)
 
     /// PERSIST-008-O3: a network failure is never a stale head or a conflict: lost before applying, lost after

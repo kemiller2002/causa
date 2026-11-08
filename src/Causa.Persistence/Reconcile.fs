@@ -203,6 +203,33 @@ module Writes =
     let filesAtCommitOid (answer: ProviderAnswer) : CommitOid option =
         Json.parse answer.Body |> Json.path [ "data"; "repository"; "c"; "oid" ] |> Json.text |> Option.map CommitOid
 
+    /// One GraphQL read of the Git blob ids of the investigation's three files at two commits (PERSIST-009-O1: compare
+    /// the investigation's files at the base head and at the new head). It does not rely on a compare listing's
+    /// `files`, which a provider may omit or cap.
+    let blobIdsAt (id: RequestId) (connection: ConnectionContext) (CommitOid baseOid) (CommitOid head) (RepoPath prefix) : HttpRequest =
+        let obj alias commit name = sprintf "%s: object(expression: %s) { oid }" alias (gqlString (sprintf "%s:%s/%s" commit prefix name))
+        let query =
+            sprintf
+                "query { repository(owner: %s, name: %s) { %s %s %s %s %s %s } }"
+                (gqlString connection.Repository.Owner)
+                (gqlString connection.Repository.Name)
+                (obj "bm" baseOid "manifest.json") (obj "be" baseOid "events.ndjson") (obj "bs" baseOid "snapshot.json")
+                (obj "hm" head "manifest.json") (obj "he" head "events.ndjson") (obj "hs" head "snapshot.json")
+        { Id = id
+          Method = Post
+          Url = GitHubRequests.GraphQlUrl
+          Headers = GitHubRequests.headers connection @ [ "Content-Type", "application/json" ]
+          Body = Some(Json.serialize (Json.Object [ "query", Json.String query ])) }
+
+    /// Whether the investigation's files differ between the two commits of a blobIdsAt answer; None when the answer
+    /// does not decode.
+    let filesChanged (answer: ProviderAnswer) : bool option =
+        match Json.parse answer.Body |> Json.path [ "data"; "repository" ] with
+        | Some(Json.Object _) as repo ->
+            let oid alias = Json.path [ alias; "oid" ] repo |> Json.text
+            Some([ "m"; "e"; "s" ] |> List.exists (fun f -> oid ("b" + f) <> oid ("h" + f)))
+        | _ -> None
+
     /// The files a compare page names as changed (`files[].filename`).
     let changedFiles (answer: ProviderAnswer) : string list =
         Json.parse answer.Body |> Json.field "files" |> Json.items |> List.choose (fun f -> Json.field "filename" (Some f) |> Json.text)

@@ -112,9 +112,11 @@ test.describe('UI-029', () => {
 
   test('UI-029-O2', async ({ page }) => {
     // Within an investigation: Overview, Causal Analysis, Evidence, Hypotheses, Timeline (and Corrective Actions where
-    // supported), each opening and marking itself current.
+    // supported), each opening and marking itself current. A section with nothing to show is not listed (UI-029-O2), so
+    // this opens a catalog case that has content in every section, not whichever card the list shows first (working
+    // copies created earlier in the same run sort first and may hold only hypotheses).
     await connect(page);
-    await openInvestigation(page);
+    await openInvestigation(page, 'Apollo 11');
     const nav = sections(page);
     await expect(nav, 'no investigation section navigation').toBeVisible();
     const names = (await nav.getByRole('link').allInnerTexts()).map((t) => t.trim());

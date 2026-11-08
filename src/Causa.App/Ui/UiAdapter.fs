@@ -278,7 +278,8 @@ module WorkspaceAnalysis =
             | Overview -> true
             // The causal graph also for a working copy once it holds a hypothesis (a fresh investigation's graph).
             | CausalAnalysis -> not i.Relationships.IsEmpty || (offered && not i.Hypotheses.IsEmpty)
-            | EvidenceSection -> not i.Evidence.IsEmpty
+            // Evidence also when it can be admitted here (an editable working copy), so the first Add evidence form is reachable.
+            | EvidenceSection -> not i.Evidence.IsEmpty || offered
             // Hypotheses also when one can be recorded here (an editable working copy).
             | HypothesesSection -> not i.Hypotheses.IsEmpty || offered
             | TimelineSection -> not i.Timeline.IsEmpty
@@ -596,7 +597,7 @@ module UiAdapter =
             match conclusionStrengthOf (value Fields.conclusionStrength) with
             | None -> Error [ notChosen Fields.conclusionStrength "a conclusion strength" ]
             | Some strength ->
-                Ok(Core(RecordConclusion { ConclusionId = derivedId cmdId "conclusion"; Statement = required Fields.conclusionStatement; Strength = strength; CauseIds = []; ResidualUncertainty = text Fields.conclusionResidual }))
+                Ok(Core(RecordConclusion { ConclusionId = derivedId cmdId "conclusion"; Statement = required Fields.conclusionStatement; Strength = strength; CauseIds = []; ResidualUncertainty = text Fields.residualUncertainty }))
 
     /// INV-014 / INV-009 / UIA-RECORD-EVIDENCE / INV-030 / INV-032: validate the editor (errors go to ContentErrors),
     /// then send the kernel the command at the investigation's current version; the editor's drafts clear once sent.
@@ -830,6 +831,9 @@ module UiAdapter =
             match session.State with
             | SaveState.Unsaved when not config.CanSave -> Unavailable "Saving arrives with the data repository writer; this build keeps changes in this tab."
             | SaveState.Unsaved -> Available
+            // PERSIST-018: while the tab knows it is offline a save request is still accepted; it sends nothing and the
+            // investigation shows Offline (KnownOffline), and nothing is sent once the connection returns.
+            | SaveState.Offline when config.CanSave -> Available
             | SaveState.SaveFailed(Refused(RateLimited _))
             | SaveState.SaveFailed(Refused(NetworkUnavailable _))
             | SaveState.SaveFailed RepositoryKeptChanging when config.CanSave -> Available

@@ -76,7 +76,7 @@ module Fields =
     /// The required choice groups (ODR-V416-RC3 A: nothing selected at first) and the optional residual uncertainty.
     let evidenceCategory = FieldId "INV-045"
     let conclusionStrength = FieldId "INV-046"
-    let conclusionResidual = FieldId "INV-047"
+    let residualUncertainty = FieldId "INV-047"
     let relationshipRationale = FieldId "INV-038"
     /// The link editor's evidence and hypothesis choosers (J2-04 picks them by combobox name; INV-030 names the action).
     let linkEvidence = FieldId "UIF-LINK-EVIDENCE"
@@ -540,7 +540,7 @@ module ContentForms =
         [ { Field = Fields.conclusionStatement; Label = "Conclusion statement"; Component = TextArea; Rules = [ Required; MinLength 1; MaxLength 10000 ] }
           { Field = Fields.conclusionStrength; Label = "Conclusion strength"; Component = RadioGroup
             Rules = [ Required; OneOf [ "plausibleExplanation"; "leadingExplanation"; "supportedCause"; "confirmedCause"; "acceptedWithResidualUncertainty" ] ] }
-          { Field = Fields.conclusionResidual; Label = "Residual uncertainty"; Component = TextArea; Rules = [ MaxLength 10000 ] } ]
+          { Field = Fields.residualUncertainty; Label = "Residual uncertainty"; Component = TextArea; Rules = [ MaxLength 10000 ] } ]
 
     let all = observation @ hypothesis @ evidence @ link @ conclusion
 
@@ -575,7 +575,7 @@ module ActionContracts =
               [ Fields.linkEvidence; Fields.linkHypothesis; Fields.relationshipKind; Fields.relationshipRationale ] "RelateEvidence; shown on the evidence and the hypothesis"
           a Actions.reassess Screens.workspace "Reassess" Button DataEditable
               [ Fields.linkEvidence; Fields.linkHypothesis; Fields.relationshipKind; Fields.relationshipRationale ] "a new current assessment; the earlier one stays in the history"
-          a Actions.recordConclusion Screens.workspace "Record a conclusion" Button DataEditable [ Fields.conclusionStatement; Fields.conclusionStrength; Fields.conclusionResidual ] "a conclusion snapshot; the investigation is not resolved"
+          a Actions.recordConclusion Screens.workspace "Record a conclusion" Button DataEditable [ Fields.conclusionStatement; Fields.conclusionStrength; Fields.residualUncertainty ] "a conclusion snapshot; the investigation is not resolved"
           a Actions.editDetails Screens.workspace "Edit investigation details" Button DataEditable [] "opens the details editor"
           a Actions.saveDetails Screens.workspace "Save details" Button DataEditable [ Fields.detailsTitle; Fields.detailsProblem; Fields.detailsQuestion ] "details changed; the identifier is unchanged"
           a Actions.cancelEditor Screens.workspace "Cancel" Button DataEditable [] "closes the editor; nothing entered is recorded or written"

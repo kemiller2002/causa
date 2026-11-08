@@ -11,7 +11,7 @@
 //
 // The `at` of every event is the current UTC time, or CAUSA_PROGRESS_AT (YYYY-MM-DDTHH:MM:SSZ) when set, so a run can
 // be reproduced byte for byte.
-#load "ProgressCore.fs"
+#load "../shared/PythonCompat.fs" "ProgressCore.fs"
 
 open System
 open System.Diagnostics

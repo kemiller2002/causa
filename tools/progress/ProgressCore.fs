@@ -1,5 +1,5 @@
 // Owner: integration. The pure core of the progress deriver (tools/progress/progress-from-tests.fsx). Shared by the
-// script (#load) and Causa.App.Tests (ProgressFromTestsTests). Everything here is a pure function over values: file
+// script (#load, after tools/shared/PythonCompat.fs) and Causa.App.Tests (ProgressFromTestsTests). Everything here is a pure function over values: file
 // contents, git answers and the clock come in as arguments, and the script performs the side effects.
 //
 // Derives implementation progress events (indy-init.progress-event/1) from test results that actually ran.
@@ -19,6 +19,7 @@ open System.Text
 open System.Text.Json
 open System.Text.RegularExpressions
 open System.Xml.Linq
+open Causa.Tools.PythonCompat
 
 // ---- Model -------------------------------------------------------------------------------------------------------
 
@@ -229,7 +230,9 @@ module Derive =
     /// Categories whose obligations cannot be evidenced by a local test run.
     let untestable = set [ "live-provider"; "independent-acceptance"; "process-record"; "owner-decision" ]
 
-    let private obligationIdentity = Regex(@"\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3}-O\d+)\b", RegexOptions.CultureInvariant)
+    // \b as Python's re defines it (PythonCompat.Re.b); .NET's \d is Python's (Unicode decimal digits).
+    let private obligationIdentity =
+        Regex(Re.b + @"([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3}-O\d+)" + Re.b, RegexOptions.CultureInvariant)
 
     /// The obligations a test evidences: identities named in the test name, plus the plan's mapping for the name
     /// (with and without the "dotnet:" prefix).
@@ -287,43 +290,6 @@ module Derive =
 
 // ---- Output ------------------------------------------------------------------------------------------------------
 
-/// A minimal JSON value, rendered exactly as Python's `json.dumps(value, indent=2)` renders it.
-type Json =
-    | JString of string
-    | JArray of Json list
-    | JObject of (string * Json) list
-
-module Json =
-    /// Python's json string escaping with ensure_ascii=True: the short escapes, then \uXXXX (lower-case hex) for every
-    /// UTF-16 unit outside printable ASCII (space to '~').
-    let quote (s: string) : string =
-        let b = StringBuilder("\"")
-        for c in s do
-            match c with
-            | '"' -> b.Append "\\\"" |> ignore
-            | '\\' -> b.Append "\\\\" |> ignore
-            | '\n' -> b.Append "\\n" |> ignore
-            | '\r' -> b.Append "\\r" |> ignore
-            | '\t' -> b.Append "\\t" |> ignore
-            | '\b' -> b.Append "\\b" |> ignore
-            | '\012' -> b.Append "\\f" |> ignore
-            | c when c < ' ' || c > '~' -> b.Append("\\u").Append((int c).ToString("x4", CultureInfo.InvariantCulture)) |> ignore
-            | c -> b.Append c |> ignore
-        b.Append('"').ToString()
-
-    let rec private render (depth: int) (value: Json) : string =
-        let pad n = String(' ', 2 * n)
-        let block opening closing (items: string list) =
-            match items with
-            | [] -> opening + closing
-            | _ -> opening + "\n" + (items |> List.map (fun i -> pad (depth + 1) + i) |> String.concat ",\n") + "\n" + pad depth + closing
-        match value with
-        | JString s -> quote s
-        | JArray items -> items |> List.map (render (depth + 1)) |> block "[" "]"
-        | JObject fields -> fields |> List.map (fun (k, v) -> quote k + ": " + render (depth + 1) v) |> block "{" "}"
-
-    let toText (value: Json) : string = render 0 value
-
 module Output =
     let private strings xs = xs |> List.map JString |> JArray
 
@@ -335,7 +301,7 @@ module Output =
             JObject [ "kind", JString "implementation-completed"; "requirements", strings rs; "commit", JString commit; "at", JString at ]
 
     /// The events as the deriver prints them on stdout (without the trailing newline).
-    let events (es: ProgressEvent list) : string = es |> List.map eventJson |> JArray |> Json.toText
+    let events (es: ProgressEvent list) : string = es |> List.map eventJson |> JArray |> Json.dumps 2
 
     /// Python's repr of a string (the quoting the summary line has always used).
     let private repr (s: string) =

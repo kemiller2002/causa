@@ -12,6 +12,7 @@ open System.Diagnostics
 open System.IO
 open Xunit
 open Causa.Tools.Progress
+open Causa.Tools.PythonCompat
 
 module private ProgressFixture =
     let repositoryRoot =
@@ -268,4 +269,4 @@ module ProgressFromTestsTests =
     [<Fact>]
     let ``Output: JSON is rendered as Python's json.dumps(indent=2) with ASCII escapes`` () =
         Assert.Equal("\"R\\u00e9 \\u007f \\ud83d\\ude00 \\\" \\\\ \\n \\u0001 ~\"", Json.quote "R\u00e9 \u007f \U0001F600 \" \\ \n \u0001 ~")
-        Assert.Equal("{\n  \"a\": [],\n  \"b\": [\n    \"c\"\n  ]\n}", Json.toText (JObject [ "a", JArray []; "b", JArray [ JString "c" ] ]))
+        Assert.Equal("{\n  \"a\": [],\n  \"b\": [\n    \"c\"\n  ]\n}", Json.dumps 2 (JObject [ "a", JArray []; "b", JArray [ JString "c" ] ]))

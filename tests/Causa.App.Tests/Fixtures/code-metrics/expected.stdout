@@ -1,0 +1,150 @@
+{
+ "size": {
+  "fs_src": {
+   "files": 4,
+   "code": 67,
+   "comments": 1
+  },
+  "fs_test": {
+   "files": 1,
+   "code": 5,
+   "comments": 1
+  },
+  "js_browser_tests": {
+   "files": 2,
+   "code": 6,
+   "comments": 4
+  },
+  "js_web": {
+   "files": 2,
+   "code": 3,
+   "comments": 4
+  }
+ },
+ "test_to_code": 0.16,
+ "fs_functions_all": {
+  "length": {
+   "n": 10,
+   "median": 5.5,
+   "p90": 9,
+   "max": 9
+  },
+  "ccn": {
+   "n": 10,
+   "median": 3.0,
+   "p90": 7,
+   "max": 12
+  }
+ },
+ "fs_top_level": {
+  "length": {
+   "n": 10,
+   "median": 5.5,
+   "p90": 9,
+   "max": 9
+  },
+  "ccn": {
+   "n": 10,
+   "median": 3.0,
+   "p90": 7,
+   "max": 12
+  }
+ },
+ "over_ccn10": 1,
+ "over_ccn20": 0,
+ "over_len60": 0,
+ "worst": [
+  {
+   "file": "src/App/Decide.fs",
+   "name": "decide",
+   "line": 9,
+   "length": 9,
+   "ccn": 12,
+   "indent": 0
+  },
+  {
+   "file": "src/App/Decide.fs",
+   "name": "helper",
+   "line": 37,
+   "length": 9,
+   "ccn": 7,
+   "indent": 4
+  },
+  {
+   "file": "src/App/Types.fs",
+   "name": "this.ToString",
+   "line": 10,
+   "length": 5,
+   "ccn": 5,
+   "indent": 4
+  },
+  {
+   "file": "src/App/Types.fs",
+   "name": "this.Area",
+   "line": 6,
+   "length": 4,
+   "ccn": 4,
+   "indent": 4
+  },
+  {
+   "file": "src/App/Decide.fs",
+   "name": "loop",
+   "line": 19,
+   "length": 7,
+   "ccn": 3,
+   "indent": 0
+  },
+  {
+   "file": "src/App/Decide.fs",
+   "name": "total",
+   "line": 20,
+   "length": 6,
+   "ccn": 3,
+   "indent": 4
+  },
+  {
+   "file": "src/App/Decide.fs",
+   "name": "walk",
+   "line": 27,
+   "length": 6,
+   "ccn": 3,
+   "indent": 0
+  },
+  {
+   "file": "src/App/Types.fs",
+   "name": "Box",
+   "line": 16,
+   "length": 3,
+   "ccn": 2,
+   "indent": 0
+  }
+ ],
+ "style_src": {
+  "mutable": 2,
+  "assign_<-": 3,
+  "for/while loops": 0,
+  "exceptions_raised": 0,
+  "Result_usage": 2,
+  "Option_usage": 2,
+  "pipelines_|>": 7,
+  "match_expressions": 3
+ },
+ "largest_files": [
+  [
+   "src/App/Decide.fs",
+   36
+  ],
+  [
+   "src/App/Types.fs",
+   22
+  ],
+  [
+   "src/App/Crlf.fs",
+   5
+  ],
+  [
+   "src/App/Lone.fs",
+   4
+  ]
+ ]
+}

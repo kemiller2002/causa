@@ -13,8 +13,11 @@
     <Compile Include="DeployScanStepTests.fs" />
     <Compile Include="../../tools/usage/UsageCore.fs" Link="Tools/UsageCore.fs" />
     <Compile Include="UsageRecorderTests.fs" />
+    <Compile Include="../../tools/shared/PythonCompat.fs" Link="Tools/PythonCompat.fs" />
     <Compile Include="../../tools/progress/ProgressCore.fs" Link="Tools/ProgressCore.fs" />
     <Compile Include="ProgressFromTestsTests.fs" />
+    <Compile Include="../../tools/metrics/MetricsCore.fs" Link="Tools/MetricsCore.fs" />
+    <Compile Include="CodeMetricsTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Causa.Domain/Causa.Domain.fsproj" />

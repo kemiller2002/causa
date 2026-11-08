@@ -1,5 +1,5 @@
 # Code-quality metrics for causa (docs/quality/CODE-METRICS-2026-11-08.md).
-# Usage: python3 -I tools/quality/code_metrics.py <repo-root>  -> JSON on stdout.
+# Usage: python3 -I docs/quality/code_metrics.py <repo-root>  -> JSON on stdout.
 # F# complexity is an approximation (decision points per let/member binding); see the report for limits.
 import re, os, json, statistics as st, subprocess, sys
 from pathlib import Path

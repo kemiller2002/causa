@@ -5,7 +5,7 @@ A one-time snapshot of causa's code quality after the Indy Init competition (7 N
 - **Commit measured:** `c8831ba` (main, "Merge pull request #6 from kemiller2002/slice/SL-T20").
 - **Collected:** 2026-11-08, by a Claude Code agent session at the owner's request.
 - **Reproduce:**
-  - `python3 -I tools/quality/code_metrics.py .` gives size, test ratio, F# function length and complexity, functional-style counts and the largest files, as JSON.
+  - `python3 -I docs/quality/code_metrics.py .` gives size, test ratio, F# function length and complexity, functional-style counts and the largest files, as JSON.
   - Run `jscpd` 4.0.5 at `--min-tokens 50` on `src`, on `tests/browser`, and on `tests/Causa.Acceptance tests/Causa.Contract.Tests tests/Causa.Invariants` to get duplication.
 
 ## Summary

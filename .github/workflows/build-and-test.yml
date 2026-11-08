@@ -62,6 +62,50 @@ jobs:
       - name: Type-check the browser kernel
         run: npm run check
 
+      # The browser specs drive the built application (/dist/index.html); without this step every app spec waits for
+      # a page that 404s. `npm run build` is `dotnet fsi build.fsx` and needs no secrets: dist/deploy-connection.json
+      # holds the schema only, so the app shows the Connect form.
+      - name: Build the site
+        run: npm run build
+
+      - name: Require the site bundle
+        run: |
+          if [ ! -f dist/index.html ]; then
+            echo "::error::npm run build did not write dist/index.html; the browser specs need it."
+            exit 1
+          fi
+
+      # The specs answer GitHub from the governed harness GitHub double (synthetic, never real-provider evidence),
+      # seeded with causa-data's demonstration catalog. Both repositories are public and pinned to exact commits,
+      # checked out read-only next to this one.
+      - name: Check out the harness double (Indy-init, pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: dae2347d26d0fb7dccc36484033515bbbaa31675
+          path: .ci/indy-init
+          persist-credentials: false
+          sparse-checkout: verification/harness
+      - name: Check out the demonstration catalog (causa-data, pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/causa-data
+          ref: 7e10394cc95b47f7dfa5baf2e5b3a68b929bf9c4
+          path: .ci/causa-data
+          persist-credentials: false
+
+      - name: Start and seed the harness GitHub double on port 4611
+        timeout-minutes: 2
+        run: |
+          nohup node .ci/indy-init/verification/harness/github-double.mjs 4611 > "$RUNNER_TEMP/github-double.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null -H "authorization: Bearer harness-token" http://127.0.0.1:4611/repos/harness/causa-test; then break; fi
+            sleep 1
+          done
+          curl -fsS -o /dev/null -H "authorization: Bearer harness-token" http://127.0.0.1:4611/repos/harness/causa-test \
+            || { echo "::error::The harness GitHub double did not answer on port 4611."; cat "$RUNNER_TEMP/github-double.log"; exit 1; }
+          node tests/browser/support/seed-harness-double.mjs .ci/causa-data http://127.0.0.1:4611
+
       # Chromium is never installed with `--with-deps`: that runs `sudo
       # apt-get update` on every run, and apt has no overall deadline, so an
       # unanswered mirror hung browser suites until the six-hour job limit
@@ -125,13 +169,27 @@ jobs:
         timeout-minutes: 15
         run: npx playwright install --with-deps webkit
 
+      # Excluded here, and why:
+      #   tests/browser/live/ (PERSIST-041, PERSIST-049, UI-006): they need the live test repository's credentials
+      #   (CAUSA_WRITE_TOKEN, CAUSA_GITHUB_TOKEN), which this job does not have; they run in the Verification gate,
+      #   as ci.yml leaves the .NET Live suites to it. CAUSA_EXCLUDE_LIVE_BROWSER=1 makes playwright.config.ts ignore
+      #   that directory. Nothing else is excluded.
+      # A test with no timeout of its own fails after a minute (playwright.config.ts), the run stops after ten
+      # failures, and the step has its own deadline, so a broken app fails fast instead of holding the job.
       - name: Verify the pages in a real browser
-        run: npx playwright test
+        timeout-minutes: 30
+        env:
+          CAUSA_EXCLUDE_LIVE_BROWSER: "1"
+          CAUSA_PROVIDER: harness-double
+          CAUSA_DOUBLE_URL: http://127.0.0.1:4611
+        run: npx playwright test -c playwright.config.ts --max-failures=10
 
       - name: Upload browser traces on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-traces
-          path: test-results/
+          path: |
+            test-results/
+            ${{ runner.temp }}/github-double.log
           retention-days: 7

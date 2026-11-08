@@ -19,9 +19,11 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    # A normal run takes a few minutes. Anything that stalls fails here
-    # instead of holding a runner for the six-hour default.
-    timeout-minutes: 45
+    # The browser suite drives the built app in Chromium and WebKit (about
+    # 95 tests each, one worker against one double), which takes most of an
+    # hour. Anything that stalls fails here instead of holding a runner for
+    # the six-hour default.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -177,7 +179,7 @@ jobs:
       # A test with no timeout of its own fails after a minute (playwright.config.ts), the run stops after ten
       # failures, and the step has its own deadline, so a broken app fails fast instead of holding the job.
       - name: Verify the pages in a real browser
-        timeout-minutes: 30
+        timeout-minutes: 55
         env:
           CAUSA_EXCLUDE_LIVE_BROWSER: "1"
           CAUSA_PROVIDER: harness-double

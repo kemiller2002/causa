@@ -742,6 +742,9 @@ module UiAdapter =
             match session.State with
             | SaveState.Unsaved when not config.CanSave -> Unavailable "Saving arrives with the data repository writer; this build keeps changes in this tab."
             | SaveState.Unsaved -> Available
+            // PERSIST-018: while the tab knows it is offline a save request is still accepted; it sends nothing and the
+            // investigation shows Offline (KnownOffline), and nothing is sent once the connection returns.
+            | SaveState.Offline when config.CanSave -> Available
             | SaveState.SaveFailed(Refused(RateLimited _))
             | SaveState.SaveFailed(Refused(NetworkUnavailable _))
             | SaveState.SaveFailed RepositoryKeptChanging when config.CanSave -> Available

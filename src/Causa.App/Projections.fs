@@ -312,7 +312,10 @@ type ConnectionView =
       Disconnect: Availability
       /// "owner/repository on branch", shown after Connect (UI-022: not in the global header as a commit hash).
       Connected: string option
-      WriteScope: WriteScope }
+      WriteScope: WriteScope
+      /// The tab knows it is offline (Model.Network = Offline): saves send nothing until the connection returns.
+      /// Additive, approved by the coordinator after the competition (PERSIST-017, PERSIST-018).
+      Offline: bool }
 
 // -- InvestigationList.fs --
 

@@ -579,3 +579,14 @@ type OpenWhileOffline() =
         Assert.Equal("You are offline. Changes stay in this tab.", latestPolite offline)
         Assert.Equal("This investigation is unavailable offline; it opens when the connection returns.", latestPolite opened)
         Assert.Equal(FactKnown "Offline: changes stay in this tab until the connection returns.", (UiAdapter.administrationView opened).Connection.Status)
+
+/// ConnectionView.Offline follows what the tab knows of its network, so the connection region can say it is offline.
+type ConnectionOffline() =
+    [<Fact>]
+    member _.``ConnectionView.Offline is true exactly while the tab knows it is offline``() =
+        let s0 = fst (Fixture.ui.Init InvestigationsRoute)
+        Assert.False((UiAdapter.connectionView s0).Offline)
+        let offline, _ = UiAdapter.browser Fixture.engine (ConnectivityChanged false) s0
+        Assert.True((UiAdapter.connectionView offline).Offline)
+        let online, _ = UiAdapter.browser Fixture.engine (ConnectivityChanged true) offline
+        Assert.False((UiAdapter.connectionView online).Offline)

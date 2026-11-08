@@ -628,7 +628,8 @@ module UiAdapter =
             |> Option.map (fun c ->
                 if s.Local.DeployConnected then sprintf "%s/%s@%s (test deployment)" c.Repository.Owner c.Repository.Name c.Repository.Branch
                 else sprintf "%s/%s on %s" c.Repository.Owner c.Repository.Name c.Repository.Branch)
-          WriteScope = (match s.Model.Connection with Connected true -> Writable | Connected false -> ReadOnlyConnection | _ -> WriteScopeUnknown) }
+          WriteScope = (match s.Model.Connection with Connected true -> Writable | Connected false -> ReadOnlyConnection | _ -> WriteScopeUnknown)
+          Offline = (s.Model.Network = NetworkState.Offline) }
 
     let private sessionLocalFailure =
         UiFailure.CapabilityAbsent(DataVisible, "No data repository is connected in this build: changes stay in this tab and are not saved.")

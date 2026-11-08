@@ -140,7 +140,7 @@ test('PERSIST-004-O3', async ({ context }) => {
   for (const p of [a, b]) {
     await p.getByRole('button', { name: /(add|record) an? observation/i }).first().click();
     await p.getByRole('textbox', { name: /observation text/i }).fill(mark('p004o3'));
-    await p.getByRole('button', { name: /^(add|record)/i }).last().click();
+    await p.getByRole('button', { name: /^(add|record) an? observation$/i }).last().click();
   }
   await save(a);
   await button(b, 'Save').click();

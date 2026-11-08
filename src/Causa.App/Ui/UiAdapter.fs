@@ -78,6 +78,9 @@ type AdapterState = { Model: Model; Local: Local }
 type ContentKind =
     | Observation
     | Hypothesis
+    | Evidence
+    | Relationship
+    | Conclusion
 
 /// The analysis the workspace sections render, read from a replayed Investigation (Data Understood once the adapter
 /// wraps it with Understood.projected at the investigation's version). Pure; it invents nothing: a value the domain
@@ -266,7 +269,12 @@ module WorkspaceAnalysis =
             | Some c when c.Blockers.IsEmpty -> Available
             | Some c -> Unavailable(c.Blockers.Head.Message)
             | None -> Available
-        Map.ofList [ Actions.recordObservation, of' "RecordObservation"; Actions.recordHypothesis, of' "RecordHypothesis" ]
+        Map.ofList
+            [ Actions.recordObservation, of' "RecordObservation"
+              Actions.recordHypothesis, of' "RecordHypothesis"
+              Actions.recordEvidence, of' "AdmitEvidence"
+              Actions.linkEvidence, of' "RelateEvidence"
+              Actions.recordConclusion, of' "RecordConclusion" ]
 
     /// The sections that have something to show, in the fixed order (UI-029-O2); the Overview always.
     let sections (target: RouteTarget) (current: Section) (offered: bool) (i: Investigation) : NavLink<Section> list =
@@ -275,7 +283,8 @@ module WorkspaceAnalysis =
             | Overview -> true
             // The causal graph also for a working copy once it holds a hypothesis (a fresh investigation's graph).
             | CausalAnalysis -> not i.Relationships.IsEmpty || (offered && not i.Hypotheses.IsEmpty)
-            | EvidenceSection -> not i.Evidence.IsEmpty
+            // Evidence also when it can be admitted here (an editable working copy), so the first Add evidence form is reachable.
+            | EvidenceSection -> not i.Evidence.IsEmpty || offered
             // Hypotheses also when one can be recorded here (an editable working copy).
             | HypothesesSection -> not i.Hypotheses.IsEmpty || offered
             | TimelineSection -> not i.Timeline.IsEmpty
@@ -596,12 +605,103 @@ module UiAdapter =
             )
         | _ -> None
 
-    /// INV-014 / INV-009: validate the editor, then send the kernel the command at the session's current version.
+    /// The wire value a choice group sends, read into the kernel's union (catalog INV-045, INV-046, INV-031 options).
+    let evidenceCategoryOf (v: string) =
+        match v with
+        | "directObservation" -> Some EvidenceCategory.DirectObservation
+        | "measurement" -> Some EvidenceCategory.Measurement
+        | "log" -> Some EvidenceCategory.Log
+        | "document" -> Some EvidenceCategory.Document
+        | "experimentResult" -> Some EvidenceCategory.ExperimentResult
+        | "testimony" -> Some EvidenceCategory.Testimony
+        | "externalReference" -> Some EvidenceCategory.ExternalReference
+        | _ -> None
+
+    let conclusionStrengthOf (v: string) =
+        match v with
+        | "plausibleExplanation" -> Some ConclusionStrength.PlausibleExplanation
+        | "leadingExplanation" -> Some ConclusionStrength.LeadingExplanation
+        | "supportedCause" -> Some ConclusionStrength.SupportedCause
+        | "confirmedCause" -> Some ConclusionStrength.ConfirmedCause
+        | "acceptedWithResidualUncertainty" -> Some ConclusionStrength.AcceptedWithResidualUncertainty
+        | _ -> None
+
+    let relationshipKindOf (v: string) =
+        match v with
+        | "supports" -> Some Causa.Domain.RelationshipKind.Supports
+        | "contradicts" -> Some Causa.Domain.RelationshipKind.Contradicts
+        | "consistent-with" -> Some Causa.Domain.RelationshipKind.ConsistentWith
+        | "inconclusive" -> Some Causa.Domain.RelationshipKind.Inconclusive
+        | _ -> None
+
+    /// The editor a record action submits: its form spec (what is validated) and every field it owns (what is cleared).
+    let contentForm (kind: ContentKind) : FieldSpec list * FieldId list =
+        let ids (specs: FieldSpec list) = specs |> List.map (fun f -> f.Field)
+        match kind with
+        | Observation -> ContentForms.observation, ids ContentForms.observation
+        | Hypothesis -> ContentForms.hypothesisOnRecord, ids ContentForms.hypothesis
+        | Evidence -> ContentForms.evidence, ids ContentForms.evidence
+        | Relationship -> ContentForms.link, ids ContentForms.link
+        | Conclusion -> ContentForms.conclusion, ids ContentForms.conclusion
+
+    /// The kernel command an editor's valid values describe, or the field errors that stop it (a chooser naming an
+    /// evidence item or hypothesis this investigation does not hold). Pure.
+    let contentCommand (kind: ContentKind) (i: Investigation) (cmdId: Guid) (value: FieldId -> string) : Result<Command, ValidationError list> =
+        let text f = NonEmptyText.create (value f)
+        let required f = (text f).Value
+        let notChosen f label = { Field = f; Rule = Required; Message = sprintf "Choose %s from this investigation." label }
+        match kind with
+        | Observation ->
+            Ok(Core(RecordObservation { ObservationId = derivedId cmdId "observation"; Original = required Fields.observationText; ObservedAt = None; Source = text Fields.observationSource }))
+        | Hypothesis ->
+            Ok(Core(RecordHypothesis { HypothesisId = HypothesisId(derivedId cmdId "hypothesis"); Statement = required Fields.hypothesisStatement; Mechanism = text Fields.hypothesisExplanation }))
+        | Evidence ->
+            match evidenceCategoryOf (value Fields.evidenceCategory) with
+            | None -> Error [ notChosen Fields.evidenceCategory "an evidence category" ]
+            | Some category ->
+                let url = value Fields.evidenceUrl
+                Ok(
+                    Core(
+                        AdmitEvidence
+                            { EvidenceId = derivedId cmdId "evidence"
+                              ContentKind = Causa.Domain.ContentKind.Text
+                              Content = required Fields.evidenceContent
+                              Category = category
+                              Source = required Fields.evidenceSource
+                              CapturedAt = None
+                              Label = required Fields.evidenceLabel
+                              SourceUrl = (if String.IsNullOrWhiteSpace url then None else Some(url.Trim())) }
+                    )
+                )
+        | Relationship ->
+            let evidence =
+                match Guid.TryParse(value Fields.linkEvidence) with
+                | true, g when i.Evidence.ContainsKey g -> Ok g
+                | _ -> Error(notChosen Fields.linkEvidence "an evidence item")
+            let hypothesis =
+                match Guid.TryParse(value Fields.linkHypothesis) with
+                | true, g when i.Hypotheses.ContainsKey(HypothesisId g) -> Ok(HypothesisId g)
+                | _ -> Error(notChosen Fields.linkHypothesis "a hypothesis")
+            let kind =
+                match relationshipKindOf (value Fields.relationshipKind) with
+                | Some k -> Ok k
+                | None -> Error(notChosen Fields.relationshipKind "a relationship kind")
+            match evidence, hypothesis, kind with
+            | Ok e, Ok h, Ok k ->
+                Ok(Core(RelateEvidence { RelationshipId = derivedId cmdId "relationship"; EvidenceId = e; HypothesisId = h; Kind = k; Rationale = text Fields.relationshipRationale }))
+            | e, h, k ->
+                let failed r = match r with Error x -> [ x ] | Ok _ -> []
+                Error(failed e @ failed h @ failed k)
+        | Conclusion ->
+            match conclusionStrengthOf (value Fields.conclusionStrength) with
+            | None -> Error [ notChosen Fields.conclusionStrength "a conclusion strength" ]
+            | Some strength ->
+                Ok(Core(RecordConclusion { ConclusionId = derivedId cmdId "conclusion"; Statement = required Fields.conclusionStatement; Strength = strength; CauseIds = []; ResidualUncertainty = text Fields.residualUncertainty }))
+
+    /// INV-014 / INV-009 / UIA-RECORD-EVIDENCE / INV-030 / INV-032: validate the editor (errors go to ContentErrors),
+    /// then send the kernel the command at the investigation's current version; the editor's drafts clear once sent.
     let private recordContent (config: AdapterConfig) (engine: Engine) (kind: ContentKind) (s: AdapterState) =
-        let spec, fields =
-            match kind with
-            | Observation -> ContentForms.observation, [ Fields.observationText; Fields.observationSource ]
-            | Hypothesis -> ContentForms.hypothesisOnRecord, [ Fields.hypothesisStatement; Fields.hypothesisExplanation ]
+        let spec, fields = contentForm kind
         match sessionOfRoute s with
         | None -> s, []
         | Some ref ->
@@ -612,31 +712,17 @@ module UiAdapter =
                 | Ok(Some i) ->
                     let value f = s.Local.Content |> Map.tryFind f |> Option.defaultValue ""
                     let cmdId = CommandIds.at (config.Now())
-                    let command =
-                        match kind with
-                        | Observation ->
-                            Core(
-                                RecordObservation
-                                    { ObservationId = derivedId cmdId "observation"
-                                      Original = (NonEmptyText.create (value Fields.observationText)).Value
-                                      ObservedAt = None
-                                      Source = NonEmptyText.create (value Fields.observationSource) }
-                            )
-                        | Hypothesis ->
-                            Core(
-                                RecordHypothesis
-                                    { HypothesisId = HypothesisId(derivedId cmdId "hypothesis")
-                                      Statement = (NonEmptyText.create (value Fields.hypothesisStatement)).Value
-                                      Mechanism = NonEmptyText.create (value Fields.hypothesisExplanation) }
-                            )
-                    let envelope = { CommandId = cmdId; Investigation = ref.Id; ExpectedVersion = Some i.Version; Command = command }
-                    let s2, fx = step engine (Msg.DomainCommand envelope) s
-                    { s2 with
-                        Local =
-                            { s2.Local with
-                                Content = fields |> List.fold (fun m f -> Map.remove f m) s2.Local.Content
-                                ContentErrors = [] } },
-                    fx
+                    match contentCommand kind i cmdId value with
+                    | Error errors -> { s with Local = { s.Local with ContentErrors = errors } }, []
+                    | Ok command ->
+                        let envelope = { CommandId = cmdId; Investigation = ref.Id; ExpectedVersion = Some i.Version; Command = command }
+                        let s2, fx = step engine (Msg.DomainCommand envelope) s
+                        { s2 with
+                            Local =
+                                { s2.Local with
+                                    Content = fields |> List.fold (fun m f -> Map.remove f m) s2.Local.Content
+                                    ContentErrors = [] } },
+                        fx
                 | _ -> s, []
 
     let private closeDetails (local: Local) = { local with Details = None; DetailsErrors = [] }
@@ -725,7 +811,7 @@ module UiAdapter =
             { s with Local = { s.Local with Form = Connection.withField f v s.Local.Form } }, []
         | UiIntent.Input(f, v, _) when StartForm.fields |> List.exists (fun x -> x.Field = f) ->
             { s with Local = { s.Local with Start = StartForm.withField f v s.Local.Start; Submission = Submission.NotSubmitted } }, []
-        | UiIntent.Input(f, v, _) when ContentForms.observation @ ContentForms.hypothesis |> List.exists (fun x -> x.Field = f) ->
+        | UiIntent.Input(f, v, _) when ContentForms.all |> List.exists (fun x -> x.Field = f) ->
             { s with Local = { s.Local with Content = s.Local.Content |> Map.add f v } }, []
         | UiIntent.Input(f, v, _) when DetailsForm.fields |> List.exists (fun x -> x.Field = f) ->
             match s.Local.Details with
@@ -739,11 +825,15 @@ module UiAdapter =
         | UiIntent.Activate(a, _) when a = Actions.startInvestigation -> start config engine s
         | UiIntent.Activate(a, _) when a = Actions.recordObservation -> recordContent config engine Observation s
         | UiIntent.Activate(a, _) when a = Actions.recordHypothesis -> recordContent config engine Hypothesis s
+        | UiIntent.Activate(a, _) when a = Actions.recordEvidence -> recordContent config engine Evidence s
+        | UiIntent.Activate(a, _) when a = Actions.linkEvidence -> recordContent config engine Relationship s
+        | UiIntent.Activate(a, _) when a = Actions.recordConclusion -> recordContent config engine Conclusion s
         | UiIntent.Activate(a, _) when a = Actions.editDetails -> editDetails config s
         | UiIntent.Activate(a, _) when a = Actions.saveDetails -> saveDetails config engine s
         | UiIntent.Activate(a, _) when a = Actions.cancelEditor ->
-            // INV-036: closes the editor (the details editor too); nothing entered is recorded or written.
-            let cleared = [ Fields.observationText; Fields.observationSource; Fields.hypothesisStatement; Fields.hypothesisExplanation ]
+            // INV-036: closes the open editor (the details editor too); nothing entered is recorded or written.
+            // Every content draft (observation, hypothesis, evidence, link, conclusion) is cleared with it.
+            let cleared = ContentForms.all |> List.map (fun x -> x.Field)
             { s with Local = { closeDetails s.Local with Content = cleared |> List.fold (fun m f -> Map.remove f m) s.Local.Content; ContentErrors = [] } }, []
         | UiIntent.Activate(a, _) when a = Actions.cancelStart -> cancelStart config engine s
         | UiIntent.Activate(a, _) when a = Actions.save || a = ActionId "UIA-SAVE-RETRY" ->

@@ -131,7 +131,7 @@ test('PERSIST-002-O3', async ({ context }) => {
   await a.getByRole('button', { name: /(add|record) an? observation/i }).first().click();
   const text = mark('p002o3-unsaved');
   await a.getByRole('textbox', { name: /observation text/i }).fill(text);
-  await a.getByRole('button', { name: /^(add|record)/i }).last().click();
+  await a.getByRole('button', { name: /^(add|record) an? observation$/i }).last().click();
   await expect(saveState(a)).toHaveText(/Unsaved/);
   await expect(b.getByText(text)).toHaveCount(0);
   await expect(saveState(b)).toHaveText(/^\s*Saved\s*$/);

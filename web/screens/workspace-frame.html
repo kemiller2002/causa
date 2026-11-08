@@ -267,6 +267,43 @@
             </div>
           </form>
           </template>
+          <template data-if="editor.conclusion.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="INV-032" novalidate aria-labelledby="causa-ed-conclusion" aria-describedby="causa-ed-conclusion-lead">
+            <h3 id="causa-ed-conclusion" class="causa-section__subtitle">Record a conclusion</h3>
+            <p class="causa-item__note" id="causa-ed-conclusion-lead">A conclusion is a snapshot of what you can conclude now; the investigation stays open.</p>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-conclusion-statement">Conclusion statement</label>
+              <textarea id="causa-conclusion-statement" rows="3" aria-required="true" data-on="input" data-event="INV-033" data-bind-value="editor.conclusion.statement"></textarea>
+            </div>
+            <fieldset class="ef-choice-group causa-choices">
+              <legend class="ef-choice-group__legend">Conclusion strength</legend>
+              <template data-each="editor.conclusion.strengths" data-key="key">
+                <label class="ef-choice">
+                  <input type="radio" name="causa-conclusion-strength" data-on="change" data-event="INV-046" data-bind-value="key" data-bind-aria-label="name" data-bind-aria-describedby="describedBy" data-bind-checked="checked">
+                  <span class="ef-choice__content"><strong data-text="label"></strong><span data-bind-id="describedBy" data-text="description"></span></span>
+                </label>
+              </template>
+            </fieldset>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-conclusion-residual">Residual uncertainty</label>
+              <p class="ef-field__description" id="causa-conclusion-residual-help">What is still uncertain. Needed while any unknown is open, and the investigation's primary question stays open until it is resolved, so fill this in; also needed for Accepted with residual uncertainty.</p>
+              <textarea id="causa-conclusion-residual" rows="3" aria-describedby="causa-conclusion-residual-help" data-on="input" data-event="INV-047" data-bind-value="editor.conclusion.residual"></textarea>
+            </div>
+            <template data-if="editor.conclusion.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.conclusion.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.conclusion.unavailable"></p>
+            <p class="causa-editor__status" role="status" data-text="editor.conclusion.status"></p>
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.conclusion.disabled">Record a conclusion</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+          </form>
+          </template>
         </section>
       </template>
 
@@ -282,7 +319,8 @@
                   <pre class="causa-item__text causa-item__text--lead" data-text="statement"></pre>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
-                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>How the evidence bears on it</strong></p><pre class="causa-item__text" data-text="bearings"></pre></div></template>
+                  <template data-if="hasRationale"><details class="causa-item__more"><summary>Why: the rationale for each</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
                 </article></li>
               </template>
             </ul>
@@ -296,7 +334,8 @@
                   <pre class="causa-item__text causa-item__text--lead" data-text="statement"></pre>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
-                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>How the evidence bears on it</strong></p><pre class="causa-item__text" data-text="bearings"></pre></div></template>
+                  <template data-if="hasRationale"><details class="causa-item__more"><summary>Why: the rationale for each</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
                 </article></li>
               </template>
             </ul>
@@ -377,6 +416,114 @@
               </details>
             </template>
             </div>
+          </template>
+          <template data-if="editor.evidence.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="UIA-RECORD-EVIDENCE" novalidate aria-labelledby="causa-ed-evidence">
+            <h3 id="causa-ed-evidence" class="causa-section__subtitle">Add evidence</h3>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-evidence-label">Evidence label</label>
+              <p class="ef-field__description" id="causa-evidence-label-help">A short name you will recognise in lists and pickers.</p>
+              <input id="causa-evidence-label" autocomplete="off" aria-required="true" aria-describedby="causa-evidence-label-help" data-on="input" data-event="INV-027" data-bind-value="editor.evidence.label">
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-evidence-content">Evidence original content</label>
+              <p class="ef-field__description" id="causa-evidence-content-help">The evidence itself, as found: a quotation, a reading, an excerpt.</p>
+              <textarea id="causa-evidence-content" rows="4" aria-required="true" aria-describedby="causa-evidence-content-help" data-on="input" data-event="INV-012" data-bind-value="editor.evidence.content"></textarea>
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-evidence-source">Evidence source reference</label>
+              <p class="ef-field__description" id="causa-evidence-source-help">Where it came from: a document, a person, a system.</p>
+              <input id="causa-evidence-source" autocomplete="off" aria-required="true" aria-describedby="causa-evidence-source-help" data-on="input" data-event="INV-028" data-bind-value="editor.evidence.source">
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-evidence-url">Evidence source URL</label>
+              <p class="ef-field__description" id="causa-evidence-url-help">Optional. A web address beginning with https:// or http://.</p>
+              <input id="causa-evidence-url" type="url" inputmode="url" autocomplete="off" aria-describedby="causa-evidence-url-help" data-on="input" data-event="INV-029" data-bind-value="editor.evidence.url">
+            </div>
+            <fieldset class="ef-choice-group causa-choices">
+              <legend class="ef-choice-group__legend">Evidence category</legend>
+              <template data-each="editor.evidence.categories" data-key="key">
+                <label class="ef-choice">
+                  <input type="radio" name="causa-evidence-category" data-on="change" data-event="INV-045" data-bind-value="key" data-bind-aria-label="name" data-bind-aria-describedby="describedBy" data-bind-checked="checked">
+                  <span class="ef-choice__content"><strong data-text="label"></strong><span data-bind-id="describedBy" data-text="description"></span></span>
+                </label>
+              </template>
+            </fieldset>
+            <template data-if="editor.evidence.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.evidence.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.evidence.unavailable"></p>
+            <p class="causa-editor__status" role="status" data-text="editor.evidence.status"></p>
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.evidence.disabled">Record evidence</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+          </form>
+          </template>
+          <template data-if="editor.link.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="INV-030" novalidate aria-labelledby="causa-ed-link" aria-describedby="causa-ed-link-lead">
+            <h3 id="causa-ed-link" class="causa-section__subtitle">Link evidence to a hypothesis</h3>
+            <p class="causa-item__note" id="causa-ed-link-lead">Say how one piece of evidence bears on one hypothesis, and why. Choosing a pair that is already linked and selecting Reassess records a new assessment; the earlier one stays in the history.</p>
+            <p class="causa-item__note" data-text="editor.link.missing"></p>
+            <template data-if="editor.link.ready">
+            <div class="ef-stack">
+            <div class="ef-select-field">
+              <label class="ef-field__label" for="causa-link-evidence">Evidence</label>
+              <span class="ef-select">
+                <select id="causa-link-evidence" class="ef-select__input" aria-required="true" data-on="change" data-event="UIF-LINK-EVIDENCE">
+                  <option value="" data-bind-selected="editor.link.evidence-unchosen">Choose evidence</option>
+                  <template data-each="editor.link.evidence-options" data-key="key"><option data-bind-value="key" data-bind-selected="selected" data-text="label"></option></template>
+                </select>
+                <span class="ef-select__indicator" aria-hidden="true"></span>
+              </span>
+            </div>
+            <div class="ef-select-field">
+              <label class="ef-field__label" for="causa-link-hypothesis">Hypothesis</label>
+              <span class="ef-select">
+                <select id="causa-link-hypothesis" class="ef-select__input" aria-required="true" data-on="change" data-event="UIF-LINK-HYPOTHESIS">
+                  <option value="" data-bind-selected="editor.link.hypothesis-unchosen">Choose a hypothesis</option>
+                  <template data-each="editor.link.hypothesis-options" data-key="key"><option data-bind-value="key" data-bind-selected="selected" data-text="label"></option></template>
+                </select>
+                <span class="ef-select__indicator" aria-hidden="true"></span>
+              </span>
+            </div>
+            <fieldset class="ef-choice-group causa-choices">
+              <legend class="ef-choice-group__legend">Evidence relationship kind</legend>
+              <template data-each="editor.link.kinds" data-key="key">
+                <label class="ef-choice">
+                  <input type="radio" name="causa-link-kind" data-on="change" data-event="INV-031" data-bind-value="key" data-bind-aria-label="name" data-bind-aria-describedby="describedBy" data-bind-checked="checked">
+                  <span class="ef-choice__content"><strong data-text="label"></strong><span data-bind-id="describedBy" data-text="description"></span></span>
+                </label>
+              </template>
+            </fieldset>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-link-rationale">Evidence relationship rationale</label>
+              <p class="ef-field__description" id="causa-link-rationale-help">Why the evidence bears on the hypothesis this way: the inference, in your words.</p>
+              <textarea id="causa-link-rationale" rows="3" aria-required="true" aria-describedby="causa-link-rationale-help" data-on="input" data-event="INV-038" data-bind-value="editor.link.rationale"></textarea>
+            </div>
+            </div>
+            </template>
+            <template data-if="editor.link.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.link.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.link.unavailable"></p>
+            <p class="causa-editor__status" role="status" data-text="editor.link.status"></p>
+            <template data-if="editor.link.ready">
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.link.disabled">Link evidence to a hypothesis</button>
+              <template data-if="editor.link.reassess-offered"><button class="ef-button" type="button" data-event="UIA-REASSESS" data-bind-disabled="editor.link.reassess-disabled">Reassess</button></template>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+            </template>
+          </form>
           </template>
         </section>
       </template>

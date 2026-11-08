@@ -64,14 +64,45 @@ module SectionData =
             | [] -> if current.IsEmpty then "No evidence assessed against it yet" else sprintf "%d assessment(s)" current.Length
             | parts -> String.concat " · " parts
 
-    /// Each current assessment as one line, "Supports — <other side>: <rationale>", for a card's detail (INV-044:
-    /// the assessment shows on both the evidence and the hypothesis).
-    let assessmentLines (otherSide: LinkCard -> string) (links: LinkCard list) =
+    /// The kind as the verb of a sentence, in the stored word's own lower case so it reads the same as the choice the
+    /// user made in the link editor (INV-031): "supports", "contradicts", "is consistent with", "is inconclusive about".
+    let kindVerb (k: KindShown) =
+        match k with
+        | CatalogKind Supports -> "supports"
+        | CatalogKind Contradicts -> "contradicts"
+        | CatalogKind ConsistentWith -> "is consistent with"
+        | CatalogKind Inconclusive -> "is inconclusive about"
+        | UninterpretedKind "insufficient" -> "is insufficient to judge"
+        | UninterpretedKind s -> if s.Trim() = "" then "bears (kind not stated) on" else s
+
+    let private why (l: LinkCard) = if l.Rationale.Trim() = "" then "" else " Why: " + l.Rationale
+
+    /// Each current assessment as one sentence for a card's detail (INV-044: the assessment shows on both the evidence
+    /// and the hypothesis). On an evidence card the evidence is the subject: "supports “<hypothesis>”. Why: …".
+    let evidenceAssessments (links: LinkCard list) =
         links
         |> List.filter (fun l -> l.Current)
-        |> List.map (fun l ->
-            let why = if l.Rationale.Trim() = "" then "" else " Why: " + l.Rationale
-            sprintf "%s — %s%s" (kindText l.Kind) (otherSide l) why)
+        |> List.map (fun l -> sprintf "%s \u201c%s\u201d.%s" (kindVerb l.Kind) l.HypothesisStatement (why l))
+        |> String.concat "\n"
+
+    /// On a hypothesis card, always visible: one short line per current assessment naming the evidence and its kind,
+    /// "“<evidence>” contradicts it." (J2-05 reads the labels without opening anything); the rationale is behind a
+    /// disclosure (hypothesisAssessments).
+    let hypothesisBearings (links: LinkCard list) =
+        links
+        |> List.filter (fun l -> l.Current)
+        |> List.map (fun l -> sprintf "\u201c%s\u201d %s it." l.EvidenceLabel (kindVerb l.Kind))
+        |> String.concat "\n"
+
+    /// Whether any current assessment on a card has a rationale to disclose.
+    let hasRationale (links: LinkCard list) =
+        links |> List.exists (fun l -> l.Current && l.Rationale.Trim() <> "")
+
+    /// On a hypothesis card the evidence is named: "“<evidence>” contradicts it. Why: …".
+    let hypothesisAssessments (links: LinkCard list) =
+        links
+        |> List.filter (fun l -> l.Current)
+        |> List.map (fun l -> sprintf "\u201c%s\u201d %s it.%s" l.EvidenceLabel (kindVerb l.Kind) (why l))
         |> String.concat "\n"
 
     /// How many records a section shows before the rest are folded into a "Show more" disclosure.

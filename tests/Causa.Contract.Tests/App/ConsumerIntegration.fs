@@ -513,7 +513,7 @@ type ReopenAfterSave() =
             saved
             |> go (UiIntent.Navigate InvestigationsRoute)
             |> go (UiIntent.Navigate(WorkspaceRoute(target, Overview)))
-        Assert.Equal<Section list>([ Overview; CausalAnalysis; HypothesesSection; TimelineSection ], sections reopened)
+        Assert.Equal<Section list>([ Overview; CausalAnalysis; EvidenceSection; HypothesesSection; TimelineSection ], sections reopened)
 
 /// The evidence, link and conclusion editors (UIA-RECORD-EVIDENCE, INV-030, INV-032): availability from the kernel's
 /// capabilities, validation into ContentErrors, the command at the investigation's version, Cancel clears the drafts.
@@ -544,6 +544,17 @@ type EvidenceLinkConclusion() =
         |> input Fields.evidenceContent "/var 100% used"
         |> input Fields.evidenceCategory "measurement"
         |> act Actions.recordEvidence
+
+    [<Fact>]
+    member _.``a writable working copy with no evidence lists Evidence, so the first Add evidence form is reachable``() =
+        let s = Fixture.started ()
+        Assert.True((investigation s).Evidence.IsEmpty)
+        match (Fixture.ui.Project s).Screen with
+        | WorkspaceScreen v ->
+            match v.Frame with
+            | Ready f -> Assert.Contains(f.Sections, fun l -> l.Destination = EvidenceSection)
+            | other -> Assert.Fail(sprintf "%A" other)
+        | other -> Assert.Fail(sprintf "%A" other)
 
     [<Fact>]
     member _.``availability comes from the kernel: linking waits for evidence, the other two are offered``() =
@@ -619,7 +630,7 @@ type EvidenceLinkConclusion() =
             linked
             |> input Fields.conclusionStatement "The disk filled up and the export stopped."
             |> input Fields.conclusionStrength "leadingExplanation"
-            |> input Fields.conclusionResidual "Why /var filled is not known yet."
+            |> input Fields.residualUncertainty "Why /var filled is not known yet."
             |> act Actions.recordConclusion
         Assert.Empty(concluded.Local.ContentErrors)
         Assert.Equal(Some i2.Version, (lastEnvelope concluded).ExpectedVersion)

@@ -1,0 +1,26 @@
+{
+  "tests": [
+    { "id": "dotnet:Suite.MappedTest", "obligations": ["R-002-O1"] },
+    { "id": "Suite.Unprefixed", "obligations": ["R-002-O2"] },
+    { "id": "dotnet:Suite.NoObligations" },
+    { "id": "playwright:renders the start page", "obligations": ["R-010-O1"] }
+  ],
+  "obligations": [
+    { "id": "R-001-O1", "requirement": "R-001", "categories": [] },
+    { "id": "R-001-O2", "requirement": "R-001", "categories": ["security", "live-provider"] },
+    { "id": "R-002-O1", "requirement": "R-002", "categories": ["functional"] },
+    { "id": "R-002-O2", "requirement": "R-002", "categories": [] },
+    { "id": "R-003-O1", "requirement": "R-003", "categories": [] },
+    { "id": "R-004-O1", "requirement": "R-004", "categories": [] },
+    { "id": "R-005-O1", "requirement": "R-005", "categories": ["owner-decision"] },
+    { "id": "R-006-O1", "requirement": "R-006", "categories": [] },
+    { "id": "R-007-O1", "requirement": "R-007", "categories": [] },
+    { "id": "R-008-O1", "requirement": "R-008", "categories": ["security"] },
+    { "id": "R-010-O1", "requirement": "R-010", "categories": [] },
+    { "id": "Ré-011-O1", "requirement": "Ré-011", "categories": ["process-record"] },
+    { "id": "R-012-O1", "requirement": "R-012", "categories": [] },
+    { "id": "UI-010-O1", "requirement": "UI-010", "categories": [] },
+    { "id": "EXT-DATA-011-O1", "requirement": "EXT-DATA-011", "categories": ["independent-acceptance"] },
+    { "id": "EXT-DATA-011-O2", "requirement": "EXT-DATA-011", "categories": [] }
+  ]
+}

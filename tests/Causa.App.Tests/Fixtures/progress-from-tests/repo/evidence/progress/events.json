@@ -1,0 +1,5 @@
+[
+  { "kind": "implementation-started", "workItem": "C", "requirements": ["R-005", "R-006", "R-012"], "at": "2026-01-01T00:00:00Z" },
+  { "kind": "implementation-completed", "requirements": ["R-006"], "commit": "0000000000000000000000000000000000000000", "at": "2026-01-01T00:00:00Z" },
+  { "kind": "verification-recorded", "requirements": ["R-001"], "at": "2026-01-01T00:00:00Z" }
+]

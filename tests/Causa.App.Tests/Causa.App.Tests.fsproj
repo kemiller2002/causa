@@ -13,6 +13,8 @@
     <Compile Include="DeployScanStepTests.fs" />
     <Compile Include="../../tools/usage/UsageCore.fs" Link="Tools/UsageCore.fs" />
     <Compile Include="UsageRecorderTests.fs" />
+    <Compile Include="../../tools/progress/ProgressCore.fs" Link="Tools/ProgressCore.fs" />
+    <Compile Include="ProgressFromTestsTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Causa.Domain/Causa.Domain.fsproj" />

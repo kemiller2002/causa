@@ -115,6 +115,11 @@
 .causa-editor__actions { gap: var(--ef-primitive-space-2); }
 .causa-editor .causa-item__note:empty { display: none; }
 .causa-list__entry { list-style: none; }
+/* Edit investigation details (INV-034): Edit details, then the editor (as the content editors), then Save details or
+   Cancel. Every control is at least a 44 px target. */
+.causa-details__actions, .causa-details__unavailable { max-inline-size: var(--ef-layout-measure); }
+.causa-details__unavailable .causa-item__note:empty { display: none; }
+.causa-details__edit, .causa-details .ef-button { min-block-size: var(--ef-layout-target-min); min-inline-size: var(--ef-layout-target-min); }
 
 /* ---- Causal graph (Causal Analysis). Forma --ef-* tokens only. The page never scrolls sideways: the graph scrolls
    inside its own focusable box. Every layer is a full-canvas SVG in user units of 1 px, so the F# layout's

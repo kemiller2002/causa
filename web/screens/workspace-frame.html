@@ -96,6 +96,7 @@
         <div><dt>State</dt><dd data-requirement-id="INV-018" data-text="workspace.state"></dd></div>
       </dl>
 
+      <template data-if="details.closed">
       <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-problem">
         <h2 id="causa-ws-problem">Problem statement</h2>
         <pre class="causa-verbatim" data-requirement-id="INV-008" data-text="workspace.problem"></pre>
@@ -106,6 +107,68 @@
           <h2 id="causa-ws-question">Primary investigative question</h2>
           <pre class="causa-verbatim" data-requirement-id="INV-023" data-text="workspace.question"></pre>
         </section>
+      </template>
+
+      <!-- Edit investigation details (INV-034): offered on an editable investigation stored in causa-storage 1.2.0;
+           on an older one it is shown unavailable with the reason. Bindings: Views/Workspace/Details.fs. -->
+      <template data-if="details.edit-offered">
+        <div class="ef-cluster causa-details__actions">
+          <button class="ef-button causa-details__edit" type="button" data-requirement-id="INV-034" data-event="INV-034">Edit details</button>
+        </div>
+      </template>
+      <template data-if="details.edit-explained">
+        <div class="ef-stack causa-details__unavailable">
+          <button class="ef-button causa-details__edit" type="button" data-requirement-id="INV-034" disabled aria-describedby="causa-details-unavailable">Edit details</button>
+          <p class="causa-item__note" id="causa-details-unavailable" data-text="details.edit-unavailable"></p>
+        </div>
+      </template>
+      <p class="causa-editor__status" role="status" data-text="details.status"></p>
+      </template>
+
+      <template data-if="details.open">
+      <form class="ef-form ef-stack causa-panel causa-editor causa-details" data-event="UIA-SAVE-DETAILS" novalidate aria-labelledby="causa-ed-details">
+        <h2 id="causa-ed-details" class="causa-section__subtitle">Edit investigation details</h2>
+        <p class="causa-item__note">The investigation identifier stays the same. Earlier text stays in the history.</p>
+        <template data-if="details.errors-present">
+          <div class="ef-validation-summary" role="alert" aria-labelledby="causa-details-errors-title">
+            <p class="ef-validation-summary__title" id="causa-details-errors-title">The details were not changed. Correct the following:</p>
+            <ul class="ef-validation-summary__list">
+              <template data-each="details.errors" data-key="key"><li data-text="message"></li></template>
+            </ul>
+          </div>
+        </template>
+        <div class="ef-field">
+          <label class="ef-field__label" for="causa-details-title">Title</label>
+          <p class="ef-field__description" id="causa-details-title-help">At most 200 characters.</p>
+          <input id="causa-details-title" type="text" autocomplete="off" aria-required="true"
+            aria-describedby="causa-details-title-help causa-details-title-error" data-bind-aria-invalid="details.title-aria-invalid"
+            data-requirement-id="UIF-DETAILS-TITLE" data-on="input" data-event="UIF-DETAILS-TITLE" data-bind-value="details.title">
+          <p class="ef-field__error causa-field-error" id="causa-details-title-error" data-text="details.title-error"></p>
+        </div>
+        <div class="ef-field">
+          <label class="ef-field__label" for="causa-details-problem">Problem statement</label>
+          <p class="ef-field__description" id="causa-details-problem-help">Required. Kept exactly as you write it.</p>
+          <textarea id="causa-details-problem" rows="6" aria-required="true"
+            aria-describedby="causa-details-problem-help causa-details-problem-error" data-bind-aria-invalid="details.problem-aria-invalid"
+            data-requirement-id="UIF-DETAILS-PROBLEM" data-on="input" data-event="UIF-DETAILS-PROBLEM" data-bind-value="details.problem"></textarea>
+          <p class="ef-field__error causa-field-error" id="causa-details-problem-error" data-text="details.problem-error"></p>
+        </div>
+        <div class="ef-field">
+          <label class="ef-field__label" for="causa-details-question">Primary investigative question</label>
+          <p class="ef-field__description" id="causa-details-question-help">The question this investigation should answer.</p>
+          <textarea id="causa-details-question" rows="3"
+            aria-describedby="causa-details-question-help causa-details-question-error" data-bind-aria-invalid="details.question-aria-invalid"
+            data-requirement-id="UIF-DETAILS-QUESTION" data-on="input" data-event="UIF-DETAILS-QUESTION" data-bind-value="details.question"></textarea>
+          <p class="ef-field__error causa-field-error" id="causa-details-question-error" data-text="details.question-error"></p>
+        </div>
+        <p class="causa-item__note">Save details records the change in this tab; select Save afterwards to keep it.</p>
+        <div class="ef-cluster causa-editor__actions">
+          <button class="ef-button causa-action-primary" type="submit" data-requirement-id="UIA-SAVE-DETAILS" data-bind-disabled="details.save-disabled">Save details</button>
+          <template data-if="details.cancel-offered">
+            <button class="ef-button" type="button" data-requirement-id="INV-036" data-event="INV-036">Cancel</button>
+          </template>
+        </div>
+      </form>
       </template>
       </div>
       </template>

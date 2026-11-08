@@ -99,6 +99,19 @@ module Update =
             | Some(Loaded v) -> Some v
             | _ -> None)
 
+    /// The causa-storage version an investigation is stored in: the version of its first event (one investigation has
+    /// one version, contract v1.1.0 section 2.1).
+    let storageVersionOf (i: Investigation) : string option =
+        i.Timeline |> List.tryHead |> Option.map (fun e -> e.Provenance.FormatVersion)
+
+    /// CAUSA.UNREPRESENTABLE, in words: the command is refused before anything is sent or written, and nothing entered
+    /// is stripped to make it fit (contract v1.1.0 section 3, v1.2.0 section 3).
+    let unrepresentableReason (eventType: string) (version: string) =
+        sprintf
+            "CAUSA.UNREPRESENTABLE: this investigation is stored in causa-storage %s, which cannot hold %s; it was created before this change existed, so it cannot be changed this way. Nothing was sent."
+            version
+            eventType
+
     /// Applies one command to a state through the kernel: decide, then the events it allows, evolved in order. The
     /// events carry the command's own RequestedAt (its UUIDv7 id), never the time of this re-decision.
     let apply (backend: Backend) (state: Investigation option) (command: CommandEnvelope) : Result<Investigation, string> =
@@ -106,7 +119,19 @@ module Update =
         | _, None -> Error "The command has no UUIDv7 identity, so its time cannot be fixed; it is refused."
         | Allowed payloads, Some requestedAt ->
             let current = state |> Option.map (fun i -> i.Version) |> Option.defaultValue (AggregateVersion 0L)
-            Events.envelopes command.Investigation current command.CommandId requestedAt backend.Author backend.StorageVersion payloads
+            // An investigation keeps the storage version it was created in (S-6 A); only a new one takes the backend's.
+            let version = state |> Option.bind storageVersionOf |> Option.defaultValue backend.StorageVersion
+            let unrepresentable =
+                payloads
+                |> List.tryPick (function
+                    | CoreEvent e when not (EventRegistry.representableIn version e) -> Some e
+                    | _ -> None)
+            match unrepresentable with
+            | Some e ->
+                let name = EventRegistry.kindOf e |> Option.map (fun k -> k.EventType) |> Option.defaultValue "This change"
+                Error(unrepresentableReason name version)
+            | None ->
+            Events.envelopes command.Investigation current command.CommandId requestedAt backend.Author version payloads
             |> List.fold
                 (fun acc env -> acc |> Result.bind (fun s -> backend.Kernel.Evolve s env |> Result.map Some |> Result.mapError (fun e -> e.Reason)))
                 (Ok state)

@@ -427,7 +427,7 @@ module Reapply =
 
     let redecide (actor: Actor) (remote: VerifiedInvestigation) (commands: CommandEnvelope list) : CommandEnvelope list * RefusedCommand list =
         let actorId = match actor with Actor.Human a | Actor.System a | Actor.Agent(a, _, _) -> a.Value
-        let version = match remote.History with e :: _ -> e.Provenance.FormatVersion | [] -> "1.1.0"
+        let version = match remote.History with e :: _ -> e.Provenance.FormatVersion | [] -> StorageVersion.v120
         let reason (d: Decision) =
             match d with
             | Blocked bs -> bs |> List.map (fun b -> b.Message) |> String.concat " "

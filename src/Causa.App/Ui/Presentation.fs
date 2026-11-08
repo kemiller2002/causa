@@ -566,7 +566,8 @@ module ActionContracts =
           a Actions.reassess Screens.workspace "Reassess" Button DataEditable
               [ Fields.linkEvidence; Fields.linkHypothesis; Fields.relationshipKind; Fields.relationshipRationale ] "a new current assessment; the earlier one stays in the history"
           a Actions.recordConclusion Screens.workspace "Record a conclusion" Button DataEditable [ Fields.conclusionStatement ] "a conclusion snapshot; the investigation is not resolved"
-          a Actions.editDetails Screens.workspace "Edit investigation details" Button DataEditable [] "opens the details editor"
+          // Catalog name "Edit investigation details"; the button reads "Edit details" (the governed INV-START probe).
+          a Actions.editDetails Screens.workspace "Edit details" Button DataEditable [] "opens the details editor (causa-storage 1.2.0 investigations)"
           a Actions.saveDetails Screens.workspace "Save details" Button DataEditable [ Fields.detailsTitle; Fields.detailsProblem; Fields.detailsQuestion ] "details changed; the identifier is unchanged"
           a Actions.cancelEditor Screens.workspace "Cancel" Button DataEditable [] "closes the editor; nothing entered is recorded or written"
           a Actions.save Screens.workspace "Save" Button DataEditable [] "SM-SAVE SaveRequested; Saved only after read-back confirmation"

@@ -108,7 +108,7 @@ let backend: Backend =
       Actor = { ActorId = "causa-user" }
       Author = Actor.Human(NonEmptyText.create "causa-user" |> Option.get)
       Now = fun () -> DateTimeOffset.UtcNow
-      StorageVersion = "1.1.0"
+      StorageVersion = StorageVersion.v120
       Persistence =
         Some
             { Connector = GitHubConnect.connector

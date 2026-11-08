@@ -9,8 +9,9 @@ namespace Causa.App.Views.Workspace
 open Causa.Ui.Contracts
 open Causa.App.Views
 
-/// One option of a choice group or a picker: the stored value, its words and, for a choice, what it means.
-type EditorChoice = { Value: string; Label: string; Description: string }
+/// One option of a choice group: the stored value, its readable words, its accessible name (the words, or the stored
+/// word where the card that shows the choice afterwards uses it) and what it means.
+type EditorChoice = { Value: string; Label: string; Name: string; Description: string }
 
 module ContentEditors =
     /// Field ids the catalog names but Presentation.Fields does not declare yet (integration lane, SL-T23).
@@ -19,14 +20,15 @@ module ContentEditors =
         let conclusionStrength = FieldId "INV-046"
         let residualUncertainty = FieldId "INV-047"
 
-    /// INV-031's options in its order (OD-INDY-23); the label is the stored word itself, the description the catalog's
-    /// meaning. "Not assessed" is the absence of a link, never an option.
+    /// INV-031's options in its order (OD-INDY-23), with the catalog's meaning. The accessible name is the lower-case
+    /// word the evidence and hypothesis cards use afterwards ("supports “…”"; J2 picks the choice by that word); the
+    /// visible words are the same, capitalised. "Not assessed" is the absence of a link, never an option.
     let relationshipKinds : EditorChoice list =
-        [ { Value = "supports"; Label = "supports"; Description = "Makes the hypothesis more credible." }
-          { Value = "contradicts"; Label = "contradicts"; Description = "Makes the hypothesis less credible." }
-          { Value = "consistent-with"; Label = "consistent-with"
-            Description = "Fits, but does not favour it over other hypotheses it also fits." }
-          { Value = "inconclusive"; Label = "inconclusive"; Description = "Assessed, but whether it fits cannot be determined yet." } ]
+        [ "supports", "Supports", "supports", "Makes the hypothesis more credible."
+          "contradicts", "Contradicts", "contradicts", "Makes the hypothesis less credible."
+          "consistent-with", "Consistent with", "consistent with", "Fits, but does not favour it over other hypotheses it also fits."
+          "inconclusive", "Inconclusive", "inconclusive", "Assessed, but whether it fits cannot be determined yet." ]
+        |> List.map (fun (v, l, n, d) -> { Value = v; Label = l; Name = n; Description = d })
 
     /// INV-045's seven causa-storage evidenceCategory values (OD-CR-02 A: nothing selected at first).
     let evidenceCategories : EditorChoice list =
@@ -37,16 +39,16 @@ module ContentEditors =
           "experimentResult", "Experiment result", "The outcome of a test you ran."
           "testimony", "Testimony", "What someone says happened."
           "externalReference", "External reference", "A published source outside the investigation." ]
-        |> List.map (fun (v, l, d) -> { Value = v; Label = l; Description = d })
+        |> List.map (fun (v, l, d) -> { Value = v; Label = l; Name = l; Description = d })
 
     /// INV-046's five causa-storage conclusionStrength values, weakest first (OD-CR-04 A).
     let conclusionStrengths : EditorChoice list =
         [ "plausibleExplanation", "Plausible explanation", "It could explain the problem; others remain open."
           "leadingExplanation", "Leading explanation", "The best explanation so far."
           "supportedCause", "Supported cause", "The evidence supports it as the cause."
-          "confirmedCause", "Confirmed cause", "Confirmed by evidence or a test."
+          "confirmedCause", "Confirmed cause", "Confirmed by evidence or a test. Refused until causes are recorded."
           "acceptedWithResidualUncertainty", "Accepted with residual uncertainty", "Accepted; state what is still uncertain." ]
-        |> List.map (fun (v, l, d) -> { Value = v; Label = l; Description = d })
+        |> List.map (fun (v, l, d) -> { Value = v; Label = l; Name = l; Description = d })
 
     let private availability (actions: Map<ActionId, Availability>) (a: ActionId) =
         actions |> Map.tryFind a |> Option.defaultValue NotOffered
@@ -72,6 +74,7 @@ module ContentEditors =
         [ for o in options ->
               [ Bind.cellText "key" o.Value
                 Bind.cellText "label" o.Label
+                Bind.cellText "name" o.Name
                 Bind.cellText "description" o.Description
                 Bind.cellText "describedBy" (sprintf "causa-%s-%s-help" prefix o.Value)
                 Bind.cellFlag "checked" (o.Value = selected) ] ]
@@ -136,12 +139,13 @@ module ContentEditors =
         let evidenceOptions = a |> Option.map (fun a -> a.Evidence |> List.map (fun e -> e.Id, evidenceName e)) |> Option.defaultValue []
         let hypothesisOptions = a |> Option.map (fun a -> a.Hypotheses |> List.map (fun h -> h.Id, h.Statement)) |> Option.defaultValue []
         let reassess = availability actions Actions.reassess
+        let link = availability actions Actions.linkEvidence
         Bind.ofList(
             form "editor.observation" obsStatus (availability actions Actions.recordObservation) [ "text", Fields.observationText; "source", Fields.observationSource ] view.Drafts
             @ form "editor.hypothesis" hypStatus (availability actions Actions.recordHypothesis) [ "statement", Fields.hypothesisStatement; "explanation", Fields.hypothesisExplanation ] view.Drafts
             @ form "editor.evidence" (statusLine "evidence items" unsaved (empty evidenceFields) evidence) (availability actions Actions.recordEvidence) evidenceFields view.Drafts
             @ [ Bind.items "editor.evidence.categories" (choiceRows "category" (draft view.Drafts PendingFields.evidenceCategory) evidenceCategories) ]
-            @ form "editor.link" (statusAt "on each evidence card above" "assessments" unsaved (empty linkFields) links) (availability actions Actions.linkEvidence) linkFields view.Drafts
+            @ form "editor.link" (statusAt "on each evidence card above" "assessments" unsaved (empty linkFields) links) link linkFields view.Drafts
             @ [ Bind.items "editor.link.kinds" (choiceRows "kind" (draft view.Drafts Fields.relationshipKind) relationshipKinds)
                 Bind.items "editor.link.evidence-options" (pickerRows (draft view.Drafts Fields.linkEvidence) evidenceOptions)
                 Bind.flag "editor.link.evidence-unchosen" ((draft view.Drafts Fields.linkEvidence) = "")
@@ -149,13 +153,17 @@ module ContentEditors =
                 Bind.flag "editor.link.hypothesis-unchosen" ((draft view.Drafts Fields.linkHypothesis) = "")
                 // Both sides must exist before a link can be made: say which is missing instead of an empty picker.
                 Bind.flag "editor.link.ready" (not evidenceOptions.IsEmpty && not hypothesisOptions.IsEmpty)
+                // The engine's own reason, when it gives one, says it; this note only fills the gap.
                 Bind.text
                     "editor.link.missing"
-                    (match evidenceOptions.IsEmpty, hypothesisOptions.IsEmpty with
-                     | true, true -> "Record evidence and a hypothesis first; then link them here."
-                     | true, false -> "Record evidence first; then link it to a hypothesis here."
-                     | false, true -> "Record a hypothesis first (Hypotheses section); then link evidence to it here."
-                     | false, false -> "")
+                    (match link with
+                     | Unavailable _ -> ""
+                     | _ ->
+                         match evidenceOptions.IsEmpty, hypothesisOptions.IsEmpty with
+                         | true, true -> "Record evidence and a hypothesis first; then link them here."
+                         | true, false -> "Record evidence first; then link it to a hypothesis here."
+                         | false, true -> "Record a hypothesis first (Hypotheses section); then link evidence to it here."
+                         | false, false -> "")
                 Bind.flag "editor.link.reassess-offered" (match reassess with NotOffered -> false | _ -> true)
                 Bind.flag "editor.link.reassess-disabled" (match reassess with Available -> false | _ -> true) ]
             @ form "editor.conclusion" (statusLine "conclusions" unsaved (empty conclusionFields) conclusions) (availability actions Actions.recordConclusion) conclusionFields view.Drafts

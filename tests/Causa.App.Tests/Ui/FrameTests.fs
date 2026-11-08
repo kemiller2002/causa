@@ -248,14 +248,26 @@ module GraphEditorTests =
         Assert.True(flag b "editor.link.evidence-unchosen")
 
     [<Fact>]
+    let ``until evidence exists the link editor shows the engine's reason and no second note`` () =
+        let p = { projection [ Actions.linkEvidence, Unavailable "No usable evidence has been admitted." ] [] 0 with Evidence = [] }
+        let b = bind EvidenceView p noDrafts (Some SavedKind)
+        Assert.True(flag b "editor.link.offered")
+        Assert.True(flag b "editor.link.disabled")
+        Assert.Equal("No usable evidence has been admitted.", text b "editor.link.unavailable")
+        Assert.Equal("", text b "editor.link.missing")
+        Assert.False(flag b "editor.link.ready")
+
+    [<Fact>]
     let ``the choice groups offer exactly the catalog's options, none chosen at first`` () =
         let kindRule =
             ContentForms.link
             |> List.find (fun f -> f.Field = Fields.relationshipKind)
             |> fun f -> f.Rules |> List.pick (function OneOf vs -> Some vs | _ -> None)
         Assert.Equal<string list>(kindRule, ContentEditors.relationshipKinds |> List.map (fun c -> c.Value))
-        // The label is the stored word, so the choice reads the same as the card that shows it afterwards.
-        Assert.True(ContentEditors.relationshipKinds |> List.forall (fun c -> c.Label = c.Value))
+        // Readable words on screen; the accessible name is the lower-case word the cards use afterwards ("supports “…”").
+        Assert.Equal<string list>([ "Supports"; "Contradicts"; "Consistent with"; "Inconclusive" ], ContentEditors.relationshipKinds |> List.map (fun c -> c.Label))
+        Assert.Equal<string list>([ "supports"; "contradicts"; "consistent with"; "inconclusive" ], ContentEditors.relationshipKinds |> List.map (fun c -> c.Name))
+        Assert.Equal("Direct observation", (ContentEditors.evidenceCategories |> List.head).Label)
         Assert.Equal<string list>(
             [ "directObservation"; "measurement"; "log"; "document"; "experimentResult"; "testimony"; "externalReference" ],
             ContentEditors.evidenceCategories |> List.map (fun c -> c.Value))

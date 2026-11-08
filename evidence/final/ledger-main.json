@@ -1,0 +1,2395 @@
+{
+  "schema": "indy-init.scope-report/1",
+  "scopeSha256": "09e38f7db1888b3bbb957272cddfa050908a077a1f115d0cef2d412d7ec40666",
+  "mainHealthy": true,
+  "states": {
+    "not-started": 131,
+    "in-progress": 68,
+    "implemented-unverified": 9,
+    "verified-unmerged": 0,
+    "integrated": 0,
+    "blocked": 0,
+    "failed": 0,
+    "excluded": 0
+  },
+  "mandatoryApplicable": 203,
+  "mandatoryOpen": 203,
+  "completion": "CONTINUE_REQUIRED",
+  "groups": [
+    {
+      "group": "AR",
+      "requirements": 30,
+      "mandatoryRequirements": 30,
+      "applicableObligations": 81,
+      "implemented": 6,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 64,
+      "inProgress": 11,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 23,
+        "in-progress": 5,
+        "implemented-unverified": 2,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T18",
+        "T24",
+        "T30",
+        "T31",
+        "T33",
+        "T34",
+        "T36"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    },
+    {
+      "group": "EXT-DATA",
+      "requirements": 13,
+      "mandatoryRequirements": 13,
+      "applicableObligations": 31,
+      "implemented": 0,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 0,
+      "inProgress": 31,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 0,
+        "in-progress": 13,
+        "implemented-unverified": 0,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "T15",
+        "T20",
+        "T21",
+        "T25"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    },
+    {
+      "group": "INV",
+      "requirements": 46,
+      "mandatoryRequirements": 41,
+      "applicableObligations": 254,
+      "implemented": 0,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 254,
+      "inProgress": 0,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 46,
+        "in-progress": 0,
+        "implemented-unverified": 0,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "WI-INV-LIST",
+        "WI-INV-START",
+        "WI-INV-WORKSPACE"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    },
+    {
+      "group": "PERSIST",
+      "requirements": 46,
+      "mandatoryRequirements": 46,
+      "applicableObligations": 255,
+      "implemented": 0,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 128,
+      "inProgress": 127,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 21,
+        "in-progress": 25,
+        "implemented-unverified": 0,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "T12",
+        "T18",
+        "T19",
+        "T21",
+        "T22",
+        "T31",
+        "T34"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    },
+    {
+      "group": "PF",
+      "requirements": 19,
+      "mandatoryRequirements": 19,
+      "applicableObligations": 55,
+      "implemented": 0,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 0,
+      "inProgress": 55,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 0,
+        "in-progress": 19,
+        "implemented-unverified": 0,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "T18",
+        "T21",
+        "T31"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    },
+    {
+      "group": "UI",
+      "requirements": 30,
+      "mandatoryRequirements": 30,
+      "applicableObligations": 140,
+      "implemented": 0,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 99,
+      "inProgress": 41,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 24,
+        "in-progress": 6,
+        "implemented-unverified": 0,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "T16",
+        "T19",
+        "T22",
+        "T29",
+        "T31"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    },
+    {
+      "group": "VER",
+      "requirements": 9,
+      "mandatoryRequirements": 9,
+      "applicableObligations": 23,
+      "implemented": 19,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 4,
+      "inProgress": 0,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 2,
+        "in-progress": 0,
+        "implemented-unverified": 7,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "T10",
+        "T11",
+        "T29",
+        "WI-GEN-VER"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    },
+    {
+      "group": "WDL",
+      "requirements": 15,
+      "mandatoryRequirements": 15,
+      "applicableObligations": 31,
+      "implemented": 0,
+      "verified": 0,
+      "integrated": 0,
+      "missing": 31,
+      "inProgress": 0,
+      "blocked": 0,
+      "failed": 0,
+      "excluded": 0,
+      "states": {
+        "not-started": 15,
+        "in-progress": 0,
+        "implemented-unverified": 0,
+        "verified-unmerged": 0,
+        "integrated": 0,
+        "blocked": 0,
+        "failed": 0,
+        "excluded": 0
+      },
+      "workItems": [
+        "T23",
+        "T24"
+      ],
+      "supportingEvidence": [],
+      "exclusions": []
+    }
+  ],
+  "requirements": [
+    {
+      "id": "AR-001",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-002",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-003",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-004",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-005",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T24",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-006",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T13",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-007",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-008",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T30",
+        "T33",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-009",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T12",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-010",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-011",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T11",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-012",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-013",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-014",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-015",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-017",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-018",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-019",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-020",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-021",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-022",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T12",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-023",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T10",
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-024",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-027",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-028",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-029",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-030",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-031",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-034",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34",
+        "T36"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "AR-035",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-001",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-002",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-003",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-004",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-005",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-006",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-007",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-008",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-009",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20",
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-010",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20",
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-011",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T15",
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-012",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "EXT-DATA-013",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T20",
+        "T25"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-001",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-002",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-003",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-004",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-005",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-006",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-007",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-008",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-009",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-010",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-011",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-012",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-013",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-014",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-015",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-016",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-017",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-018",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-019",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-020",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-021",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-022",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-023",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T12"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-024",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-025",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-026",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-030",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-031",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-032",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-033",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-040",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-041",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-042",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-043",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-044",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-045",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-046",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-047",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-048",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-049",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-050",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-051",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T12"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-052",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-053",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-054",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PERSIST-055",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T34"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-001",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-002",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-003",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-004",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-005",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-006",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-007",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-008",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-009",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-011",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-012",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-013",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18",
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-014",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18",
+        "T21"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-015",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-016",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-017",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-018",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-019",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "PF-020",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T18",
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-001",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-003",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-004",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-005",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-006",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T19",
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-010",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-011",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T16",
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-013",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-014",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T16",
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-015",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-016",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T16",
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-017",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-018",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22",
+        "T29"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-019",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22",
+        "T29"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-020",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T16",
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-021",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-022",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-023",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-024",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-025",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-026",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-029",
+      "mandatory": true,
+      "state": "in-progress",
+      "workItems": [
+        "T16",
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-030",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-031",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-032",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-033",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-034",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-038",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-039",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "UI-040",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T22",
+        "T31"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-001",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T10"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-002",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T10"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-003",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T10"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-004",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T11"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-005",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T10"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-006",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T11"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-007",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T29"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-008",
+      "mandatory": true,
+      "state": "implemented-unverified",
+      "workItems": [
+        "T11"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "VER-010",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-GEN-VER"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-001",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23",
+        "T24"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-002",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23",
+        "T24"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-003",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-004",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-005",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-006",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-007",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-008",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-009",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-010",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-011",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-012",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-014",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-015",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "WDL-013",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "T23"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-001",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-002",
+      "mandatory": false,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-004",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-005",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-006",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-007",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-008",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-009",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-010",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-011",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-012",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-013",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-014",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-015",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-016",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-017",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-018",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-019",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-020",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-021",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-022",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-023",
+      "mandatory": false,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-START"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-024",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-025",
+      "mandatory": false,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-026",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-027",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-028",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-029",
+      "mandatory": false,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-030",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-031",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-032",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-033",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-034",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-035",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-036",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-037",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-038",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-039",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-LIST"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-040",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-LIST"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-041",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-LIST"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-042",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-043",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-044",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-045",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-046",
+      "mandatory": true,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    },
+    {
+      "id": "INV-047",
+      "mandatory": false,
+      "state": "not-started",
+      "workItems": [
+        "WI-INV-WORKSPACE"
+      ],
+      "integratedAt": null,
+      "excludedBy": null
+    }
+  ]
+}

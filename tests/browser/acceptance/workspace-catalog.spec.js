@@ -102,9 +102,10 @@ test('a working copy records an observation and a hypothesis, saves them and rea
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(status(page)).toHaveText(/^\s*Saved\s*$/, { timeout: 20000 });
   await expect(page.getByLabel('Observation text', { exact: true }), 'no observation editor on the working copy').toBeVisible({ timeout: 20000 });
-  // Cancel drops what was typed and records nothing.
+  // Cancel drops what was typed and records nothing. The Overview also holds the conclusion editor, with its own
+  // Cancel: this is the observation form's.
   await page.getByLabel('Observation text', { exact: true }).fill(`wc-cancelled-${tag}`);
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('form', { name: 'Add an observation' }).getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.getByLabel('Observation text', { exact: true })).toHaveValue('');
   await expect(status(page)).toHaveText(/^\s*Saved\s*$/);
   // A blank observation is refused with a message, nothing recorded.

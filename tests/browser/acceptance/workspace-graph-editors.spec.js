@@ -103,8 +103,8 @@ test('at 390 px a working copy admits evidence, links it to a hypothesis as supp
   await linkButton.click();
   await expect(card, 'the link does not read on the evidence card').toContainText(`supports “${hyp}”. Why: ${why}`);
   await expect(page.getByRole('status').filter({ hasText: /Recorded assessments are listed on each evidence card above\..*not saved yet/ })).toBeVisible();
-  await page.locator('#causa-ed-evidence').evaluate((e) => e.scrollIntoView({ block: 'start' }));
-  await page.screenshot({ path: process.env.CAUSA_EDITOR_SHOT || test.info().outputPath('graph-editors-390.png') });
+  // The shot: the whole Evidence section at 390 px, the card with its link above the two editors.
+  await page.screenshot({ path: process.env.CAUSA_EDITOR_SHOT || test.info().outputPath('graph-editors-390.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(status(page)).toHaveText(/^\s*Saved\s*$/, { timeout: 20000 });

@@ -236,8 +236,9 @@ test.describe('UI-011', () => {
     await expect(page.locator('main h1')).toHaveText('Settings');
     await page.goBack();
     await expect(page.locator('main h1')).toHaveText('Administration');
-    const y2 = await page.evaluate(() => scrollY);
-    expect(Math.abs(y2 - y), 'scroll position not preserved on Back').toBeLessThanOrEqual(Math.max(48, y * 0.1));
+    // The restored position is reached by Forma's smooth scrolling, so it is read once that scroll has settled.
+    await expect.poll(async () => Math.abs((await page.evaluate(() => scrollY)) - y), { message: 'scroll position not preserved on Back', timeout: 5000 })
+      .toBeLessThanOrEqual(Math.max(48, y * 0.1));
     await ctx.close();
   });
 

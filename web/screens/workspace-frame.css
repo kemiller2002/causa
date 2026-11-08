@@ -257,7 +257,7 @@ html:has(.causa-workspace) { scroll-behavior: auto; }
   min-block-size: var(--ef-layout-target-min);
   min-inline-size: var(--ef-layout-target-min);
   max-inline-size: 100%;
-  white-space: normal;
+  text-wrap: wrap;
   overflow-wrap: anywhere;
   text-align: start;
 }

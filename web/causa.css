@@ -62,6 +62,12 @@ html { color-scheme: light; }
   color: var(--causa-on-navy);
 }
 
+/* In the masthead the shell is a bar, not a sidebar: one column as wide as its links, so the persistent list is never
+   squeezed into Forma's 11-16rem sidebar track and pushed past the viewport (UI-011-O2 at 820 px). */
+.causa-masthead .causa-primary-shell {
+  grid-template-columns: minmax(0, max-content);
+}
+
 .causa-masthead .ef-navigation-shell__persistent {
   grid-auto-flow: column;
   grid-auto-columns: max-content;
@@ -70,7 +76,7 @@ html { color-scheme: light; }
 
 /* Whole words in the masthead navigation at every width (CR-6). */
 .causa-masthead .ef-navigation-shell a[href] {
-  white-space: nowrap;
+  text-wrap: nowrap;
 }
 
 .causa-masthead .ef-navigation-shell__compact > summary {
@@ -131,10 +137,18 @@ html { color-scheme: light; }
   block-size: 1px;
   overflow: hidden;
   clip-path: inset(50%);
-  white-space: nowrap;
+  text-wrap: nowrap;
 }
 
 /* 390 px audit: field descriptions and the character counters inside them at Forma's small size (14 px, not 13 px). */
 .causa-site .ef-field__description { font-size: var(--ef-type-size-small); }
 /* The masthead's current-investigation link is a full tap target. */
 .causa-context a { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); }
+
+/* The compact navigation's landmark (it wraps Forma's disclosure): shown exactly where Forma shows the disclosure,
+   with the links laid out as Forma lays out the compact list. */
+.causa-primary-compact { display: none; }
+@media (max-width: 48rem) {
+  .causa-primary-compact { display: block; }
+  .causa-primary-compact .ef-navigation-shell__compact .causa-primary { display: grid; gap: var(--ef-primitive-spacing-2, 0.5rem); padding-block-start: var(--ef-primitive-spacing-2, 0.5rem); }
+}

@@ -514,3 +514,17 @@ type ReopenAfterSave() =
             |> go (UiIntent.Navigate InvestigationsRoute)
             |> go (UiIntent.Navigate(WorkspaceRoute(target, Overview)))
         Assert.Equal<Section list>([ Overview; CausalAnalysis; HypothesesSection; TimelineSection ], sections reopened)
+
+/// PERSIST-018: while the tab knows it is offline, Save is still offered; the save machine then sends nothing and
+/// the investigation shows Offline.
+type SaveOfferedOffline() =
+    [<Fact>]
+    member _.``an Offline session offers Save on a connection that can save``() =
+        let s = Fixture.started ()
+        let session = s.Model.Sessions |> Map.toList |> List.exactlyOne |> snd
+        let offline = { session with State = SaveState.Offline }
+        let shown = UiAdapter.savePresentation { Fixture.config with CanSave = true } s offline
+        Assert.Equal(Available, shown.Save)
+        Assert.Equal(OfflineKind, shown.Kind)
+        // A build that cannot save still says why rather than offering it.
+        Assert.NotEqual(Available, (UiAdapter.savePresentation Fixture.config s offline).Save)

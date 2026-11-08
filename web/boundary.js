@@ -98,11 +98,44 @@ const unsaved = () => byId("causa-unsaved")?.value === "true";
 window.addEventListener("beforeunload", (event) => {
   if (unsaved()) { event.preventDefault(); event.returnValue = ""; }
 });
+// The confirmation is an in-page modal dialog (Forma's dialog pattern), created only while it is asked and removed
+// when it closes: Keep working (or Escape) keeps everything; Disconnect anyway lets the original activation through.
+let disconnectConfirmed = false;
+const confirmDisconnect = (target) => {
+  const dialog = document.createElement("dialog");
+  dialog.className = "ef-dialog";
+  dialog.setAttribute("aria-labelledby", "causa-disconnect-title");
+  dialog.setAttribute("aria-describedby", "causa-disconnect-description");
+  dialog.innerHTML =
+    '<div class="ef-dialog__body"><h2 id="causa-disconnect-title">Disconnect with unsaved changes?</h2>' +
+    '<p id="causa-disconnect-description">Your unsaved changes exist only in this tab. Disconnecting loses them.</p></div>' +
+    '<div class="ef-dialog__actions"><button type="button" class="ef-button causa-action-primary" value="keep">Keep working</button>' +
+    '<button type="button" class="ef-button" value="disconnect">Disconnect anyway</button></div>';
+  dialog.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest("button[value]") : null;
+    if (button) dialog.close(button.value);
+  });
+  dialog.addEventListener("close", () => {
+    const choice = dialog.returnValue;
+    dialog.remove();
+    if (choice === "disconnect" && target.isConnected) {
+      disconnectConfirmed = true;
+      target.click();
+    } else if (target.isConnected) {
+      target.focus();
+    }
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+};
 document.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target.closest('[data-event="UIA-DISCONNECT"]') : null;
-  if (target && unsaved() && !window.confirm("You have unsaved changes in this tab. Disconnect anyway? They will be lost.")) {
+  if (!target) return;
+  if (disconnectConfirmed) { disconnectConfirmed = false; return; }
+  if (unsaved()) {
     event.preventDefault();
     event.stopImmediatePropagation();
+    confirmDisconnect(target);
   }
 }, true);
 
@@ -110,26 +143,49 @@ document.addEventListener("click", (event) => {
 // history.state as the user scrolls and restored once the kernel has rendered the route the browser popped. Only the
 // browser's own scroll offset is kept: no application state.
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+// A position is kept once the user has stayed there for a moment (300 ms): the scroll a user makes on the way to the
+// Menu at the top, just before choosing a destination, is not where they were reading. A save still pending when the
+// route changes is dropped, so it never lands on the new entry.
 let scrollSave;
 window.addEventListener("scroll", () => {
   clearTimeout(scrollSave);
   scrollSave = setTimeout(() => {
     history.replaceState({ ...(history.state ?? {}), causaScrollY: window.scrollY }, "");
-  }, 100);
+  }, 300);
 }, { passive: true });
-// After a route change, focus goes to the main region (tabindex=-1), never to the skip link left focused by the
-// re-render, so the skip link stays hidden and screen readers land on the new content.
+window.addEventListener("hashchange", () => clearTimeout(scrollSave), true);
+// Focus is never left on the page body or the skip link by the engine: after a route change, or a re-render that
+// removed the focused control (Record, Link, Save), focus goes to the main region (tabindex=-1) without scrolling, so
+// the next Tab continues in the content and the skip link stays hidden until the user reaches it by keyboard from the
+// top. Focus the user put on a control, including a primary navigation link they activated, is left where it is.
+const focusLost = () => {
+  const active = document.activeElement;
+  return !active || active === document.body || !active.isConnected;
+};
 const focusMain = () => {
   const active = document.activeElement;
-  if (active && active !== document.body && !active.classList.contains("ef-skip-link") && shell.main.contains(active) && active.isConnected) return;
-  shell.main.focus({ preventScroll: true });
+  if (focusLost() || active.classList.contains("ef-skip-link")) shell.main.focus({ preventScroll: true });
 };
 window.addEventListener("hashchange", () => requestAnimationFrame(() => requestAnimationFrame(focusMain)));
+// Only a control that had focus inside the main region and was then removed by a re-render hands focus to the region;
+// a page that has just loaded keeps the browser's own starting point, so the first Tab still reaches the skip link.
+let focusedInMain = null;
+document.addEventListener("focusin", (event) => {
+  focusedInMain = event.target instanceof Element && event.target !== shell.main && shell.main.contains(event.target) ? event.target : null;
+});
+let refocus = 0;
+new MutationObserver(() => {
+  cancelAnimationFrame(refocus);
+  refocus = requestAnimationFrame(() => {
+    if (focusedInMain && !focusedInMain.isConnected && focusLost()) shell.main.focus({ preventScroll: true });
+  });
+}).observe(shell.main, { childList: true, subtree: true });
 window.addEventListener("popstate", (event) => {
   const y = event.state?.causaScrollY;
   if (typeof y !== "number") return;
   // The kernel renders the popped route on the same popstate; restore after its view has been applied.
-  requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  clearTimeout(scrollSave);
+  requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "instant" })));
 });
 
 void start();

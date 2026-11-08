@@ -513,7 +513,145 @@ type ReopenAfterSave() =
             saved
             |> go (UiIntent.Navigate InvestigationsRoute)
             |> go (UiIntent.Navigate(WorkspaceRoute(target, Overview)))
-        Assert.Equal<Section list>([ Overview; CausalAnalysis; HypothesesSection; TimelineSection ], sections reopened)
+        Assert.Equal<Section list>([ Overview; CausalAnalysis; EvidenceSection; HypothesesSection; TimelineSection ], sections reopened)
+
+/// The evidence, link and conclusion editors (UIA-RECORD-EVIDENCE, INV-030, INV-032): availability from the kernel's
+/// capabilities, validation into ContentErrors, the command at the investigation's version, Cancel clears the drafts.
+type EvidenceLinkConclusion() =
+    let input f v st = Fixture.ui.Dispatch (UiIntent.Input(f, v, None)) st |> fst
+    let act a st = Fixture.ui.Dispatch (UiIntent.Activate(a, None)) st |> fst
+    let ref =
+        let writable = UiAdapter.workingCopy Fixture.config |> Option.get
+        { Address = Writable.address writable; Id = InvestigationId Fixture.identifier }
+    let investigation (s: AdapterState) =
+        match Update.investigationOf Fixture.backend s.Model ref with
+        | Ok(Some i) -> i
+        | other -> failwithf "%A" other
+    let analysis (s: AdapterState) =
+        match (Fixture.ui.Project s).Screen with
+        | WorkspaceScreen v ->
+            match v.Section with
+            | OverviewSection(Ready u) -> Understood.value u
+            | other -> failwithf "%A" other
+        | other -> failwithf "%A" other
+    let lastEnvelope (s: AdapterState) = s.Model.Sessions[ref].Unsaved |> List.last
+    let withHypothesis () =
+        Fixture.started () |> input Fields.hypothesisStatement "The disk filled up." |> act Actions.recordHypothesis
+    let withEvidence () =
+        withHypothesis ()
+        |> input Fields.evidenceLabel "df at 02:10"
+        |> input Fields.evidenceSource "ops runbook capture"
+        |> input Fields.evidenceContent "/var 100% used"
+        |> input Fields.evidenceCategory "measurement"
+        |> act Actions.recordEvidence
+
+    [<Fact>]
+    member _.``a writable working copy with no evidence lists Evidence, so the first Add evidence form is reachable``() =
+        let s = Fixture.started ()
+        Assert.True((investigation s).Evidence.IsEmpty)
+        match (Fixture.ui.Project s).Screen with
+        | WorkspaceScreen v ->
+            match v.Frame with
+            | Ready f -> Assert.Contains(f.Sections, fun l -> l.Destination = EvidenceSection)
+            | other -> Assert.Fail(sprintf "%A" other)
+        | other -> Assert.Fail(sprintf "%A" other)
+
+    [<Fact>]
+    member _.``availability comes from the kernel: linking waits for evidence, the other two are offered``() =
+        let s = withHypothesis ()
+        let actions = (analysis s).Actions
+        Assert.Equal(Some Available, actions.TryFind Actions.recordEvidence)
+        Assert.Equal(Some Available, actions.TryFind Actions.recordConclusion)
+        Assert.Equal(Some(Unavailable "No usable evidence has been admitted."), actions.TryFind Actions.linkEvidence)
+        Assert.Equal(Some Available, (analysis (withEvidence ())).Actions.TryFind Actions.linkEvidence)
+
+    [<Fact>]
+    member _.``invalid editors put their errors in ContentErrors and send nothing``() =
+        let s = withHypothesis ()
+        let before = s.Model.Sessions
+        let evidence = s |> input Fields.evidenceLabel "df at 02:10" |> act Actions.recordEvidence
+        Assert.Contains(evidence.Local.ContentErrors, fun e -> e.Field = Fields.evidenceCategory)
+        Assert.Contains(evidence.Local.ContentErrors, fun e -> e.Field = Fields.evidenceSource)
+        Assert.Contains(evidence.Local.ContentErrors, fun e -> e.Field = Fields.evidenceContent)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, evidence.Model.Sessions)
+        let link =
+            s
+            |> input Fields.linkEvidence (Guid.NewGuid().ToString())
+            |> input Fields.linkHypothesis (Guid.NewGuid().ToString())
+            |> input Fields.relationshipKind "supports"
+            |> input Fields.relationshipRationale "why"
+            |> act Actions.linkEvidence
+        Assert.Contains(link.Local.ContentErrors, fun e -> e.Field = Fields.linkEvidence)
+        Assert.Contains(link.Local.ContentErrors, fun e -> e.Field = Fields.linkHypothesis)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, link.Model.Sessions)
+        let conclusion = s |> input Fields.conclusionStatement "The disk filled." |> input Fields.conclusionStrength "certain" |> act Actions.recordConclusion
+        Assert.Contains(conclusion.Local.ContentErrors, fun e -> e.Field = Fields.conclusionStrength)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, conclusion.Model.Sessions)
+
+    [<Fact>]
+    member _.``a working copy with one evidence item that supports one hypothesis shows it in the causal graph``() =
+        let s = withEvidence ()
+        Assert.Empty(s.Local.ContentErrors)
+        let i1 = investigation s
+        let evidenceId, evidence = i1.Evidence |> Map.toList |> List.exactlyOne
+        Assert.Equal("df at 02:10", evidence.Label |> Option.map NonEmptyText.value |> Option.defaultValue "")
+        Assert.Equal(EvidenceCategory.Measurement, evidence.Category)
+        let (HypothesisId h) = i1.Hypotheses |> Map.toList |> List.exactlyOne |> fst
+        Assert.False(s.Local.Content.ContainsKey Fields.evidenceLabel, "the evidence editor was not cleared")
+        let linked =
+            s
+            |> input Fields.linkEvidence (evidenceId.ToString())
+            |> input Fields.linkHypothesis (h.ToString())
+            |> input Fields.relationshipKind "supports"
+            |> input Fields.relationshipRationale "A full /var stops every write."
+            |> act Actions.linkEvidence
+        Assert.Empty(linked.Local.ContentErrors)
+        // The command went at the version the investigation had, with an id from CommandIds.
+        let sent = lastEnvelope linked
+        Assert.Equal(Some i1.Version, sent.ExpectedVersion)
+        let i2 = investigation linked
+        let relationship = i2.Relationships |> Map.toList |> List.exactlyOne |> snd
+        Assert.Equal(Causa.Domain.RelationshipKind.Supports, relationship.Kind)
+        // Causal Analysis and Evidence are listed, and the graph draws one supports line from the evidence.
+        match (Fixture.ui.Project linked).Screen with
+        | WorkspaceScreen v ->
+            match v.Frame with
+            | Ready f ->
+                Assert.Contains(f.Sections, fun l -> l.Destination = CausalAnalysis)
+                Assert.Contains(f.Sections, fun l -> l.Destination = EvidenceSection)
+            | other -> Assert.Fail(sprintf "%A" other)
+        | other -> Assert.Fail(sprintf "%A" other)
+        let graph = Causa.App.Views.CausalGraph.layout (analysis linked)
+        let edge = graph.Edges |> List.exactlyOne
+        Assert.Equal(Causa.App.Views.EdgeKind.SupportsEdge, edge.Kind)
+        Assert.Equal(0, graph.UnlinkedEvidence)
+        // A conclusion with its strength; the start's open question needs the residual uncertainty (R6.4).
+        let concluded =
+            linked
+            |> input Fields.conclusionStatement "The disk filled up and the export stopped."
+            |> input Fields.conclusionStrength "leadingExplanation"
+            |> input Fields.residualUncertainty "Why /var filled is not known yet."
+            |> act Actions.recordConclusion
+        Assert.Empty(concluded.Local.ContentErrors)
+        Assert.Equal(Some i2.Version, (lastEnvelope concluded).ExpectedVersion)
+        let c = (investigation concluded).Conclusions |> Map.toList |> List.exactlyOne |> snd
+        Assert.Equal(ConclusionStrength.LeadingExplanation, c.Strength)
+        Assert.Equal(Some "Why /var filled is not known yet.", c.ResidualUncertainty |> Option.map NonEmptyText.value)
+
+    [<Fact>]
+    member _.``Cancel clears the evidence, link and conclusion drafts and records nothing``() =
+        let s = withHypothesis ()
+        let before = s.Model.Sessions
+        let cancelled =
+            s
+            |> input Fields.evidenceLabel "draft"
+            |> input Fields.evidenceCategory "log"
+            |> input Fields.relationshipRationale "draft"
+            |> input Fields.conclusionStatement "draft"
+            |> input Fields.conclusionStrength "plausibleExplanation"
+            |> act Actions.cancelEditor
+        Assert.True(cancelled.Local.Content.IsEmpty)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, cancelled.Model.Sessions)
 
 /// PERSIST-018: while the tab knows it is offline, Save is still offered; the save machine then sends nothing and
 /// the investigation shows Offline.

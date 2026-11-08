@@ -97,6 +97,7 @@
       </dl>
 
       <template data-if="details.closed">
+      <div class="ef-stack causa-details__summary">
       <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-problem">
         <h2 id="causa-ws-problem">Problem statement</h2>
         <pre class="causa-verbatim" data-requirement-id="INV-008" data-text="workspace.problem"></pre>
@@ -123,6 +124,7 @@
         </div>
       </template>
       <p class="causa-editor__status" role="status" data-text="details.status"></p>
+      </div>
       </template>
 
       <template data-if="details.open">

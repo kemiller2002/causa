@@ -666,3 +666,54 @@ type SaveOfferedOffline() =
         Assert.Equal(OfflineKind, shown.Kind)
         // A build that cannot save still says why rather than offering it.
         Assert.NotEqual(Available, (UiAdapter.savePresentation Fixture.config s offline).Save)
+
+/// PERSIST-017-O2 / T-L02: an investigation this tab never loaded, opened while the tab knows it is offline, is
+/// unavailable offline and nothing is sent; the connection text says the tab is offline.
+type OpenWhileOffline() =
+    [<Fact>]
+    member _.``an open while offline is UnavailableOffline, sends nothing, and the connection says offline``() =
+        let fake = Causa.TestSupport.StatefulFake()
+        let address = (WorkspaceAddress.workingCopy [] "offline-open").Value
+        let backend =
+            { Fixture.backend with
+                Persistence =
+                    Some
+                        { Connector = GitHubConnect.connector
+                          Machine = SaveMachines.withStorage Fixture.backend.Author
+                          Lister = GitHubLister.lister
+                          Codec = StorageCodecs.codec }
+                WorkingCopy = Some address }
+        let engine = Update.engine backend
+        let config = { Fixture.config with SessionLocal = false; CanSave = true; Run = "offline-open"; InvestigationOf = Update.investigationOf backend; WorkingCopy = Some address }
+        let ui = UiAdapter.backend config engine
+        let rec settle (s: AdapterState) (effects: HostEffect list) =
+            match effects with
+            | [] -> s
+            | Http r :: rest -> let s2, more = UiAdapter.browser engine (HttpCompleted(fake.Execute r)) s in settle s2 (rest @ more)
+            | _ :: rest -> settle s rest
+        let s0 = fst (ui.Init InvestigationsRoute)
+        let connected =
+            let s1 = { s0 with Local = { s0.Local with Credential = Some fake.WriteConnection.Credential; Form = { Owner = fake.Owner; Repository = fake.Name; Branch = fake.Branch; CredentialEntered = true } } }
+            let s2, fx = ui.Dispatch (UiIntent.Activate(Actions.connect, None)) s1
+            settle s2 fx
+        Assert.Equal(Connected true, connected.Model.Connection)
+        let offline, _ = UiAdapter.browser engine (ConnectivityChanged false) connected
+        Assert.Equal(NetworkState.Offline, offline.Model.Network)
+        let id = InvestigationId(Guid.NewGuid())
+        let target = { Workspace = "workspaces/demo/causa-app-offline-open"; Role = WorkspaceRole.WorkingCopy; Id = id }
+        let opened, effects = ui.Dispatch (UiIntent.Navigate(WorkspaceRoute(target, Overview))) offline
+        Assert.Empty(effects |> List.filter (function Http _ -> true | _ -> false))
+        Assert.Equal(Some UnavailableOffline, opened.Model.Loads |> Map.tryFind { Address = address; Id = id })
+        // The workspace says the investigation is unavailable offline, never that GitHub could not be reached.
+        match (ui.Project opened).Screen with
+        | WorkspaceScreen v ->
+            match v.Frame with
+            | Failed(UiFailure.CapabilityAbsent(_, because)) -> Assert.Contains("unavailable offline", because)
+            | other -> Assert.Fail(sprintf "%A" other)
+        | other -> Assert.Fail(sprintf "%A" other)
+        // The connection says the tab is offline, never that changes can be saved: the latest polite announcement and
+        // the connection fact.
+        let latestPolite (st: AdapterState) = st.Local.Announcements |> List.filter (fun (p, _) -> p = Polite) |> List.last |> snd
+        Assert.Equal("You are offline. Changes stay in this tab.", latestPolite offline)
+        Assert.Equal("This investigation is unavailable offline; it opens when the connection returns.", latestPolite opened)
+        Assert.Equal(FactKnown "Offline: changes stay in this tab until the connection returns.", (UiAdapter.administrationView opened).Connection.Status)

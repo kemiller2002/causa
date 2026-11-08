@@ -38,7 +38,27 @@ const open = async (page, hash = '#/') => {
 const primary = (page) => page.getByRole('navigation', { name: 'Primary', exact: true }).filter({ visible: true }).first();
 const sections = (page) => page.getByRole('navigation', { name: /investigation sections/i }).first();
 const none = (label, violations) => expect(violations, `${label}: ${JSON.stringify(violations).slice(0, 1500)}`).toEqual([]);
+// CAUSA_PROVIDER=harness-double answers api.github.com from the local GitHub double (synthetic, never evidence), as the
+// persistence specs and the governed journeys do; otherwise nothing is intercepted and Connect reaches the real
+// test repository. A page-level route a test sets itself (e.g. a refused Connect) still takes precedence.
+const routedContexts = new WeakSet();
+const useDouble = async (context) => {
+  if (process.env.CAUSA_PROVIDER !== 'harness-double' || routedContexts.has(context)) return;
+  routedContexts.add(context);
+  const double = process.env.CAUSA_DOUBLE_URL || 'http://127.0.0.1:4610';
+  await context.route('https://api.github.com/**', async (route) => {
+    const r = route.request();
+    const u = new URL(r.url());
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE' };
+    if (r.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    // read the whole answer before fulfilling: a streamed answer can be disposed if the page moves on
+    let answer, body;
+    try { answer = await route.fetch({ url: double + u.pathname + u.search }); body = await answer.body(); } catch { return route.abort('failed').catch(() => {}); }
+    await route.fulfill({ status: answer.status(), headers: { ...answer.headers(), ...cors }, body }).catch(() => {});
+  });
+};
 const connect = async (page) => {
+  await useDouble(page.context());
   await open(page, '#/');
   await page.getByLabel('Repository owner', { exact: true }).fill(REPO.owner);
   await page.getByLabel('Repository', { exact: true }).fill(REPO.repo);

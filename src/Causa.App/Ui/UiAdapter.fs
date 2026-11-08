@@ -347,7 +347,9 @@ module UiAdapter =
     /// Runs one engine message and keeps the announcements it asked for.
     let private step (engine: Engine) (msg: Msg) (s: AdapterState) : AdapterState * HostEffect list =
         let model, effects = engine.Update msg s.Model
-        { Model = model; Local = { s.Local with Announcements = announcementsOf effects @ s.Local.Announcements |> List.truncate 8 } }, effects
+        // In the order they were made (oldest first), the last eight: the live region speaks the latest of each kind.
+        let all = s.Local.Announcements @ announcementsOf effects
+        { Model = model; Local = { s.Local with Announcements = all |> List.skip (max 0 (all.Length - 8)) } }, effects
 
     let private connect (engine: Engine) (s: AdapterState) =
         match Connection.validate s.Local.Form, s.Local.Credential with
@@ -971,7 +973,10 @@ module UiAdapter =
                 | Some(LoadFailed(ProviderFailed AuthenticationFailed)) -> let f = UiFailure.CredentialRefused in empty (Failed f) (ScreenFailed f) None blank
                 | Some(LoadFailed(ProviderFailed e)) -> let f = UiFailure.ProviderError(Classify.message e) in empty (Failed f) (ScreenFailed f) None blank
                 | Some(LoadFailed(Unverifiable fs)) -> let f = UiFailure.InvalidData(sprintf "%d verification failure(s)" fs.Length) in empty (Failed f) (ScreenFailed f) None blank
-                | Some UnavailableOffline -> let f = UiFailure.ProviderUnreachable in empty (Failed f) (ScreenFailed f) None blank
+                // T-L02: never "GitHub could not be reached" for an open the tab did not send because it knows it is offline.
+                | Some UnavailableOffline ->
+                    let f = UiFailure.CapabilityAbsent(DataVisible, "this investigation is unavailable offline; it opens when the connection returns.")
+                    empty (Failed f) (ScreenFailed f) None blank
                 | Some NotLoaded
                 | None ->
                     match s.Model.Connection with
@@ -980,11 +985,17 @@ module UiAdapter =
 
     let private unknownFact label = { Label = label; Status = FactUnknown }
 
+    /// The connection in words; while the tab knows it is offline it says so, never that changes can be saved.
+    let connectionText (m: Model) =
+        match m.Network, m.Connection with
+        | NetworkState.Offline, (Connected _ | Connecting _ | Reauthenticating) -> "Offline: changes stay in this tab until the connection returns."
+        | _ -> Connection.describe m.Connection
+
     let administrationView (s: AdapterState) : AdministrationView =
         let connected = s.Model.Context |> Option.map (fun c -> sprintf "%s/%s on %s" c.Repository.Owner c.Repository.Name c.Repository.Branch)
         { Provider = { Label = "Persistence provider"; Status = FactKnown "GitHub" }
           Repository = (match connected with Some r -> { Label = "Data repository"; Status = FactKnown r } | None -> unknownFact "Data repository")
-          Connection = { Label = "Connection"; Status = FactKnown(Connection.describe s.Model.Connection) }
+          Connection = { Label = "Connection"; Status = FactKnown(connectionText s.Model) }
           Catalog = unknownFact "Investigation catalog"
           StorageContract = unknownFact "Storage contract"
           ApplicationVersion = unknownFact "Application version"
@@ -1000,7 +1011,7 @@ module UiAdapter =
                 Scope = SessionScope
                 Options = [ "Most recently updated"; "Title" ]
                 Effective = "Most recently updated" } ]
-          ConnectionPreference = { Label = "Data repository connection"; Status = FactKnown(Connection.describe s.Model.Connection) } }
+          ConnectionPreference = { Label = "Data repository connection"; Status = FactKnown(connectionText s.Model) } }
 
     let project (config: AdapterConfig) (s: AdapterState) : AppView =
         let screen =

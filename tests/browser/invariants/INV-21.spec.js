@@ -83,7 +83,8 @@ test('no credential in storage, URL or artifact', async ({ page, context }) => {
   const owner = page.getByLabel(/owner/i).first();
   if (!(await owner.isVisible().catch(() => false))) await connectAction.click();
   await page.getByLabel(/owner/i).first().fill(REPO.owner);
-  await page.getByLabel(/^repository$|repository name|^repo/i).first().fill(REPO.repo);
+  // Exactly "Repository": a pattern also matches "Repository owner", which would leave the repository empty.
+  await page.getByLabel('Repository', { exact: true }).fill(REPO.repo);
   await page.getByLabel(/branch/i).first().fill(REPO.branch);
   await page.getByLabel(/token|credential/i).first().fill(TOKEN);
   await page.getByRole('button', { name: /connect/i }).first().click();

@@ -1,2 +1,4 @@
 /* Owner: ui (T16). not-found. Forma tokens only. */
 .causa-not-found .ef-empty-state { max-inline-size: var(--ef-layout-measure); }
+/* The way back is a full-size tap target (FL-01): at least 44 px tall. */
+.causa-not-found__home { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); }

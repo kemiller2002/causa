@@ -184,3 +184,109 @@ test('at 390 px a working copy records a cause, a corrective action for it and a
   await fresh.context.close();
   await context.close();
 });
+
+// Task 2: a Confirmed cause conclusion entirely in the app. Hypothesis, supporting evidence, Mark plausible then Mark
+// supported (with the evidence), a cause for it, Confirm cause, and a conclusion of strength Confirmed cause naming it;
+// Save, and a fresh context reads the states and the conclusion back.
+test('at 390 px a hypothesis is marked supported, its cause confirmed, and a Confirmed cause conclusion names it after a reload', async ({ browser }) => {
+  const { context, page, errors } = await connected(browser, PHONE);
+  const tag = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const status = (p) => p.getByRole('status', { name: /save state/i }).first();
+  const title = `cc-title-${tag}`, hyp = `cc-hyp-${tag}`, label = `cc-ev-${tag}`, outcome = `cc-outcome-${tag}`;
+  const conclusion = `cc-conclusion-${tag}`, residual = `cc-residual-${tag}`;
+
+  await page.getByRole('link', { name: /new investigation/i }).first().click();
+  await page.getByLabel('Problem statement', { exact: true }).fill(`cc-problem-${tag}`);
+  await page.getByLabel('Title', { exact: true }).fill(title);
+  await page.getByLabel('Primary investigative question', { exact: true }).fill(`cc-question-${tag}`);
+  await page.getByRole('button', { name: 'Start investigation', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(status(page)).toHaveText(/^\s*Saved\s*$/, { timeout: 20000 });
+
+  // A hypothesis and evidence supporting it.
+  await openSection(page, 'Hypotheses');
+  await page.getByLabel('Hypothesis statement', { exact: true }).fill(hyp);
+  await page.getByRole('button', { name: 'Record a hypothesis', exact: true }).click();
+  const hcard = page.getByRole('article').filter({ hasText: hyp });
+  await expect(hcard).toContainText('Proposed');
+  // Proposed: Mark plausible is offered, Mark supported is not (the kernel's table), Falsify waits for evidence.
+  await expect(hcard.getByRole('button', { name: 'Mark plausible', exact: true })).toBeEnabled();
+  await expect(hcard.getByRole('button', { name: 'Mark supported', exact: true })).toHaveCount(0);
+  await expect(hcard.getByRole('button', { name: 'Falsify', exact: true })).toBeDisabled();
+  await expect(hcard).toContainText('Falsify: Falsifying a hypothesis must cite the evidence that caused it (R2.3).');
+  await openSection(page, 'Evidence');
+  await page.getByLabel('Evidence label', { exact: true }).fill(label);
+  await page.getByLabel('Evidence original content', { exact: true }).fill(`cc-content-${tag}`);
+  await page.getByLabel('Evidence source reference', { exact: true }).fill(`cc-src-${tag}`);
+  await page.getByRole('group', { name: 'Evidence category' }).getByRole('radio', { name: 'Measurement', exact: true }).check();
+  await page.getByRole('button', { name: 'Record evidence', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Evidence', exact: true }).selectOption({ label });
+  await page.getByRole('combobox', { name: 'Hypothesis', exact: true }).selectOption({ label: hyp });
+  await page.getByRole('group', { name: 'Evidence relationship kind' }).getByLabel('supports', { exact: true }).check();
+  await page.getByLabel('Evidence relationship rationale', { exact: true }).fill(`cc-why-${tag}`);
+  await page.getByRole('button', { name: 'Link evidence to a hypothesis', exact: true }).click();
+  await expect(page.getByRole('article').filter({ hasText: label })).toContainText(`supports “${hyp}”`);
+
+  // Mark plausible, then Mark supported with the evidence.
+  await openSection(page, 'Hypotheses');
+  await hcard.getByRole('button', { name: 'Mark plausible', exact: true }).click();
+  await expect(page.getByRole('heading', { name: `Mark plausible: “${hyp}”` })).toBeVisible();
+  await page.getByLabel('Reason for the change', { exact: true }).fill(`cc-plausible-${tag}`);
+  await page.getByRole('button', { name: 'Record status change', exact: true }).click();
+  await expect(hcard).toContainText('Plausible');
+  await hcard.getByRole('button', { name: 'Mark supported', exact: true }).click();
+  await page.getByLabel('Reason for the change', { exact: true }).fill(`cc-supported-${tag}`);
+  // Without evidence the kernel refuses, in its own words, and nothing changes.
+  await page.getByRole('button', { name: 'Record status change', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Marking a hypothesis supported must cite the evidence that caused it (R2.3).' })).toBeVisible();
+  await expect(hcard).toContainText('Plausible');
+  await page.getByRole('combobox', { name: 'Evidence for the change', exact: true }).selectOption({ label });
+  await phoneLayout(page, 'status editor');
+  await page.getByRole('button', { name: 'Record status change', exact: true }).click();
+  await expect(hcard.locator('.causa-tag')).toHaveText('Supported');
+  await expect(page.getByRole('status').filter({ hasText: /Recorded status changes are listed on each hypothesis card above\..*not saved yet/ })).toBeVisible();
+
+  // A cause for it, then Confirm cause.
+  await openSection(page, 'Causal Analysis');
+  await page.getByLabel('Outcome it explains', { exact: true }).fill(outcome);
+  await page.getByRole('combobox', { name: 'Hypothesis', exact: true }).selectOption({ label: hyp });
+  await page.getByRole('group', { name: 'Cause role' }).getByRole('radio', { name: 'Root cause', exact: true }).check();
+  await page.getByRole('button', { name: 'Record a cause', exact: true }).click();
+  const causeCard = page.getByRole('article').filter({ hasText: outcome });
+  await expect(causeCard).toContainText('Proposed');
+  const confirm = causeCard.getByRole('button', { name: 'Confirm cause', exact: true });
+  await expect(confirm).toBeEnabled();
+  await phoneLayout(page, 'cause card');
+  await confirm.click();
+  await expect(causeCard.locator('.causa-tag')).toHaveText('Confirmed');
+  await expect(causeCard.getByRole('button', { name: 'Confirm cause', exact: true })).toHaveCount(0);
+
+  // A Confirmed cause conclusion naming the cause.
+  await openSection(page, 'Overview');
+  await page.getByLabel('Conclusion statement', { exact: true }).fill(conclusion);
+  await page.getByRole('group', { name: 'Conclusion strength' }).getByRole('radio', { name: 'Confirmed cause', exact: true }).check();
+  await page.getByLabel('Residual uncertainty', { exact: true }).fill(residual);
+  await page.getByRole('group', { name: 'Causes this conclusion names' }).getByRole('button', { name: outcome, exact: true }).click();
+  await page.getByRole('button', { name: 'Record a conclusion', exact: true }).click();
+  const conclusionCard = page.locator('li.causa-item--conclusion').filter({ hasText: conclusion });
+  await expect(conclusionCard).toContainText('Confirmed cause');
+  await expect(conclusionCard).toContainText(`Causes it names: “${outcome}”`);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(status(page)).toHaveText(/^\s*Saved\s*$/, { timeout: 30000 });
+
+  // A fresh context reads it all back.
+  const fresh = await connected(browser, PHONE);
+  await fresh.page.getByRole('link', { name: title }).click();
+  const back = fresh.page.locator('li.causa-item--conclusion').filter({ hasText: conclusion });
+  await expect(back).toBeVisible({ timeout: 30000 });
+  await expect(back).toContainText('Confirmed cause');
+  await expect(back).toContainText(`Causes it names: “${outcome}”`);
+  await openSection(fresh.page, 'Hypotheses');
+  await expect(fresh.page.getByRole('article').filter({ hasText: hyp }).locator('.causa-tag')).toHaveText('Supported');
+  await openSection(fresh.page, 'Causal Analysis');
+  await expect(fresh.page.getByRole('article').filter({ hasText: outcome }).locator('.causa-tag')).toHaveText('Confirmed');
+  expect(await overflow(fresh.page), 'horizontal overflow at 390 px (Causal Analysis, reopened)').toBeLessThanOrEqual(0);
+  expect([...errors, ...fresh.errors], 'page errors').toEqual([]);
+  await fresh.context.close();
+  await context.close();
+});

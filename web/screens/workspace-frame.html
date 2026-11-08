@@ -43,30 +43,27 @@
             <template data-if="save.retry-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-RETRY">Retry</button></template>
             <template data-if="save.check-again-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-CHECK-AGAIN">Check again</button></template>
             <template data-if="save.reconnect-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-RECONNECT">Reconnect</button></template>
-            <!-- Discard unsaved changes: always opens its dialog (a declared invoker, Forma's dialog pattern); the dialog
-                 says what would be discarded, or why there is nothing to discard now. -->
-            <button class="ef-button causa-save__discard" type="button" commandfor="causa-discard-dialog" command="show-modal" aria-haspopup="dialog">Discard unsaved changes</button>
-            <dialog class="ef-dialog causa-discard" id="causa-discard-dialog" aria-labelledby="causa-discard-title" aria-describedby="causa-discard-description">
+            <!-- About saving: a save-state dialog that always opens (a declared invoker, Forma's dialog pattern) and says
+                 what the current state means for this tab's changes. It offers nothing destructive (PERSIST-024-O4). -->
+            <button class="ef-button causa-save__about" type="button" commandfor="causa-save-dialog" command="show-modal" aria-haspopup="dialog">About saving</button>
+            <dialog class="ef-dialog causa-save-dialog" id="causa-save-dialog" aria-labelledby="causa-save-dialog-title" aria-describedby="causa-save-dialog-description">
               <div class="ef-dialog__body ef-stack">
-                <h2 class="causa-discard__title" id="causa-discard-title" data-text="save.discard-title"></h2>
-                <p id="causa-discard-description" data-text="save.discard-explanation"></p>
+                <h2 class="causa-save-dialog__title" id="causa-save-dialog-title" data-text="save.dialog-title"></h2>
+                <p id="causa-save-dialog-description" data-text="save.dialog-explanation"></p>
+                <template data-if="save.last-saved-present"><p>Last saved: <span data-text="save.last-saved"></span></p></template>
                 <template data-if="save.not-saved-present">
-                  <ul class="causa-discard__list">
-                    <template data-each="save.not-saved" data-key="key"><li data-text="title"></li></template>
-                  </ul>
+                  <div class="ef-stack">
+                    <p>Investigations in this tab with changes not saved yet:</p>
+                    <ul class="causa-save-dialog__list">
+                      <template data-each="save.not-saved" data-key="key"><li data-text="title"></li></template>
+                    </ul>
+                  </div>
                 </template>
+                <p>Unsaved changes exist only in this tab. Saving writes them to your data repository, and Causa says Saved only after reading them back.</p>
               </div>
-              <template data-if="save.discard-possible">
-                <div class="ef-dialog__actions ef-cluster">
-                  <button class="ef-button causa-action-primary" type="button" commandfor="causa-discard-dialog" command="close">Keep my changes</button>
-                  <button class="ef-button" type="button" commandfor="causa-discard-dialog" command="close" data-event="UIA-DISCARD-UNSAVED">Discard changes</button>
-                </div>
-              </template>
-              <template data-if="save.discard-nothing">
-                <div class="ef-dialog__actions ef-cluster">
-                  <button class="ef-button causa-action-primary" type="button" commandfor="causa-discard-dialog" command="close">Close</button>
-                </div>
-              </template>
+              <div class="ef-dialog__actions ef-cluster">
+                <button class="ef-button causa-action-primary" type="button" commandfor="causa-save-dialog" command="close">Close</button>
+              </div>
             </dialog>
           </div>
         </template>

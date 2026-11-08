@@ -162,23 +162,18 @@ module SaveDialogAndOfflineTests =
         | other -> failwithf "%s is %A" key other
 
     [<Fact>]
-    let ``the Discard dialog offers Discard only while the tab holds unsaved changes, and otherwise says why`` () =
+    let ``the save-state dialog explains every state, with its word, and offers nothing destructive`` () =
         let all = [ SavedKind; UnsavedKind; SavingKind; OfflineKind; ConflictKind; UnknownOutcomeKind; SaveFailedKind ]
         for kind in all do
             let b = SaveIndicator.bindings (Some(save kind))
-            let possible = List.contains kind [ UnsavedKind; OfflineKind; SaveFailedKind ]
-            Assert.Equal(possible, flag b "save.discard-possible")
-            Assert.Equal(not possible, flag b "save.discard-nothing")
-            // Every state has a heading and an explanation: the invoker always opens a dialog that says something.
-            Assert.NotEqual<string>("", text b "save.discard-title")
-            Assert.NotEqual<string>("", text b "save.discard-explanation")
-        let saved = SaveIndicator.bindings (Some(save SavedKind))
-        Assert.Equal("Nothing to discard", text saved "save.discard-title")
-        Assert.Equal("Discard unsaved changes?", text (SaveIndicator.bindings (Some(save UnsavedKind))) "save.discard-title")
-        Assert.Contains("Review", text (SaveIndicator.bindings (Some(save ConflictKind))) "save.discard-explanation")
+            let word, _, _ = Language.saveState kind
+            Assert.Equal(sprintf "Save state: %s" word, text b "save.dialog-title")
+            Assert.NotEqual<string>("", text b "save.dialog-explanation")
+        Assert.Equal("Every change in this investigation is saved in your data repository.", text (SaveIndicator.bindings (Some(save SavedKind))) "save.dialog-explanation")
+        Assert.Contains("Review", text (SaveIndicator.bindings (Some(save ConflictKind))) "save.dialog-explanation")
 
     [<Fact>]
-    let ``the fragment declares the Discard dialog's invoker and the dialog reads only written bindings`` () =
+    let ``the fragment declares the save-state dialog's invoker, offers no discard and reads only written bindings`` () =
         let rec up (dir: DirectoryInfo | null) =
             match dir with
             | null -> failwith "repository root not found"
@@ -186,15 +181,16 @@ module SaveDialogAndOfflineTests =
             | d -> up d.Parent
         let html = File.ReadAllText(Path.Combine(up (DirectoryInfo AppContext.BaseDirectory), "web", "screens", "workspace-frame.html"))
         // Always enabled, always opening the dialog (Forma's dialog pattern: commandfor + show-modal).
-        Assert.Contains("type=\"button\" commandfor=\"causa-discard-dialog\" command=\"show-modal\" aria-haspopup=\"dialog\">Discard unsaved changes</button>", html)
-        Assert.Contains("<dialog class=\"ef-dialog causa-discard\" id=\"causa-discard-dialog\"", html)
-        Assert.Contains("data-event=\"UIA-DISCARD-UNSAVED\">Discard changes</button>", html)
+        Assert.Contains("type=\"button\" commandfor=\"causa-save-dialog\" command=\"show-modal\" aria-haspopup=\"dialog\">About saving</button>", html)
+        Assert.Contains("<dialog class=\"ef-dialog causa-save-dialog\" id=\"causa-save-dialog\"", html)
+        // PERSIST-024-O4: Discard only in a conflict, on request; no button here names it.
+        Assert.DoesNotMatch("(?i)<button[^>]*>[^<]*discard", html)
         let written = SaveIndicator.bindings (Some(save UnsavedKind)) |> Map.toList |> List.map fst |> Set.ofList
         let read =
-            Text.RegularExpressions.Regex.Matches(html, "data-(?:text|if|each|bind-[a-z-]+)=\"(save\\.discard[a-z-]*)\"")
+            Text.RegularExpressions.Regex.Matches(html, "data-(?:text|if|each|bind-[a-z-]+)=\"(save\\.[a-z.-]+)\"")
             |> Seq.map (fun m -> m.Groups.[1].Value)
             |> Set.ofSeq
-        Assert.NotEmpty(read)
+        Assert.Contains("save.dialog-title", read)
         Assert.Empty(Set.difference read written)
 
     let private connection offline =

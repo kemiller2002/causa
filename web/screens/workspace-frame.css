@@ -207,7 +207,12 @@ details[open] > .causa-focus__summary::before { content: "▾"; }
 .causa-save__state,
 .causa-workspace__title .causa-copy-kind,
 .causa-workspace__title .causa-copy-kind .ef-badge { font-size: var(--ef-type-size-small); }
-/* Discard unsaved changes: Forma's dialog, sized for a phone, with full-size actions. */
-.causa-discard__title { margin: 0; font-size: var(--ef-type-size-h3); }
-.causa-discard__list { margin: 0; padding-inline-start: var(--ef-layout-stack-space); }
-.causa-discard .ef-button, .causa-save__discard { min-block-size: var(--ef-layout-target-min); }
+/* About saving: Forma's dialog with full-size actions. */
+.causa-save-dialog__title { margin: 0; font-size: var(--ef-type-size-h3); }
+.causa-save-dialog__list { margin: 0; padding-inline-start: var(--ef-layout-stack-space); }
+.causa-save-dialog .ef-button, .causa-save__about { min-block-size: var(--ef-layout-target-min); }
+/* Keyboard focus is never left under the sticky masthead (WCAG 2.4.11). Forma scrolls the page smoothly, and that
+   includes the scroll that brings a newly focused control into view: for the length of the animation the control
+   sits under the masthead or off screen (seen on the workspace header's controls after a dialog closes). In a
+   workspace the page scrolls to the focused control at once. */
+html:has(.causa-workspace) { scroll-behavior: auto; }

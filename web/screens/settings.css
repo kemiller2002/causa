@@ -1,0 +1,8 @@
+/* Owner: ui (T16). Settings. Forma tokens only. */
+.causa-preferences { list-style: none; padding: 0; margin: 0; max-inline-size: var(--ef-layout-measure); }
+.causa-preference__control { display: block; min-block-size: var(--ef-layout-target-min); min-inline-size: 12rem; max-inline-size: 100%; }
+/* WebKit draws a native select's focus ring that measured 1.04:1 against the surface; use Forma's ring (FL-04). */
+.causa-preference__control:focus-visible {
+  outline: var(--ef-focus-ring-width) solid var(--ef-color-focus-ring);
+  outline-offset: var(--ef-focus-ring-offset);
+}

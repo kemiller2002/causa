@@ -312,7 +312,10 @@ type ConnectionView =
       Disconnect: Availability
       /// "owner/repository on branch", shown after Connect (UI-022: not in the global header as a commit hash).
       Connected: string option
-      WriteScope: WriteScope }
+      WriteScope: WriteScope
+      /// The tab knows it is offline (Model.Network = Offline): saves send nothing until the connection returns.
+      /// Additive, approved by the coordinator after the competition (PERSIST-017, PERSIST-018).
+      Offline: bool }
 
 // -- InvestigationList.fs --
 
@@ -442,11 +445,14 @@ type DetailsEditorView =
     { Open: bool
       Form: DetailsForm
       Errors: ValidationError list
-      /// INV-034 is offered only where the engine authorizes it (UI-004); under causa-data v1.0.0 there is no rename
-      /// event (DATA-REPOSITORY-CONTRACT C5), so a real backend reports Unavailable until ODR-R10-26 is decided.
+      /// INV-034 is offered only where the engine authorizes it (UI-004): an open working copy stored in
+      /// causa-storage 1.2.0 (InvestigationTitleRevised, UnknownRevised). An older investigation stays in its version,
+      /// so the edit is Unavailable there with that reason (CAUSA.UNREPRESENTABLE).
       Edit: Availability
       SaveDetails: Availability
-      Cancel: Availability }
+      Cancel: Availability
+      /// After Save details, while the change is not saved yet: what happened and what keeps it ("" otherwise).
+      Status: string }
 
 // ---- Save-state presentation (INV-015, INV-016, INV-043, UI-006, PERSIST-030..033) ------------------------------------
 

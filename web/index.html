@@ -33,14 +33,18 @@
         <!-- Forma navigation shell (FL-09, CR-4 from T16): below 48rem the compact disclosure shows and the persistent
              list hides; above 48rem the reverse. Both carry the same three links and bindings. -->
         <div class="ef-navigation-shell causa-primary-shell">
-          <details class="ef-navigation-shell__compact">
-            <summary>Menu</summary>
-            <nav class="causa-primary" aria-label="Primary" data-requirement-id="INV-041">
-            <a href="#/" data-bind-aria-current="nav.investigations.current">Investigations</a>
-            <a href="#/administration" data-bind-aria-current="nav.administration.current">Administration</a>
-            <a href="#/settings" data-bind-aria-current="nav.settings.current">Settings</a>
-            </nav>
-          </details>
+          <!-- The compact copy's landmark wraps the disclosure, so the primary navigation is a landmark at every width
+               even while the Menu is closed (UI-011-O1). -->
+          <nav class="causa-primary-compact" aria-label="Primary" data-requirement-id="INV-041">
+            <details class="ef-navigation-shell__compact">
+              <summary>Menu</summary>
+              <div class="causa-primary">
+              <a href="#/" data-bind-aria-current="nav.investigations.current">Investigations</a>
+              <a href="#/administration" data-bind-aria-current="nav.administration.current">Administration</a>
+              <a href="#/settings" data-bind-aria-current="nav.settings.current">Settings</a>
+              </div>
+            </details>
+          </nav>
           <nav class="ef-navigation-shell__persistent causa-primary" aria-label="Primary">
             <a href="#/" data-bind-aria-current="nav.investigations.current">Investigations</a>
             <a href="#/administration" data-bind-aria-current="nav.administration.current">Administration</a>
@@ -80,9 +84,28 @@
     </aside>
 
     <main class="causa-main" id="causa-main" tabindex="-1" hidden>
+      <!-- The deployed test build's injected connection did not connect: what happened and a safe next step (UI-010).
+           The Connect form stays available below. -->
+      <template data-if="deploy.failed">
+        <aside class="ef-alert ef-fault-banner causa-deploy-fault" role="alert" data-ef-intent="banner" data-ef-severity="warning" aria-labelledby="causa-deploy-fault-title">
+          <div class="ef-fault-banner__body">
+            <h2 class="ef-alert__title" id="causa-deploy-fault-title">Not connected</h2>
+            <p data-text="deploy.failure-text"></p>
+            <p>Nothing was changed. You can also connect with the form below.</p>
+          </div>
+          <div class="ef-recovery-actions" role="group" aria-label="Recovery actions">
+            <button type="button" class="ef-button" data-event="UIA-DEPLOY-RETRY">Try again</button>
+          </div>
+        </aside>
+      </template>
       <!-- causa:screens -->
     </main>
 
+    <!-- Browser mechanism only (web/boundary.js): connectivity and the timer tick go to the engine as events; the
+         unsaved flag drives the leave warning and the Disconnect confirmation (PERSIST-018, -019). -->
+    <input type="hidden" id="causa-connectivity" data-on="change" data-event="UIA-CONNECTIVITY">
+    <input type="hidden" id="causa-tick" data-on="change" data-event="UIA-TICK">
+    <input type="hidden" id="causa-unsaved" data-bind-value="shell.unsaved" value="false">
     <p class="ef-visually-hidden" id="causa-live-polite" aria-live="polite" data-text="announce.polite"></p>
     <p class="ef-visually-hidden" id="causa-live-assertive" aria-live="assertive" data-text="announce.assertive"></p>
   </div>

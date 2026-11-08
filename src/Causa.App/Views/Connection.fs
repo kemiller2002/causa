@@ -33,6 +33,8 @@ module ConnectionScreen =
         | Writable -> "This token can save changes"
         | WriteScopeUnknown -> ""
 
+    let offlineText = "Offline: changes stay in this tab until the connection returns."
+
     let bindings (view: ConnectionView) : Bindings =
         let connected =
             match view.State with
@@ -56,4 +58,8 @@ module ConnectionScreen =
               Bind.flag "connection.connect-disabled" (not (enabled view.Connect))
               Bind.flag "connection.disconnect-offered" (offered view.Disconnect)
               Bind.text "connection.connected-to" (view.Connected |> Option.defaultValue "")
-              Bind.text "connection.write-scope" (writeScope view.WriteScope) ]
+              Bind.text "connection.write-scope" (writeScope view.WriteScope)
+              // While the tab knows it is offline the line never says changes can be saved (Administration's wording).
+              Bind.flag "connection.online" (connected && not view.Offline)
+              Bind.flag "connection.offline" (connected && view.Offline)
+              Bind.text "connection.offline-text" offlineText ]

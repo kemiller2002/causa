@@ -106,6 +106,12 @@ module Copy =
               Preserved = preservedNothingChanged
               NextStep = "Try again. If it keeps happening, see Administration."
               Retry = true }
+        // Unavailable because the tab is offline: say so first, not "not available yet" (nothing is missing from Causa).
+        | UiFailure.CapabilityAbsent(_, because) when because.Contains("offline", System.StringComparison.OrdinalIgnoreCase) ->
+            { What = "You are offline: " + because
+              Preserved = preservedNothingChanged
+              NextStep = "Changes you have not saved stay in this tab. When the connection returns, open it again or go back to Investigations."
+              Retry = false }
         | UiFailure.CapabilityAbsent(_, because) ->
             { What = "This view is not available yet: " + because
               Preserved = preservedNothingChanged

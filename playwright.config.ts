@@ -14,6 +14,11 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: 0,
+  // A test that sets no timeout of its own fails after a minute, so a broken app fails fast.
+  timeout: 60_000,
+  // CAUSA_EXCLUDE_LIVE_BROWSER=1 (Build and test) leaves out tests/browser/live: those specs need the live test
+  // repository's credentials and run in the Verification gate, which has them.
+  testIgnore: process.env.CAUSA_EXCLUDE_LIVE_BROWSER === "1" ? ["**/live/**"] : [],
   // The governed gate reads Playwright's JSON results from $CAUSA_PLAYWRIGHT_JSON (catalog acceptance); locally, list.
   reporter: process.env.CAUSA_PLAYWRIGHT_JSON
     ? [["list"], ["json", { outputFile: process.env.CAUSA_PLAYWRIGHT_JSON }]]

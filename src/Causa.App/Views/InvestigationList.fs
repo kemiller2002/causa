@@ -17,6 +17,16 @@ module InvestigationListScreen =
         | Some(AsProjected u) -> Some(Understood.value u)
         | None -> None
 
+    /// Forma's status-lozenge state for a lifecycle word (components.css: ok, attention, unknown, blocked). The word is
+    /// always the lozenge's text, so the state is never told by colour alone (UI-016-O13).
+    let lifecycleState (word: string) =
+        match word.Trim().ToLowerInvariant() with
+        | "resolved"
+        | "closed" -> "ok"
+        | "awaiting evidence"
+        | "awaiting verification" -> "attention"
+        | _ -> "unknown"
+
     let private copyKey kind =
         match kind with
         | FrozenDemonstration -> "frozen"
@@ -40,6 +50,12 @@ module InvestigationListScreen =
                 Bind.cellText "copyKind" (copyKey i.Copy)
                 Bind.cellFlag "frozen" (i.Copy = FrozenDemonstration)
                 Bind.cellText "status" (shownText i.Status)
+                Bind.cellFlag "statusKnown" i.Status.IsSome
+                Bind.cellText "statusState" (i.Status |> Option.map (fun _ -> lifecycleState (shownText i.Status)) |> Option.defaultValue "unknown")
+                Bind.cellFlag "statusUnknown" i.Status.IsNone
+                Bind.cellFlag "lastActivityKnown" i.LastActivity.IsSome
+                Bind.cellFlag "lastActivityUnknown" i.LastActivity.IsNone
+                Bind.cellText "lastActivityIso" (i.LastActivity |> Option.map (fun d -> d.ToUniversalTime().ToString "o") |> Option.defaultValue "")
                 Bind.cellText "lastActivity" (Copy.dateOption i.LastActivity)
                 Bind.cellText "hypotheses" (count (fun x -> x.Hypotheses))
                 Bind.cellText "evidence" (count (fun x -> x.Evidence))

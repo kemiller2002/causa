@@ -1,0 +1,784 @@
+<!-- Owner: ui-2 (WI-INV-WORKSPACE, reassigned). investigation-workspace (#/investigations/{id}): the record header with
+     the investigation's title, its save state (Forma status lozenge with the state's word; INV-016, INV-043) and Save
+     (INV-015); the investigation sections the backend lists (INV-042); identifier, creation time (INV-007) and state
+     (INV-018); the original problem statement (INV-008) and the primary investigative question (INV-023), as entered.
+     Bindings: Views/Workspace/Frame.fs, Views/SaveIndicator.fs, Views/Workspace/StoredRecord.fs. -->
+<template data-if="screen.investigation-workspace">
+  <div class="ef-container ef-stack causa-screen causa-workspace" data-screen="investigation-workspace">
+
+    <template data-if="workspace.frame-absent">
+      <h1 class="causa-screen__title" data-text="shell.heading"></h1>
+    </template>
+
+    <template data-if="workspace.loading">
+      <p class="causa-loading" role="status"><span class="ef-spinner" aria-hidden="true"></span> <span data-text="workspace.loading-text"></span></p>
+    </template>
+
+    <template data-if="workspace.failed">
+      <div class="ef-alert ef-fault-inline causa-failure causa-workspace__failure" role="alert">
+        <div class="ef-stack causa-workspace__failure-body">
+          <p class="ef-alert__title" data-text="workspace.failure-what"></p>
+          <p data-text="workspace.failure-preserved"></p>
+          <p data-text="workspace.failure-next"></p>
+          <template data-if="workspace.retry-offered"><button class="ef-button" type="button" data-event="UIA-RETRY-LOAD">Try again</button></template>
+        </div>
+      </div>
+    </template>
+
+    <template data-if="workspace.frame-present">
+      <div class="ef-stack causa-workspace__body">
+      <header class="ef-record-header causa-workspace__header">
+        <div class="ef-record-header__main">
+          <div class="causa-workspace__title">
+            <p class="ef-record-header__type causa-copy-kind" data-bind-data-copy="workspace.copy-kind"><span class="ef-badge" data-text="workspace.copy-tag"></span> <span data-text="workspace.copy"></span></p>
+            <h1 class="causa-screen__title" data-text="workspace.title"></h1>
+          </div>
+        </div>
+        <template data-if="save.present">
+          <div class="ef-record-header__actions ef-cluster causa-save" data-requirement-id="INV-043">
+            <p class="ef-status-lozenge causa-save__state" role="status" aria-label="Save state" aria-describedby="causa-save-explanation" data-requirement-id="INV-016" data-bind-data-state="save.state" data-text="save.label"></p>
+            <template data-if="save.offered">
+              <button class="ef-button causa-action-primary" type="button" data-requirement-id="INV-015" data-event="INV-015" data-bind-disabled="save.disabled">Save</button>
+            </template>
+            <template data-if="save.retry-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-RETRY">Retry</button></template>
+            <template data-if="save.check-again-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-CHECK-AGAIN">Check again</button></template>
+            <template data-if="save.reconnect-offered"><button class="ef-button" type="button" data-event="UIA-SAVE-RECONNECT">Reconnect</button></template>
+            <!-- About saving: a save-state dialog that always opens (a declared invoker, Forma's dialog pattern) and says
+                 what the current state means for this tab's changes. It offers nothing destructive (PERSIST-024-O4). -->
+            <button class="ef-button causa-save__about" type="button" commandfor="causa-save-dialog" command="show-modal" aria-haspopup="dialog">About saving</button>
+            <dialog class="ef-dialog causa-save-dialog" id="causa-save-dialog" aria-labelledby="causa-save-dialog-title" aria-describedby="causa-save-dialog-description">
+              <div class="ef-dialog__body ef-stack">
+                <h2 class="causa-save-dialog__title" id="causa-save-dialog-title" data-text="save.dialog-title"></h2>
+                <p id="causa-save-dialog-description" data-text="save.dialog-explanation"></p>
+                <template data-if="save.last-saved-present"><p>Last saved: <span data-text="save.last-saved"></span></p></template>
+                <template data-if="save.not-saved-present">
+                  <div class="ef-stack">
+                    <p>Investigations in this tab with changes not saved yet:</p>
+                    <ul class="causa-save-dialog__list">
+                      <template data-each="save.not-saved" data-key="key"><li data-text="title"></li></template>
+                    </ul>
+                  </div>
+                </template>
+                <p>Unsaved changes exist only in this tab. Saving writes them to your data repository, and Causa says Saved only after reading them back.</p>
+              </div>
+              <div class="ef-dialog__actions ef-cluster">
+                <button class="ef-button causa-action-primary" type="button" commandfor="causa-save-dialog" command="close">Close</button>
+              </div>
+            </dialog>
+          </div>
+        </template>
+      </header>
+
+      <template data-if="save.present">
+        <div class="ef-stack causa-save__details" id="causa-save-explanation">
+        <p class="causa-save__detail" data-text="save.text"></p>
+        <template data-if="save.last-saved-present"><p class="causa-save__detail">Last saved: <span data-text="save.last-saved"></span></p></template>
+        <template data-if="save.conflict-present"><p class="causa-save__detail" role="alert" data-text="save.conflict"></p></template>
+        <p class="causa-save__detail" data-text="save.unavailable"></p>
+        </div>
+      </template>
+
+      <template data-if="workspace.sections-present">
+        <nav class="causa-sections" aria-label="Investigation sections" data-requirement-id="INV-042">
+          <ul class="ef-cluster causa-sections__list">
+            <template data-each="workspace.sections" data-key="key">
+              <li><a class="causa-sections__link" data-bind-href="href" data-bind-aria-current="current" data-text="label"></a></li>
+            </template>
+          </ul>
+        </nav>
+      </template>
+
+      <template data-if="section.show-summary">
+      <div class="ef-stack causa-workspace__summary">
+      <dl class="ef-key-value-list causa-workspace__facts">
+        <div><dt>Investigation identifier</dt><dd class="causa-workspace__identifier" data-text="workspace.identifier"></dd></div>
+        <div><dt>Created</dt><dd data-requirement-id="INV-007" data-text="workspace.created"></dd></div>
+        <div><dt>State</dt><dd data-requirement-id="INV-018" data-text="workspace.state"></dd></div>
+      </dl>
+
+      <template data-if="details.closed">
+      <div class="ef-stack causa-details__summary">
+      <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-problem">
+        <h2 id="causa-ws-problem">Problem statement</h2>
+        <pre class="causa-verbatim" data-requirement-id="INV-008" data-text="workspace.problem"></pre>
+      </section>
+
+      <template data-if="workspace.question-present">
+        <section class="ef-section causa-panel causa-workspace__statement" aria-labelledby="causa-ws-question">
+          <h2 id="causa-ws-question">Primary investigative question</h2>
+          <pre class="causa-verbatim" data-requirement-id="INV-023" data-text="workspace.question"></pre>
+        </section>
+      </template>
+
+      <!-- Edit investigation details (INV-034): offered on an editable investigation stored in causa-storage 1.2.0;
+           on an older one it is shown unavailable with the reason. Bindings: Views/Workspace/Details.fs. -->
+      <template data-if="details.edit-offered">
+        <div class="ef-cluster causa-details__actions">
+          <button class="ef-button causa-details__edit" type="button" data-requirement-id="INV-034" data-event="INV-034">Edit details</button>
+        </div>
+      </template>
+      <template data-if="details.edit-explained">
+        <div class="ef-stack causa-details__unavailable">
+          <button class="ef-button causa-details__edit" type="button" data-requirement-id="INV-034" disabled aria-describedby="causa-details-unavailable">Edit details</button>
+          <p class="causa-item__note" id="causa-details-unavailable" data-text="details.edit-unavailable"></p>
+        </div>
+      </template>
+      <p class="causa-editor__status" role="status" data-text="details.status"></p>
+      </div>
+      </template>
+
+      <template data-if="details.open">
+      <form class="ef-form ef-stack causa-panel causa-editor causa-details" data-event="UIA-SAVE-DETAILS" novalidate aria-labelledby="causa-ed-details">
+        <h2 id="causa-ed-details" class="causa-section__subtitle">Edit investigation details</h2>
+        <p class="causa-item__note">The investigation identifier stays the same. Earlier text stays in the history.</p>
+        <template data-if="details.errors-present">
+          <div class="ef-validation-summary" role="alert" aria-labelledby="causa-details-errors-title">
+            <p class="ef-validation-summary__title" id="causa-details-errors-title">The details were not changed. Correct the following:</p>
+            <ul class="ef-validation-summary__list">
+              <template data-each="details.errors" data-key="key"><li data-text="message"></li></template>
+            </ul>
+          </div>
+        </template>
+        <div class="ef-field">
+          <label class="ef-field__label" for="causa-details-title">Title</label>
+          <p class="ef-field__description" id="causa-details-title-help">At most 200 characters.</p>
+          <input id="causa-details-title" type="text" autocomplete="off" aria-required="true"
+            aria-describedby="causa-details-title-help causa-details-title-error" data-bind-aria-invalid="details.title-aria-invalid"
+            data-requirement-id="UIF-DETAILS-TITLE" data-on="input" data-event="UIF-DETAILS-TITLE" data-bind-value="details.title">
+          <p class="ef-field__error causa-field-error" id="causa-details-title-error" data-text="details.title-error"></p>
+        </div>
+        <div class="ef-field">
+          <label class="ef-field__label" for="causa-details-problem">Problem statement</label>
+          <p class="ef-field__description" id="causa-details-problem-help">Required. Kept exactly as you write it.</p>
+          <textarea id="causa-details-problem" rows="6" aria-required="true"
+            aria-describedby="causa-details-problem-help causa-details-problem-error" data-bind-aria-invalid="details.problem-aria-invalid"
+            data-requirement-id="UIF-DETAILS-PROBLEM" data-on="input" data-event="UIF-DETAILS-PROBLEM" data-bind-value="details.problem"></textarea>
+          <p class="ef-field__error causa-field-error" id="causa-details-problem-error" data-text="details.problem-error"></p>
+        </div>
+        <div class="ef-field">
+          <label class="ef-field__label" for="causa-details-question">Primary investigative question</label>
+          <p class="ef-field__description" id="causa-details-question-help">The question this investigation should answer.</p>
+          <textarea id="causa-details-question" rows="3"
+            aria-describedby="causa-details-question-help causa-details-question-error" data-bind-aria-invalid="details.question-aria-invalid"
+            data-requirement-id="UIF-DETAILS-QUESTION" data-on="input" data-event="UIF-DETAILS-QUESTION" data-bind-value="details.question"></textarea>
+          <p class="ef-field__error causa-field-error" id="causa-details-question-error" data-text="details.question-error"></p>
+        </div>
+        <p class="causa-item__note">Save details records the change in this tab; select Save afterwards to keep it.</p>
+        <div class="ef-cluster causa-editor__actions">
+          <button class="ef-button causa-action-primary" type="submit" data-requirement-id="UIA-SAVE-DETAILS" data-bind-disabled="details.save-disabled">Save details</button>
+          <template data-if="details.cancel-offered">
+            <button class="ef-button" type="button" data-requirement-id="INV-036" data-event="INV-036">Cancel</button>
+          </template>
+        </div>
+      </form>
+      </template>
+      </div>
+      </template>
+      <!-- The section the route names (T22): read-only content from the domain engine's projection. -->
+      <template data-if="section.loading">
+        <p class="causa-loading" role="status"><span class="ef-spinner" aria-hidden="true"></span> <span data-text="section.loading-text"></span></p>
+      </template>
+      <template data-if="section.failed">
+        <div class="ef-alert ef-fault-inline causa-workspace__failure" role="alert">
+          <div class="ef-stack causa-workspace__failure-body">
+            <p class="ef-alert__title" data-text="section.failure-what"></p>
+            <p data-text="section.failure-preserved"></p>
+            <p data-text="section.failure-next"></p>
+          </div>
+        </div>
+      </template>
+
+      <template data-if="section.overview">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-overview">
+          <h2 id="causa-sec-overview" class="causa-section__title">Overview</h2>
+          <dl class="ef-facts causa-tally">
+            <div class="ef-facts__item"><dt>Hypotheses</dt><dd data-text="overview.hypotheses"></dd></div>
+            <div class="ef-facts__item"><dt>Evidence</dt><dd data-text="overview.evidence"></dd></div>
+            <div class="ef-facts__item"><dt>Assessments</dt><dd data-text="overview.relationships"></dd></div>
+            <div class="ef-facts__item"><dt>Conclusions</dt><dd data-text="overview.conclusions"></dd></div>
+            <div class="ef-facts__item"><dt>Unresolved contradictions</dt><dd data-text="overview.contradictions"></dd></div>
+          </dl>
+          <template data-if="conclusions.present">
+            <section class="ef-stack" aria-labelledby="causa-sec-conclusions">
+              <h3 id="causa-sec-conclusions" class="causa-section__subtitle">Conclusions</h3>
+              <ul class="ef-stack causa-list">
+                <template data-each="conclusions.items" data-key="key">
+                  <li class="ef-card causa-item causa-item--conclusion">
+                    <p class="causa-item__meta"><span class="ef-badge causa-tag" data-tone="positive" data-text="strength"></span></p>
+                    <pre class="causa-item__text" data-text="statement"></pre>
+                    <template data-if="hasResidual">
+                      <p class="causa-item__note"><strong>Residual uncertainty:</strong> <span data-text="residual"></span></p>
+                    </template>
+                  </li>
+                </template>
+              </ul>
+            </section>
+          </template>
+          <template data-if="overview.observations-present">
+            <section class="ef-stack" aria-labelledby="causa-sec-observations">
+              <h3 id="causa-sec-observations" class="causa-section__subtitle">Observations</h3>
+              <ul class="causa-list causa-list--compact">
+                <template data-each="overview.observations.items" data-key="key">
+                  <li class="causa-item">
+                    <pre class="causa-item__text" data-text="text"></pre>
+                    <template data-if="hasSource"><p class="causa-item__note">Source: <span data-text="source"></span></p></template>
+                  </li>
+                </template>
+              </ul>
+              <template data-if="overview.observations.more-present">
+                <details class="causa-more">
+                  <summary class="causa-more__toggle" data-text="overview.observations.more-label"></summary>
+                  <ul class="causa-list causa-list--compact">
+                <template data-each="overview.observations.more" data-key="key">
+                  <li class="causa-item">
+                    <pre class="causa-item__text" data-text="text"></pre>
+                    <template data-if="hasSource"><p class="causa-item__note">Source: <span data-text="source"></span></p></template>
+                  </li>
+                </template>
+              </ul>
+                </details>
+              </template>
+            </section>
+          </template>
+          <template data-if="editor.observation.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="INV-014" novalidate aria-labelledby="causa-ed-observation">
+            <h3 id="causa-ed-observation" class="causa-section__subtitle">Add an observation</h3>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-observation-text">Observation text</label>
+              <textarea id="causa-observation-text" rows="3" aria-required="true" data-on="input" data-event="INV-024" data-bind-value="editor.observation.text"></textarea>
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-observation-source">Observation source reference</label>
+              <p class="ef-field__description" id="causa-observation-source-help">Optional.</p>
+              <input id="causa-observation-source" autocomplete="off" aria-describedby="causa-observation-source-help" data-on="input" data-event="INV-025" data-bind-value="editor.observation.source">
+            </div>
+            <template data-if="editor.observation.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.observation.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.observation.unavailable"></p>
+            <p class="causa-editor__status" role="status" data-text="editor.observation.status"></p>
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.observation.disabled">Record an observation</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+          </form>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.hypotheses">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-hypotheses">
+          <h2 id="causa-sec-hypotheses" class="causa-section__title">Hypotheses</h2>
+          <template data-if="hypotheses.present">
+            <div class="ef-stack causa-section__body">
+            <ul class="ef-stack causa-list">
+              <template data-each="hypotheses.items" data-key="key">
+                <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="statement"></pre>
+                  <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
+                  <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
+                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
+                </article></li>
+              </template>
+            </ul>
+            <template data-if="hypotheses.more-present">
+              <details class="causa-more">
+                <summary class="causa-more__toggle" data-text="hypotheses.more-label"></summary>
+                <ul class="ef-stack causa-list">
+              <template data-each="hypotheses.more" data-key="key">
+                <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="statement"></pre>
+                  <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
+                  <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
+                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><pre class="causa-item__text" data-text="assessments"></pre></details></template>
+                </article></li>
+              </template>
+            </ul>
+              </details>
+            </template>
+            </div>
+          </template>
+          <template data-if="editor.hypothesis.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="INV-009" novalidate aria-labelledby="causa-ed-hypothesis">
+            <h3 id="causa-ed-hypothesis" class="causa-section__subtitle">Add a hypothesis</h3>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-hypothesis-statement">Hypothesis statement</label>
+              <textarea id="causa-hypothesis-statement" rows="3" aria-required="true" data-on="input" data-event="INV-026" data-bind-value="editor.hypothesis.statement"></textarea>
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-hypothesis-explanation">Hypothesis explanation</label>
+              <p class="ef-field__description" id="causa-hypothesis-explanation-help">Optional.</p>
+              <textarea id="causa-hypothesis-explanation" rows="3" aria-describedby="causa-hypothesis-explanation-help" data-on="input" data-event="INV-011" data-bind-value="editor.hypothesis.explanation"></textarea>
+            </div>
+            <template data-if="editor.hypothesis.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.hypothesis.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.hypothesis.unavailable"></p>
+            <p class="causa-editor__status" role="status" data-text="editor.hypothesis.status"></p>
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.hypothesis.disabled">Record a hypothesis</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+          </form>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.evidence">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-evidence">
+          <h2 id="causa-sec-evidence" class="causa-section__title">Evidence</h2>
+          <template data-if="evidence.present">
+            <div class="ef-stack causa-section__body">
+            <ul class="ef-stack causa-list">
+              <template data-each="evidence.items" data-key="key">
+                <li class="causa-list__entry"><article class="ef-card causa-item">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-text="category"></span></p>
+                  <h3 class="causa-item__title" data-text="label"></h3>
+                  <pre class="causa-item__text" data-text="content"></pre>
+                  <dl class="ef-key-value-list causa-item__facts">
+                    <div><dt>Source</dt><dd><span data-text="source"></span>
+                      <template data-if="hasUrl"><a class="causa-item__link" data-bind-href="url" rel="noopener noreferrer" target="_blank">Open source</a></template></dd></div>
+                    <div><dt>Captured</dt><dd data-text="captured"></dd></div>
+                    <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
+                  </dl>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><pre class="causa-item__text" data-text="assessments"></pre></div></template>
+                </article></li>
+              </template>
+            </ul>
+            <template data-if="evidence.more-present">
+              <details class="causa-more">
+                <summary class="causa-more__toggle" data-text="evidence.more-label"></summary>
+                <ul class="ef-stack causa-list">
+              <template data-each="evidence.more" data-key="key">
+                <li class="causa-list__entry"><article class="ef-card causa-item">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-text="category"></span></p>
+                  <h3 class="causa-item__title" data-text="label"></h3>
+                  <pre class="causa-item__text" data-text="content"></pre>
+                  <dl class="ef-key-value-list causa-item__facts">
+                    <div><dt>Source</dt><dd><span data-text="source"></span>
+                      <template data-if="hasUrl"><a class="causa-item__link" data-bind-href="url" rel="noopener noreferrer" target="_blank">Open source</a></template></dd></div>
+                    <div><dt>Captured</dt><dd data-text="captured"></dd></div>
+                    <div><dt>Bearing on hypotheses</dt><dd data-text="bearing"></dd></div>
+                  </dl>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>Assessments</strong></p><pre class="causa-item__text" data-text="assessments"></pre></div></template>
+                </article></li>
+              </template>
+            </ul>
+              </details>
+            </template>
+            </div>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.causal-analysis">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-causal">
+          <h2 id="causa-sec-causal" class="causa-section__title">Causal Analysis</h2>
+          <p class="causa-section__lead">How each piece of evidence bears on each hypothesis (the current assessment of every pair).</p>
+          <template data-if="focus.present">
+            <section class="ef-stack causa-focus" aria-labelledby="causa-focus-heading">
+              <h3 id="causa-focus-heading" class="causa-section__subtitle">By hypothesis</h3>
+              <p class="causa-section__lead">Each hypothesis with the evidence assessed against it, most supported first. A solid bar supports, a dashed bar contradicts, a dotted bar is another assessment.</p>
+              <ol class="causa-focus__list">
+              <template data-if="focus.p1.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details" open>
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p1.title"></span> <span class="causa-focus__counts" data-text="focus.p1.counts"></span></summary>
+                    <template data-if="focus.p1.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p1.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p2.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p2.title"></span> <span class="causa-focus__counts" data-text="focus.p2.counts"></span></summary>
+                    <template data-if="focus.p2.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p2.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p3.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p3.title"></span> <span class="causa-focus__counts" data-text="focus.p3.counts"></span></summary>
+                    <template data-if="focus.p3.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p3.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p4.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p4.title"></span> <span class="causa-focus__counts" data-text="focus.p4.counts"></span></summary>
+                    <template data-if="focus.p4.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p4.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p5.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p5.title"></span> <span class="causa-focus__counts" data-text="focus.p5.counts"></span></summary>
+                    <template data-if="focus.p5.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p5.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p6.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p6.title"></span> <span class="causa-focus__counts" data-text="focus.p6.counts"></span></summary>
+                    <template data-if="focus.p6.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p6.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p7.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p7.title"></span> <span class="causa-focus__counts" data-text="focus.p7.counts"></span></summary>
+                    <template data-if="focus.p7.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p7.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p8.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p8.title"></span> <span class="causa-focus__counts" data-text="focus.p8.counts"></span></summary>
+                    <template data-if="focus.p8.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p8.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p9.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p9.title"></span> <span class="causa-focus__counts" data-text="focus.p9.counts"></span></summary>
+                    <template data-if="focus.p9.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p9.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p10.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p10.title"></span> <span class="causa-focus__counts" data-text="focus.p10.counts"></span></summary>
+                    <template data-if="focus.p10.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p10.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p11.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p11.title"></span> <span class="causa-focus__counts" data-text="focus.p11.counts"></span></summary>
+                    <template data-if="focus.p11.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p11.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p12.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p12.title"></span> <span class="causa-focus__counts" data-text="focus.p12.counts"></span></summary>
+                    <template data-if="focus.p12.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p12.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p13.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p13.title"></span> <span class="causa-focus__counts" data-text="focus.p13.counts"></span></summary>
+                    <template data-if="focus.p13.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p13.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p14.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p14.title"></span> <span class="causa-focus__counts" data-text="focus.p14.counts"></span></summary>
+                    <template data-if="focus.p14.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p14.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p15.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p15.title"></span> <span class="causa-focus__counts" data-text="focus.p15.counts"></span></summary>
+                    <template data-if="focus.p15.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p15.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              <template data-if="focus.p16.present">
+                <li class="causa-focus__panel">
+                  <details class="causa-focus__details">
+                    <summary class="causa-focus__summary"><span class="causa-focus__title" data-text="focus.p16.title"></span> <span class="causa-focus__counts" data-text="focus.p16.counts"></span></summary>
+                    <template data-if="focus.p16.empty"><p class="causa-item__note">No evidence has been assessed against this hypothesis yet.</p></template>
+                    <ul class="causa-focus__cards">
+                      <template data-each="focus.p16.items" data-key="key">
+                        <li class="causa-focus__card" data-bind-data-kind="kind">
+                          <p class="causa-focus__word" data-text="word"></p>
+                          <p class="causa-focus__text" data-text="text"></p>
+                          <template data-if="long"><details class="causa-focus__full"><summary>Full text</summary><pre class="causa-item__text" data-text="text"></pre></details></template>
+                        </li>
+                      </template>
+                    </ul>
+                  </details>
+                </li>
+              </template>
+              </ol>
+              <template data-if="focus.more-present"><p class="causa-item__note" data-text="focus.more"></p></template>
+            </section>
+          </template>
+          <template data-if="graph.present">
+            <details class="causa-graph__full-view">
+            <summary class="causa-focus__summary">Show full graph</summary>
+            <figure class="causa-graph" data-requirement-id="UI-026">
+              <div class="causa-graph__scroll" role="region" aria-label="Causal graph, scrolls sideways" tabindex="0">
+                <div class="causa-graph__canvas">
+                  <svg class="causa-graph__sizer" role="img" data-bind-aria-label="graph.summary" data-bind-width="graph.width" data-bind-height="graph.height"></svg>
+                  <template data-each="graph.columns" data-key="key">
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><text class="causa-graph__heading" data-bind-x="x" data-bind-y="y" data-text="label"></text></svg></div>
+                  </template>
+                  <template data-each="graph.edges" data-key="key">
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><path data-bind-class="cls" data-bind-d="d"><title data-text="title"></title></path></svg></div>
+                  </template>
+                  <template data-each="graph.nodes" data-key="key">
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><g><title data-text="full"></title><rect data-bind-class="cls" data-bind-x="x" data-bind-y="y" data-bind-width="w" data-bind-height="h" rx="6"></rect><text class="causa-graph__label" data-bind-x="tx" data-bind-y="ty" data-text="label"></text></g></svg></div>
+                  </template>
+                  <template data-each="graph.labels" data-key="key">
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><text class="causa-graph__word" data-bind-x="x" data-bind-y="y" data-text="text"></text></svg></div>
+                  </template>
+                </div>
+              </div>
+              <figcaption class="causa-graph__caption">Evidence (left) bears on hypotheses (middle): a solid line supports, a dashed line contradicts, a dotted line is another assessment; each line carries its word. Every assessment is also listed below as text.</figcaption>
+            </figure>
+            </details>
+          </template>
+          <h3 class="causa-section__subtitle">Relationship index</h3>
+          <template data-if="relationships.present">
+            <div class="ef-stack causa-section__body">
+            <ul class="ef-stack causa-list">
+              <template data-each="relationships.items" data-key="key">
+                <li class="ef-card causa-item causa-relationship" data-bind-data-tone="tone">
+                  <p class="causa-item__text"><span class="causa-relationship__evidence" data-text="evidence"></span></p>
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="kind"></span></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="hypothesis"></pre>
+                  <template data-if="hasRationale"><p class="causa-item__note"><strong>Rationale:</strong> <span data-text="rationale"></span></p></template>
+                </li>
+              </template>
+            </ul>
+            <template data-if="relationships.more-present">
+              <details class="causa-more">
+                <summary class="causa-more__toggle" data-text="relationships.more-label"></summary>
+                <ul class="ef-stack causa-list">
+              <template data-each="relationships.more" data-key="key">
+                <li class="ef-card causa-item causa-relationship" data-bind-data-tone="tone">
+                  <p class="causa-item__text"><span class="causa-relationship__evidence" data-text="evidence"></span></p>
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="kind"></span></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="hypothesis"></pre>
+                  <template data-if="hasRationale"><p class="causa-item__note"><strong>Rationale:</strong> <span data-text="rationale"></span></p></template>
+                </li>
+              </template>
+            </ul>
+              </details>
+            </template>
+            </div>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.timeline">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-timeline">
+          <h2 id="causa-sec-timeline" class="causa-section__title">Timeline</h2>
+          <template data-if="timeline.present">
+            <div class="ef-stack causa-section__body">
+            <ol class="ef-timeline causa-timeline" aria-label="Recorded changes, oldest first">
+              <template data-each="timeline.items" data-key="key">
+                <li class="ef-timeline__item">
+                  <span class="ef-timeline__marker" aria-hidden="true"></span>
+                  <div class="ef-timeline__content">
+                    <p class="ef-timeline__meta"><time data-bind-datetime="datetime" data-text="when"></time> <span data-text="actor"></span></p>
+                    <pre class="causa-item__text" data-text="summary"></pre>
+                  </div>
+                </li>
+              </template>
+            </ol>
+            <template data-if="timeline.more-present">
+              <details class="causa-more">
+                <summary class="causa-more__toggle" data-text="timeline.more-label"></summary>
+                <ol class="ef-timeline causa-timeline">
+              <template data-each="timeline.more" data-key="key">
+                <li class="ef-timeline__item">
+                  <span class="ef-timeline__marker" aria-hidden="true"></span>
+                  <div class="ef-timeline__content">
+                    <p class="ef-timeline__meta"><time data-bind-datetime="datetime" data-text="when"></time> <span data-text="actor"></span></p>
+                    <pre class="causa-item__text" data-text="summary"></pre>
+                  </div>
+                </li>
+              </template>
+            </ol>
+              </details>
+            </template>
+            </div>
+          </template>
+        </section>
+      </template>
+      </div>
+    </template>
+
+    <template data-if="stored.present">
+      <section class="ef-section causa-panel" aria-labelledby="causa-ws-stored">
+        <h2 id="causa-ws-stored" data-text="stored.title"></h2>
+        <p><strong>As stored in the data repository.</strong></p>
+        <p>Causa could not interpret this investigation, so it is shown exactly as stored. Nothing was changed.</p>
+        <dl class="ef-key-value-list">
+          <div><dt>Created</dt><dd data-text="stored.created"></dd></div>
+          <div><dt>Last updated</dt><dd data-text="stored.updated"></dd></div>
+          <div><dt>Recorded changes</dt><dd data-text="stored.count"></dd></div>
+        </dl>
+        <ol class="ef-stack causa-stored__events">
+          <template data-each="stored.events" data-key="key">
+            <li><span data-text="when"></span> · <span data-text="kind"></span> · <span data-text="who"></span></li>
+          </template>
+        </ol>
+      </section>
+    </template>
+  </div>
+</template>

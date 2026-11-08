@@ -34,10 +34,14 @@ type Execute = HttpRequest -> HttpOutcome
 /// and its only use is the Authorization header persistence adds to each request (PF-015, INV-21).
 [<RequireQualifiedAccess>]
 module Credential =
+    /// T18 (AR-014-O2): structured printing (%A, test output, logs) shows "<credential>" too, never the token; the
+    /// union's shape is unchanged.
+    [<StructuredFormatDisplay("{Display}")>]
     type T =
         private
         | Token of string
         override _.ToString() = "<credential>"
+        member _.Display = "<credential>"
 
     let create (token: string) : T = Token token
 

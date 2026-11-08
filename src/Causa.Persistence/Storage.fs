@@ -3,10 +3,12 @@ namespace Causa.Persistence
 
 open Causa.Domain
 
-/// IF41-STORAGE: causa-storage v1.1.0 file sets (contract/v1.1.0/CONTRACT.md wins over docs/CAUSA-DATA-CONTRACT-v1.md).
-/// v4.1.6: a 1.0.0 investigation (every catalog case) is read exactly by the v1.0.0 rules and appended to only with
-/// events v1.0.0 can store; any other command is refused as CAUSA.UNREPRESENTABLE before anything is written (S-6 A).
-/// A new working-copy investigation is written in 1.1.0. Mixed versions in one investigation are refused.
+/// IF41-STORAGE: causa-storage v1.2.0 file sets (contract/v1.2.0/CONTRACT.md, then v1.1.0, win over
+/// docs/CAUSA-DATA-CONTRACT-v1.md). v4.1.6: a 1.0.0 investigation (every catalog case) is read exactly by the v1.0.0
+/// rules and appended to only with events v1.0.0 can store; a 1.1.0 investigation stays 1.1.0 and refuses an event
+/// that needs 1.2.0 (InvestigationTitleRevised, UnknownRevised); any such command is refused as CAUSA.UNREPRESENTABLE
+/// before anything is written (S-6 A). A new working-copy investigation is written in 1.2.0. Mixed versions in one
+/// investigation are refused.
 type CommitOid = CommitOid of string
 type RepoPath = RepoPath of string
 
@@ -97,3 +99,87 @@ type StorageCodec =
       /// Ok only when Verify accepts the result, so a file set that would not verify is never sent.
       EncodeNew: InvestigationId -> EventEnvelope list -> Result<FileSet, VerificationFailure list>
       Verify: WorkspaceAddress.T -> CommitOid -> FileSet -> Result<VerifiedInvestigation, VerificationFailure list> }
+
+/// JSON as immutable data: what persistence reads from and writes to GitHub (no nullable reference in sight).
+[<RequireQualifiedAccess>]
+type Json =
+    | Null
+    | Bool of bool
+    | Number of decimal
+    | String of string
+    | Array of Json list
+    | Object of (string * Json) list
+
+[<RequireQualifiedAccess>]
+module Json =
+    let rec private ofElement (e: System.Text.Json.JsonElement) : Json =
+        match e.ValueKind with
+        | System.Text.Json.JsonValueKind.Object -> Json.Object [ for p in e.EnumerateObject() -> p.Name, ofElement p.Value ]
+        | System.Text.Json.JsonValueKind.Array -> Json.Array [ for i in e.EnumerateArray() -> ofElement i ]
+        | System.Text.Json.JsonValueKind.String -> Json.String(e.GetString() |> Option.ofObj |> Option.defaultValue "")
+        | System.Text.Json.JsonValueKind.Number ->
+            match e.TryGetDecimal() with
+            | true, d -> Json.Number d
+            | _ -> Json.Number(decimal (e.GetDouble()))
+        | System.Text.Json.JsonValueKind.True -> Json.Bool true
+        | System.Text.Json.JsonValueKind.False -> Json.Bool false
+        | _ -> Json.Null
+
+    /// The parsed JSON of a body, or None when it does not parse.
+    let parse (body: string) : Json option =
+        try
+            use doc = System.Text.Json.JsonDocument.Parse body
+            Some(ofElement doc.RootElement)
+        with :? System.Text.Json.JsonException ->
+            None
+
+    let rec private write (w: System.Text.Json.Utf8JsonWriter) (j: Json) =
+        match j with
+        | Json.Null -> w.WriteNullValue()
+        | Json.Bool b -> w.WriteBooleanValue b
+        | Json.Number n -> w.WriteNumberValue n
+        | Json.String s -> w.WriteStringValue s
+        | Json.Array items ->
+            w.WriteStartArray()
+            items |> List.iter (write w)
+            w.WriteEndArray()
+        | Json.Object props ->
+            w.WriteStartObject()
+            for (k, v) in props do
+                w.WritePropertyName k
+                write w v
+            w.WriteEndObject()
+
+    let serialize (j: Json) : string =
+        use stream = new System.IO.MemoryStream()
+        (use w = new System.Text.Json.Utf8JsonWriter(stream)
+         write w j)
+        System.Text.Encoding.UTF8.GetString(stream.ToArray())
+
+    let field (name: string) (j: Json option) : Json option =
+        match j with
+        | Some(Json.Object props) -> props |> List.tryFind (fun (k, _) -> k = name) |> Option.map snd
+        | _ -> None
+
+    let path (names: string list) (j: Json option) : Json option = names |> List.fold (fun acc n -> field n acc) j
+
+    let text (j: Json option) =
+        match j with
+        | Some(Json.String s) -> Some s
+        | _ -> None
+
+    let int (j: Json option) =
+        match j with
+        | Some(Json.Number n) when n = System.Math.Floor n -> Some(int n)
+        | _ -> None
+
+    let bool (j: Json option) =
+        match j with
+        | Some(Json.Bool b) -> Some b
+        | _ -> None
+
+    let items (j: Json option) =
+        match j with
+        | Some(Json.Array xs) -> xs
+        | _ -> []
+

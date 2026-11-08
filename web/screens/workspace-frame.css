@@ -1,0 +1,230 @@
+/* Owner: ui-2 (WI-INV-WORKSPACE, reassigned). investigation-workspace frame and save state. Reads published Forma
+   --ef-* tokens (and the Causa theme variables with a Forma fallback, as the other screens do); declares none. */
+.causa-workspace__header { align-items: flex-start; gap: var(--ef-layout-stack-space); flex-wrap: wrap; }
+.causa-workspace__header .causa-screen__title { overflow-wrap: anywhere; }
+.causa-save { align-items: center; flex-wrap: wrap; }
+.causa-save__state { margin: 0; min-block-size: var(--ef-layout-target-min); }
+.causa-save__detail { margin: 0; color: var(--ef-color-text-primary); }
+.causa-save__detail:empty { display: none; }
+.causa-sections__list { list-style: none; padding: 0; margin: 0; flex-wrap: wrap; }
+.causa-sections__link {
+  padding-inline: var(--ef-primitive-space-2);
+  border-block-end: var(--ef-primitive-space-1) solid transparent;
+  color: var(--ef-color-text-primary);
+}
+/* The current section is marked by weight and an underline as well as aria-current, never by colour alone. */
+.causa-sections__link[aria-current="page"] {
+  font-weight: 600;
+  border-block-end-color: var(--causa-teal-strong, var(--ef-color-accent-primary));
+}
+.causa-workspace__facts { margin: 0; }
+.causa-workspace__identifier { font-family: var(--ef-type-family-mono); overflow-wrap: anywhere; }
+.causa-workspace__statement h2 {
+  margin: 0 0 var(--ef-primitive-space-2);
+  font-size: var(--ef-type-size-h4);
+  line-height: var(--ef-type-leading-heading);
+  max-inline-size: none;
+}
+.causa-workspace__statement { max-inline-size: none; }
+/* The problem statement and question are shown exactly as entered: line breaks kept, long words wrapped. They are
+   <pre> elements (line breaks kept by the element itself) whose lines wrap (text-wrap) in the body's own font. */
+.causa-verbatim { text-wrap: wrap; overflow-wrap: anywhere; margin: 0; max-inline-size: var(--ef-layout-measure); font-family: inherit; font-size: inherit; }
+.causa-stored__events { padding-inline-start: var(--ef-layout-stack-space); }
+/* The record title sits in Forma's record header at the h2 scale, so a long investigation title stays readable
+   beside its save state instead of filling the screen. */
+.causa-workspace__header h1.causa-screen__title {
+  font-size: var(--ef-type-size-h3);
+  line-height: var(--ef-type-leading-heading);
+  margin: 0;
+  max-inline-size: var(--ef-layout-measure);
+}
+.causa-workspace__title { display: flex; flex-direction: column; gap: var(--ef-primitive-space-2); }
+.causa-workspace__title .causa-copy-kind { margin: 0; }
+/* A failure reads as one block of sentences: Forma's alert grid gets a single body (Limen also renders one root). */
+.causa-workspace__failure { display: block; }
+.causa-workspace__failure-body p { margin: 0; color: var(--ef-color-text-primary); max-inline-size: var(--ef-layout-measure); }
+
+/* ---- Sections (T22): read-only cards and lists from the engine's projection. Forma tokens and the Causa theme only. */
+.causa-section { margin-block-start: var(--ef-layout-block-space); }
+.causa-section__title {
+  margin: 0;
+  font-size: var(--ef-type-size-h3);
+  line-height: var(--ef-type-leading-heading);
+  max-inline-size: none;
+  padding-block-end: var(--ef-primitive-space-2);
+  border-block-end: 2px solid var(--causa-navy, var(--ef-color-border-functional));
+}
+.causa-section__subtitle { margin: 0; font-size: var(--ef-type-size-h4); max-inline-size: none; }
+.causa-section__lead { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); }
+.causa-list { list-style: none; padding: 0; margin: 0; }
+.causa-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ef-primitive-space-2);
+  padding: var(--ef-layout-stack-space);
+  background: var(--ef-color-surface-primary);
+  border: 1px solid var(--ef-color-border-subtle);
+  border-inline-start: var(--ef-primitive-space-1) solid var(--causa-navy-soft, var(--ef-color-border-functional));
+  overflow-wrap: anywhere;
+}
+.causa-item[data-tone="positive"] { border-inline-start-color: var(--causa-teal, var(--ef-color-status-success)); }
+.causa-item[data-tone="critical"] { border-inline-start-color: var(--causa-coral, var(--ef-color-status-danger)); }
+.causa-item[data-tone="attention"] { border-inline-start-color: var(--ef-color-status-warning); }
+.causa-item--conclusion { border-inline-start-color: var(--causa-teal, var(--ef-color-status-success)); }
+.causa-item__title { margin: 0; font-size: var(--ef-type-size-h4); max-inline-size: none; }
+/* A record's text keeps its line breaks (a <pre> whose lines wrap) and reads in the body's font. */
+.causa-item__text { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); text-wrap: wrap; overflow-wrap: anywhere; font-family: inherit; font-size: inherit; }
+.causa-item__text--lead { font-weight: var(--ef-type-weight-strong, 600); }
+.causa-item__note { margin: 0; max-inline-size: var(--ef-layout-measure); color: var(--ef-color-text-primary); }
+.causa-item__meta { margin: 0; color: var(--ef-color-text-primary); }
+.causa-item__facts { margin: 0; }
+.causa-item__link { margin-inline-start: var(--ef-primitive-space-2); }
+/* Tags carry the word; the colour only repeats it (UI-016-O13). Text colours are the measured strong shades. */
+.causa-tag { color: var(--ef-color-text-primary); }
+.causa-tag[data-tone="positive"] { color: var(--causa-teal-strong, var(--ef-color-status-success)); }
+.causa-tag[data-tone="critical"] { color: var(--causa-coral-strong, var(--ef-color-status-danger)); }
+.causa-tag[data-tone="attention"] { color: var(--ef-color-status-warning); }
+.causa-tally { margin: 0; }
+.causa-relationship__evidence { font-style: italic; }
+.causa-timeline { margin-block-start: var(--ef-primitive-space-2); }
+.causa-timeline .ef-timeline__content { background: var(--ef-color-surface-primary); }
+.causa-timeline .ef-timeline__meta { color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
+/* Long record lists (observations) read as one ruled list rather than a stack of cards. */
+.causa-list--compact .causa-item {
+  border: 0;
+  border-block-end: 1px solid var(--ef-color-border-subtle);
+  padding-inline: 0;
+  background: transparent;
+}
+.causa-item__more > summary { min-block-size: var(--ef-layout-target-min); display: flex; align-items: center; cursor: pointer; }
+.causa-item__assessments { display: flex; flex-direction: column; gap: var(--ef-primitive-space-1); }
+/* Long sections show their first records and fold the rest behind the browser's own disclosure. */
+.causa-more { margin-block-start: var(--ef-primitive-space-2); }
+.causa-more > .causa-list, .causa-more > .causa-timeline { margin-block-start: var(--ef-layout-stack-space); }
+.causa-more__toggle {
+  min-block-size: var(--ef-layout-target-min);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: var(--ef-type-weight-strong, 600);
+  color: var(--causa-teal-strong, var(--ef-color-accent-primary));
+}
+/* Content editors (writable working copy only). */
+.causa-editor { max-inline-size: var(--ef-layout-measure); }
+.causa-editor textarea, .causa-editor input { inline-size: 100%; box-sizing: border-box; min-block-size: var(--ef-layout-target-min); }
+.causa-editor__actions { gap: var(--ef-primitive-space-2); }
+.causa-editor .causa-item__note:empty { display: none; }
+.causa-list__entry { list-style: none; }
+/* Edit investigation details (INV-034): Edit details, then the editor (as the content editors), then Save details or
+   Cancel. Every control is at least a 44 px target. */
+.causa-details__actions, .causa-details__unavailable { max-inline-size: var(--ef-layout-measure); }
+.causa-details__unavailable .causa-item__note:empty { display: none; }
+.causa-details__edit, .causa-details .ef-button { min-block-size: var(--ef-layout-target-min); min-inline-size: var(--ef-layout-target-min); }
+
+/* ---- Causal graph (Causal Analysis). Forma --ef-* tokens only. The page never scrolls sideways: the graph scrolls
+   inside its own focusable box. Every layer is a full-canvas SVG in user units of 1 px, so the F# layout's
+   coordinates are drawn as computed. */
+.causa-graph { margin: 0; display: flex; flex-direction: column; gap: var(--ef-primitive-space-2); min-inline-size: 0; }
+.causa-graph__scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-inline-size: 100%;
+  border: 1px solid var(--ef-color-border-subtle);
+  background: var(--ef-color-surface-primary);
+}
+.causa-graph__scroll:focus-visible { outline: var(--ef-focus-ring-width) solid var(--ef-color-focus-ring); outline-offset: var(--ef-focus-ring-offset); }
+.causa-graph__canvas { position: relative; inline-size: max-content; }
+.causa-graph__sizer { display: block; }
+.causa-graph__layer { position: absolute; inset: 0; pointer-events: none; }
+.causa-graph__plane { display: block; width: 100%; height: 100%; overflow: visible; }
+.causa-graph__heading { fill: var(--ef-color-text-primary); font-weight: var(--ef-type-weight-strong, 600); font-size: 0.875rem; }
+.causa-graph__node { fill: var(--ef-color-surface-secondary); stroke: var(--ef-color-border-functional); stroke-width: 1.5; }
+.causa-graph__node--hypothesis { stroke: var(--ef-color-accent-secondary); stroke-width: 2; }
+.causa-graph__node--conclusion { stroke: var(--ef-color-status-success); stroke-width: 2.5; }
+.causa-graph__label { fill: var(--ef-color-text-primary); font-size: 0.8125rem; }
+.causa-graph__edge { fill: none; stroke-width: 2; }
+.causa-graph__edge--supports { stroke: var(--ef-color-status-success); }
+.causa-graph__edge--contradicts { stroke: var(--ef-color-status-warning); stroke-dasharray: 7 4; }
+.causa-graph__edge--other { stroke: var(--ef-color-text-secondary); stroke-dasharray: 2 4; }
+.causa-graph__word {
+  fill: var(--ef-color-text-primary);
+  font-size: 0.6875rem;
+  paint-order: stroke;
+  stroke: var(--ef-color-surface-primary);
+  stroke-width: 3px;
+}
+.causa-graph__caption { color: var(--ef-color-text-primary); max-inline-size: var(--ef-layout-measure); font-size: var(--ef-type-size-small); }
+@media (forced-colors: active) {
+  .causa-graph__edge { stroke: CanvasText; }
+  .causa-graph__node { stroke: CanvasText; fill: Canvas; }
+  .causa-graph__label, .causa-graph__word, .causa-graph__heading { fill: CanvasText; }
+}
+.causa-editor__status { margin: 0; color: var(--ef-color-text-primary); font-weight: var(--ef-type-weight-strong, 600); }
+.causa-editor__status:empty { display: none; }
+
+/* ---- Causal graph, phone first: one native <details> per hypothesis, its evidence as cards with a connector bar
+   whose line style and word carry the assessment (never colour alone). Forma --ef-* tokens only. */
+.causa-focus__list, .causa-focus__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ef-primitive-space-2); }
+.causa-focus__panel { min-inline-size: 0; }
+.causa-focus__details { border: 1px solid var(--ef-color-border-subtle); background: var(--ef-color-surface-primary); }
+.causa-focus__summary {
+  min-block-size: var(--ef-layout-target-min);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ef-primitive-space-1) var(--ef-primitive-space-2);
+  padding: var(--ef-primitive-space-2);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.causa-focus__title { font-weight: var(--ef-type-weight-strong, 600); color: var(--ef-color-text-primary); }
+.causa-focus__counts { color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
+.causa-focus__cards { padding: 0 var(--ef-primitive-space-2) var(--ef-primitive-space-2); }
+.causa-focus__card {
+  padding: var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-layout-stack-space);
+  border-inline-start: 4px solid var(--ef-color-text-secondary);
+  background: var(--ef-color-surface-secondary);
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
+}
+.causa-focus__card[data-kind="supports"] { border-inline-start: 4px solid var(--ef-color-status-success); }
+.causa-focus__card[data-kind="contradicts"] { border-inline-start: 4px dashed var(--ef-color-status-warning); }
+.causa-focus__card[data-kind="other"] { border-inline-start: 4px dotted var(--ef-color-text-secondary); }
+.causa-focus__word { margin: 0; font-weight: var(--ef-type-weight-strong, 600); color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
+.causa-focus__text {
+  margin: 0;
+  color: var(--ef-color-text-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+.causa-focus__full > summary { min-block-size: var(--ef-layout-target-min); display: flex; align-items: center; cursor: pointer; }
+.causa-graph__full-view { border: 1px solid var(--ef-color-border-subtle); min-inline-size: 0; }
+.causa-graph__full-view > .causa-graph { padding: var(--ef-primitive-space-2); }
+/* A flex summary loses the native disclosure marker: draw one (decorative; the summary's state is announced). */
+.causa-focus__summary::before { content: "▸"; color: var(--ef-color-text-primary); }
+details[open] > .causa-focus__summary::before { content: "▾"; }
+/* 390 px audit: section links are full-size targets; the header's lozenge, badge and copy kind read at Forma's small
+   size rather than 11-12 px. */
+.causa-sections__link { display: inline-flex; align-items: center; min-block-size: var(--ef-layout-target-min); }
+.causa-save__state,
+.causa-workspace__title .causa-copy-kind,
+.causa-workspace__title .causa-copy-kind .ef-badge { font-size: var(--ef-type-size-small); }
+/* About saving: Forma's dialog with full-size actions. */
+.causa-save-dialog__title { margin: 0; font-size: var(--ef-type-size-h3); }
+.causa-save-dialog__list { margin: 0; padding-inline-start: var(--ef-layout-stack-space); }
+.causa-save-dialog .ef-button, .causa-save__about { min-block-size: var(--ef-layout-target-min); }
+/* Keyboard focus is never left under the sticky masthead (WCAG 2.4.11). Forma scrolls the page smoothly, and that
+   includes the scroll that brings a newly focused control into view: for the length of the animation the control
+   sits under the masthead or off screen (seen on the workspace header's controls after a dialog closes). In a
+   workspace the page scrolls to the focused control at once. */
+html:has(.causa-workspace) { scroll-behavior: auto; }
+/* A control focused just under the sticky masthead is scrolled clear of it. Forma reserves its standard header
+   height (--ef-layout-header-offset); Causa's masthead also carries the open investigation's context, one more row
+   of tap-target height, so the workspace reserves that too (WebKit otherwise leaves the control under the masthead).
+   The same media condition as Forma's sticky header. */
+@media (min-width: 40rem) and (min-height: 36rem) {
+  html:has(.causa-workspace) { scroll-padding-block-start: calc(var(--ef-layout-header-offset) + var(--ef-layout-target-min)); }
+}

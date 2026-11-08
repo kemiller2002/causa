@@ -52,8 +52,8 @@ let screenBindings (screen: ScreenView) : Bindings =
     | AdministrationScreen v -> AdministrationScreen.bindings v
     | SettingsScreen v -> SettingsScreen.bindings v
     | NotFoundScreen v -> States.notFound v
-    | StartScreen _
-    | WorkspaceScreen _ -> Map.empty
+    | StartScreen v -> StartScreen.bindings v
+    | WorkspaceScreen v -> InvestigationWorkspace.bindings v
 
 /// The whole Limen view state of an AppView.
 let bindings (view: AppView) : Bindings = Bind.merge [ Shell.bindings view; screenBindings view.Screen ]

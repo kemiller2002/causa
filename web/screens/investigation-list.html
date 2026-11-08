@@ -1,0 +1,114 @@
+<!-- Owner: ui (T16). investigation-list (#/): the connection region before Connect (UI-001, EXT-DATA-002), then the
+     Investigations region (INV-039). Bindings come from Views/InvestigationList.fs and Views/Connection.fs. -->
+<template data-if="screen.investigation-list">
+  <div class="ef-container ef-stack causa-screen causa-list" data-screen="investigation-list">
+    <h1 class="causa-screen__title">Investigations</h1>
+
+    <template data-if="connection.visible">
+      <section class="ef-stack causa-panel causa-connect" aria-labelledby="causa-connect-heading" data-requirement-id="EXT-DATA-002">
+        <h2 id="causa-connect-heading">Connect data repository</h2>
+        <p class="causa-connect__state">Connection: <span data-text="connection.state"></span></p>
+        <!-- PERSIST-020-O4: the tab is the only place unsaved work exists; there is no local recovery. -->
+        <p class="causa-connect__tab-note" id="causa-connect-tab-note" role="note">Unsaved changes exist only in this tab and are lost when it closes. Save to keep them in your data repository.</p>
+        <form class="ef-form causa-connect__form" data-event="UIA-CONNECT" novalidate>
+          <div class="ef-field">
+            <label class="ef-field__label" for="causa-conn-owner">Repository owner</label>
+            <input id="causa-conn-owner" name="owner" autocomplete="off" spellcheck="false" aria-required="true" data-on="input" data-event="UIF-CONN-OWNER" data-bind-value="connection.owner">
+          </div>
+          <div class="ef-field">
+            <label class="ef-field__label" for="causa-conn-repository">Repository</label>
+            <input id="causa-conn-repository" name="repository" autocomplete="off" spellcheck="false" aria-required="true" data-on="input" data-event="UIF-CONN-REPOSITORY" data-bind-value="connection.repository">
+          </div>
+          <div class="ef-field">
+            <label class="ef-field__label" for="causa-conn-branch">Branch</label>
+            <input id="causa-conn-branch" name="branch" autocomplete="off" spellcheck="false" aria-required="true" data-on="input" data-event="UIF-CONN-BRANCH" data-bind-value="connection.branch">
+          </div>
+          <div class="ef-field">
+            <label class="ef-field__label" for="causa-conn-token">Access token</label>
+            <p class="ef-field__description" id="causa-conn-token-help">Kept only in this tab's memory; never saved or shown.</p>
+            <!-- Never data-bind-value: the credential is not in the projection (PF-015). -->
+            <input id="causa-conn-token" name="token" type="password" autocomplete="off" aria-required="true" aria-describedby="causa-conn-token-help" data-on="input" data-event="UIF-CONN-TOKEN">
+          </div>
+          <template data-if="connection.errors-present">
+            <div class="ef-validation-summary" role="alert">
+              <ul class="ef-validation-summary__list">
+                <template data-each="connection.errors" data-key="field"><li data-text="message"></li></template>
+              </ul>
+            </div>
+          </template>
+          <template data-if="connection.refused">
+            <p class="causa-tone" data-tone="critical" role="alert"><span aria-hidden="true">✕ </span>GitHub refused the access token. Enter a valid token and connect again.</p>
+          </template>
+          <template data-if="connection.connect-offered">
+            <button class="ef-button causa-action-primary" type="submit" aria-describedby="causa-connect-tab-note" data-bind-disabled="connection.connect-disabled">Connect data repository</button>
+          </template>
+          <template data-if="connection.connecting"><p role="status">Connecting…</p></template>
+        </form>
+      </section>
+    </template>
+
+    <template data-if="connection.connected">
+      <section class="ef-cluster causa-connected" aria-label="Connected repository">
+        <template data-if="connection.online">
+          <p>Connected to <strong data-text="connection.connected-to"></strong>. <span data-text="connection.write-scope"></span></p>
+        </template>
+        <template data-if="connection.offline">
+          <p role="status" data-text="connection.offline-text"></p>
+        </template>
+        <p class="causa-connect__tab-note" role="note">Unsaved changes exist only in this tab and are lost when it closes. Save to keep them in your data repository.</p>
+        <template data-if="list.new-offered">
+          <a class="ef-button causa-action-primary" href="#/investigations/new" data-event="UIA-NEW-INVESTIGATION">New investigation</a>
+        </template>
+        <template data-if="connection.disconnect-offered">
+          <button class="ef-button" type="button" data-event="UIA-DISCONNECT">Disconnect</button>
+        </template>
+      </section>
+    </template>
+
+    <template data-if="list.loading">
+      <p class="causa-loading" role="status"><span class="ef-spinner" aria-hidden="true"></span> <span data-text="list.loading-text"></span></p>
+    </template>
+
+    <template data-if="list.failed">
+      <div class="ef-alert ef-fault-inline causa-failure" role="alert">
+        <p class="ef-alert__title" data-text="list.failure-what"></p>
+        <p data-text="list.failure-preserved"></p>
+        <p data-text="list.failure-next"></p>
+        <template data-if="list.retry-offered"><button class="ef-button" type="button" data-event="UIA-RETRY-LOAD">Try again</button></template>
+      </div>
+    </template>
+
+    <template data-if="list.empty">
+      <div class="ef-empty-state"><p>There are no investigations in this repository yet.</p></div>
+    </template>
+
+    <template data-if="list.visible">
+      <section aria-labelledby="causa-list-heading" data-requirement-id="INV-039">
+        <h2 id="causa-list-heading" class="ef-visually-hidden">Investigations in this repository</h2>
+        <ul class="ef-card-grid causa-cards">
+          <template data-each="investigations" data-key="id">
+            <li>
+              <article class="ef-card causa-card" data-bind-data-copy="copyKind">
+                <h3 class="ef-card__title"><a class="ef-card__link" data-bind-href="href" data-event="INV-040" data-text="title"></a></h3>
+                <p class="causa-copy-kind" data-bind-data-copy="copyKind"><span class="ef-badge causa-copy-tag" data-text="copyTag"></span> <span data-text="copy"></span></p>
+                <dl class="ef-facts">
+                  <div class="ef-facts__item"><dt>Status</dt><dd>
+                    <template data-if="statusKnown"><span class="ef-status-lozenge causa-card__status" data-bind-data-state="statusState" data-text="status"></span></template>
+                    <template data-if="statusUnknown"><span class="causa-card__unknown" data-text="status"></span></template>
+                  </dd></div>
+                  <div class="ef-facts__item"><dt>Last activity</dt><dd>
+                    <template data-if="lastActivityKnown"><time data-bind-datetime="lastActivityIso" data-text="lastActivity"></time></template>
+                    <template data-if="lastActivityUnknown"><span class="causa-card__unknown" data-text="lastActivity"></span></template>
+                  </dd></div>
+                  <div class="ef-facts__item"><dt>Hypotheses</dt><dd data-text="hypotheses"></dd></div>
+                  <div class="ef-facts__item"><dt>Evidence</dt><dd data-text="evidence"></dd></div>
+                  <div class="ef-facts__item"><dt>Unresolved contradictions</dt><dd data-text="contradictions"></dd></div>
+                </dl>
+              </article>
+            </li>
+          </template>
+        </ul>
+      </section>
+    </template>
+  </div>
+</template>

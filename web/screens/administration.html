@@ -1,0 +1,24 @@
+<!-- Owner: ui (T16). Administration (#/administration, UI-018, UI-020-O2): operational information only, read-only.
+     Bindings come from Views/Administration.fs. -->
+<template data-if="screen.administration">
+  <div class="ef-container ef-stack causa-screen causa-administration" data-screen="administration">
+    <h1 class="causa-screen__title">Administration</h1>
+    <p class="causa-lead">How Causa is connected and which versions are running. Nothing here changes an investigation.</p>
+    <section aria-labelledby="causa-admin-facts" data-requirement-id="UIR-DIAGNOSTICS">
+      <h2 id="causa-admin-facts">System</h2>
+      <dl class="ef-key-value-list causa-facts">
+        <template data-each="administration.facts" data-key="key">
+          <div class="causa-fact" data-bind-data-tone="tone"><dt data-text="label"></dt><dd><span class="ef-status-lozenge" data-bind-data-state="state" data-text="value"></span></dd></div>
+        </template>
+      </dl>
+    </section>
+    <template data-if="administration.diagnostics-present">
+      <section aria-labelledby="causa-admin-diagnostics">
+        <h2 id="causa-admin-diagnostics">Diagnostics</h2>
+        <ul class="causa-diagnostics">
+          <template data-each="administration.diagnostics" data-key="key"><li data-text="text"></li></template>
+        </ul>
+      </section>
+    </template>
+  </div>
+</template>

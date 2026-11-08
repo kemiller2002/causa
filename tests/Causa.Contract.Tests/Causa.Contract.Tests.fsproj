@@ -5,6 +5,7 @@
   <ItemGroup>
     <Compile Include="App/ConsumerIntegration.fs" />
     <Compile Include="App/Producer.fs" />
+    <Compile Include="App/DetailsEditor.fs" />
     <Compile Include="Domain/ConsumerIntegration.fs" />
     <Compile Include="Domain/ConsumerPersistence.fs" />
     <Compile Include="Domain/ConsumerUi.fs" />
@@ -20,6 +21,7 @@
     <Compile Include="Save/Producer.fs" />
     <Compile Include="Storage/ConsumerPersistence.fs" />
     <Compile Include="Storage/Producer.fs" />
+    <Compile Include="Storage/V120.fs" />
     <Compile Include="View/Producer.fs" />
     <Compile Include="Wire/ConsumerIntegration.fs" />
     <Compile Include="Wire/ConsumerUi.fs" />

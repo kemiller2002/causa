@@ -5,6 +5,11 @@
   <ItemGroup>
     <Compile Include="StateMachines/SMCONNECTION.fs" />
     <Compile Include="StateMachines/SMNETWORK.fs" />
+    <Compile Include="Ui/StartTests.fs" />
+    <Compile Include="Ui/FrameTests.fs" />
+    <Compile Include="Ui/GraphTests.fs" />
+    <Compile Include="../../build/DeployConnection.fs" Link="Build/DeployConnection.fs" />
+    <Compile Include="DeployConnectionTests.fs" />
     <Compile Include="DeployScanStepTests.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -293,16 +293,19 @@ module SaveSession =
                 | Error _ -> MachineEvent SaveInput.ReadBackReadFailed
             | FreshHead ->
                 match Classify.classify Operation.ReadHead outcome |> Result.bind Decode.head with
-                | Ok head -> next (FileComparisonAt head) (compareRequest head 1)
+                | Ok head -> next (FileComparisonAt head) (Writes.blobIdsAt ctx.NextId ctx.Connection s.BaseHead head prefix)
                 | Error AuthenticationFailed -> MachineEvent SaveInput.CredentialRefused
                 | Error _ -> MachineEvent SaveInput.RebaseReadFailed
             | FileComparisonAt head ->
-                match Classify.classify (Operation.Compare s.BaseHead) outcome with
-                | Ok answer when Writes.touchesPrefix prefix (Writes.changedFiles answer) -> MachineEvent(SaveInput.StaleHeadSameInvestigation head)
-                | Ok _ -> MachineEvent(SaveInput.StaleHeadUnrelated head)
-                | Error(HistoryRewritten _) -> MachineEvent(SaveInput.StaleHeadSameInvestigation head)
+                // the investigation's own files at the base head and at the new head, by Git blob id (PERSIST-009-O1)
+                let reconciling = match s.State with SaveState.UnknownOutcome _ -> true | _ -> false
+                match Classify.classify Operation.ReadBlob outcome |> Result.map Writes.filesChanged with
+                | Ok(Some true) -> MachineEvent(SaveInput.StaleHeadSameInvestigation head)
+                | Ok(Some false) when reconciling -> MachineEvent(SaveInput.ReconcileNothingWrittenHeadMoved head)
+                | Ok(Some false) -> MachineEvent(SaveInput.StaleHeadUnrelated head)
+                | _ when reconciling -> MachineEvent SaveInput.ReconcileReadFailed
                 | Error AuthenticationFailed -> MachineEvent SaveInput.CredentialRefused
-                | Error _ -> MachineEvent SaveInput.RebaseReadFailed
+                | _ -> MachineEvent SaveInput.RebaseReadFailed
             | ReconcileHead ->
                 match Classify.classify Operation.ReadHead outcome |> Result.bind Decode.head with
                 | Ok head when head = s.BaseHead -> MachineEvent SaveInput.ReconcileNothingWrittenHeadUnchanged
@@ -322,8 +325,8 @@ module SaveSession =
                         match p.Commits |> List.tryFind (fun c -> c.Message.Split([| '\n' |]) |> Array.exists (fun l -> l.Trim() = markerText)) with
                         | Some marked -> next (ReconcileFilesAt marked.Oid) (Writes.filesAt ctx.NextId ctx.Connection marked.Oid prefix)
                         | None when p.TotalCommits > page * 100 -> next (ReconcileCommits(page + 1)) (compareRequest (CommitOid ctx.Connection.Repository.Branch) (page + 1))
-                        | None when Writes.touchesPrefix prefix (Writes.changedFiles answer) -> MachineEvent(SaveInput.StaleHeadSameInvestigation head)
-                        | None -> MachineEvent(SaveInput.ReconcileNothingWrittenHeadMoved head)
+                        // nothing of this save was written and the head moved: compare the investigation's own files
+                        | None -> next (FileComparisonAt head) (Writes.blobIdsAt ctx.NextId ctx.Connection s.BaseHead head prefix)
             | ReconcileFilesAt commit ->
                 match Classify.classify Operation.ReadBlob outcome with
                 | Ok answer -> filesVerdict commit answer SaveInput.ReconcileMarkerBytesMatch SaveInput.ReconcileMarkerBytesDiffer SaveInput.ReconcileReadFailed

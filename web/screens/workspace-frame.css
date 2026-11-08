@@ -216,3 +216,10 @@ details[open] > .causa-focus__summary::before { content: "▾"; }
    sits under the masthead or off screen (seen on the workspace header's controls after a dialog closes). In a
    workspace the page scrolls to the focused control at once. */
 html:has(.causa-workspace) { scroll-behavior: auto; }
+/* A control focused just under the sticky masthead is scrolled clear of it. Forma reserves its standard header
+   height (--ef-layout-header-offset); Causa's masthead also carries the open investigation's context, one more row
+   of tap-target height, so the workspace reserves that too (WebKit otherwise leaves the control under the masthead).
+   The same media condition as Forma's sticky header. */
+@media (min-width: 40rem) and (min-height: 36rem) {
+  html:has(.causa-workspace) { scroll-padding-block-start: calc(var(--ef-layout-header-offset) + var(--ef-layout-target-min)); }
+}

@@ -38,3 +38,5 @@ module Commands =
         | AcceptProposal _ -> "AcceptProposal"
         | RejectProposal _ -> "RejectProposal"
         | AttachExtension _ -> "AttachExtension"
+        | ReviseTitle _ -> "ReviseTitle"
+        | ReviseUnknown _ -> "ReviseUnknown"

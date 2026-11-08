@@ -95,7 +95,7 @@ module Writes =
             match basis with
             | Some b -> Kernel.kernel.Replay b.History |> Result.map Some |> Result.mapError (sprintf "the base history does not replay: %A")
             | None -> Ok None
-        let version = match basis with Some b -> (match b.History with e :: _ -> e.Provenance.FormatVersion | [] -> "1.1.0") | None -> "1.1.0"
+        let version = match basis with Some b -> (match b.History with e :: _ -> e.Provenance.FormatVersion | [] -> StorageVersion.v120) | None -> StorageVersion.v120
         let actorId = match actor with Actor.Human a | Actor.System a | Actor.Agent(a, _, _) -> a.Value
         start
         |> Result.bind (fun state0 ->

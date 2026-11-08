@@ -225,6 +225,14 @@ type WireEventKind =
 module StorageVersion =
     let v100 = "1.0.0"
     let v110 = "1.1.0"
+    /// causa-storage 1.2.0: InvestigationTitleRevised and UnknownRevised (owner-approved). New investigations use it.
+    let v120 = "1.2.0"
+
+    /// The versions in order: an investigation of a later version can hold every event an earlier one can.
+    let ordered = [ v100; v110; v120 ]
+
+    /// The position of a version in `ordered`; None for a version this build does not know.
+    let rank (version: string) = ordered |> List.tryFindIndex (fun v -> v = version)
 
 [<RequireQualifiedAccess>]
 module EventRegistry =
@@ -239,6 +247,9 @@ module EventRegistry =
           "ConclusionRecorded"; "ProposalRecorded"; "ProposalWasAccepted"; "ProposalWasRejected" ]
 
     let v110Types = v100Types @ [ "EvidenceRevised"; "ObservationRevised" ]
+
+    /// v1.2.0 section 4.3: the 33 of v1.1.0, then the two revisions (35 types).
+    let v120Types = v110Types @ [ "InvestigationTitleRevised"; "UnknownRevised" ]
 
     let private lifecycleChange command target =
         Some { EventType = "LifecycleChanged"; Command = Some command; Target = Some target }
@@ -306,24 +317,28 @@ module EventRegistry =
         | ProposalAccepted _ -> plain "ProposalWasAccepted"
         | ProposalRejected _ -> plain "ProposalWasRejected"
         | ExtensionAttached _ -> None
+        | InvestigationTitleRevised _ -> plain "InvestigationTitleRevised"
+        | UnknownRevised _ -> plain "UnknownRevised"
 
-    /// The oldest storage version that can hold the event: the revisions and the two new relationship kinds need 1.1.0.
+    /// The oldest storage version that can hold the event: the evidence and observation revisions and the two new
+    /// relationship kinds need 1.1.0; the title and unknown revisions need 1.2.0.
     let requiredVersion (event: CoreEvent) : string option =
         match event with
         | ExtensionAttached _ -> None
+        | InvestigationTitleRevised _
+        | UnknownRevised _ -> Some StorageVersion.v120
         | EvidenceRevised _
         | ObservationRevised _ -> Some StorageVersion.v110
         | EvidenceRelationshipRecorded r when r.Kind = RelationshipKind.ConsistentWith || r.Kind = RelationshipKind.Inconclusive ->
             Some StorageVersion.v110
         | _ -> Some StorageVersion.v100
 
-    /// Whether the event can be appended to an investigation stored in the given version (S-6 A: a 1.0.0
-    /// investigation stays 1.0.0 and refuses an event that needs 1.1.0).
+    /// Whether the event can be appended to an investigation stored in the given version (S-6 A: an investigation keeps
+    /// the version it was created in; a 1.0.0 one refuses an event that needs 1.1.0, a 1.1.0 one an event that needs
+    /// 1.2.0). An unknown version holds nothing.
     let representableIn (storageVersion: string) (event: CoreEvent) =
-        match requiredVersion event, storageVersion with
-        | None, _ -> false
-        | Some "1.0.0", ("1.0.0" | "1.1.0") -> true
-        | Some "1.1.0", "1.1.0" -> true
+        match requiredVersion event |> Option.bind StorageVersion.rank, StorageVersion.rank storageVersion with
+        | Some needed, Some stored -> needed <= stored
         | _ -> false
 
 /// Event identity (contract v1.0.0 section 5.2): UUIDv5(N, investigationId + "/" + aggregateVersion + "/" + correlationId).

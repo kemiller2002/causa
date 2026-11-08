@@ -1,4 +1,4 @@
-// Owner: persistence. causa-storage 1.0.0/1.1.0 file sets as wire data: the event line, the projection (section 8.3,
+// Owner: persistence. causa-storage 1.0.0/1.1.0/1.2.0 file sets as wire data: the event line, the projection (section 8.3,
 // 1.1.0 section 4.7), the snapshot and manifest, the writer, and the reader stages of CONTRACT section 11.1.
 namespace Causa.Persistence
 
@@ -41,7 +41,13 @@ type WireInvestigation =
 [<RequireQualifiedAccess>]
 module Wire =
 
-    let supportedVersions = [ "1.0.0"; "1.1.0" ]
+    let supportedVersions = [ "1.0.0"; "1.1.0"; "1.2.0" ]
+
+    /// 1.1.0 and every later version hold the 1.1.0 additions (1.2.0 section 1: 1.2.0 is 1.1.0 plus two events).
+    let holdsV110 (version: string) = version = "1.1.0" || version = "1.2.0"
+
+    /// 1.2.0 holds InvestigationTitleRevised and UnknownRevised (contract v1.2.0 section 4).
+    let holdsV120 (version: string) = version = "1.2.0"
 
     // ---- field kinds of the wire records (stage 7) -------------------------------------------------------------------
 
@@ -61,10 +67,11 @@ module Wire =
     let hypothesisState = e "proposed plausible supported weakened falsified superseded"
 
     let relationshipKind (version: string) =
-        if version = "1.1.0" then e "supports contradicts discriminates insufficient consistentWith inconclusive"
+        if holdsV110 version then e "supports contradicts discriminates insufficient consistentWith inconclusive"
         else e "supports contradicts discriminates insufficient"
 
-    /// The 31 v1.0.0 payloads and the two 1.1.0 ones, field by field (CONTRACT section 7; 1.1.0 sections 4.1-4.2).
+    /// The 31 v1.0.0 payloads, the two 1.1.0 ones and the two 1.2.0 ones, field by field (CONTRACT section 7; 1.1.0
+    /// sections 4.1-4.2; 1.2.0 sections 4.1-4.2).
     let payloadFields (version: string) (eventType: string) : (string * Kind) list option =
         match eventType with
         | "InvestigationStarted" -> Some [ "title", Text; "observationId", Uuid; "original", Text ]
@@ -116,8 +123,10 @@ module Wire =
         | "ProposalRecorded" -> Some [ "proposalId", Uuid; "kind", e "hypothesis unknown action"; "text", Text; "rationale", Nullable Text ]
         | "ProposalWasAccepted" -> Some [ "proposalId", Uuid; "targetId", Uuid ]
         | "ProposalWasRejected" -> Some [ "proposalId", Uuid; "reason", Text ]
-        | "EvidenceRevised" when version = "1.1.0" -> Some [ "evidenceId", Uuid; "label", Text; "source", Text; "sourceUrl", Nullable HttpUrl ]
-        | "ObservationRevised" when version = "1.1.0" -> Some [ "observationId", Uuid; "original", Text; "source", Nullable Text ]
+        | "EvidenceRevised" when holdsV110 version -> Some [ "evidenceId", Uuid; "label", Text; "source", Text; "sourceUrl", Nullable HttpUrl ]
+        | "ObservationRevised" when holdsV110 version -> Some [ "observationId", Uuid; "original", Text; "source", Nullable Text ]
+        | "InvestigationTitleRevised" when holdsV120 version -> Some [ "title", Text; "reason", Nullable Text ]
+        | "UnknownRevised" when holdsV120 version -> Some [ "unknownId", Uuid; "question", Text ]
         | _ -> None
 
     let private httpUrl = RegularExpressions.Regex(@"^[Hh][Tt][Tt][Pp][Ss]?://[^\t\n\u000b\f\r \u0085   -     　]", RegularExpressions.RegexOptions.Compiled)
@@ -274,7 +283,7 @@ module Wire =
     let private pid name (ev: WireEvent) = text name ev.Payload |> Option.defaultValue ""
 
     let private apply (version: string) (p: Projection) (ev: WireEvent) : Projection =
-        let v11 = version = "1.1.0"
+        let v11 = holdsV110 version
         let copy names = names |> List.map (fun n -> n, pf n ev)
         let p =
             match ev.EventType with
@@ -334,6 +343,9 @@ module Wire =
             | "ProposalRecorded" -> create "proposals" (pid "proposalId" ev) (copy [ "kind"; "text"; "rationale" ] @ [ "state", Json.String "active"; "decision", Json.Null ]) ev p
             | "ProposalWasAccepted" -> setField "proposals" (pid "proposalId" ev) [ "state", Json.String "accepted" ] p
             | "ProposalWasRejected" -> setField "proposals" (pid "proposalId" ev) [ "state", Json.String "rejected"; "decision", pf "reason" ev ] p
+            // 1.2.0 section 4.4: the title; an unknown's question (its state, basis, materiality and provenance stay)
+            | "InvestigationTitleRevised" -> { p with Header = Map.add "title" (pf "title" ev) p.Header }
+            | "UnknownRevised" -> setField "unknowns" (pid "unknownId" ev) (copy [ "question" ]) p
             | _ -> p
         { p with Header = Map.add "version" (Json.Number(decimal ev.AggregateVersion)) p.Header }
 
@@ -430,10 +442,11 @@ module Wire =
     let private versionOf (j: Json) (names: string list) =
         names |> List.choose (fun n -> match field n j with Some(Json.String s) -> Some s | _ -> None)
 
-    /// The 1.1.0 admissibility rules of CONTRACT v1.1.0 section 4.6 (1), evaluated in history order: the part of stage
-    /// 15 this contract states normatively. The core view under the engine (4.6 (2)) is the engine's.
+    /// The admissibility rules of CONTRACT v1.1.0 section 4.6 (1) and v1.2.0 section 4.5, evaluated in history order:
+    /// the part of stage 15 these contracts state normatively. The core view under the engine (4.6 (2)) is the engine's.
     let revisionRules (events: WireEvent list) : (int64 * string) option =
-        let isRevision (e: WireEvent) = e.EventType = "EvidenceRevised" || e.EventType = "ObservationRevised"
+        let isDetailsRevision (e: WireEvent) = e.EventType = "InvestigationTitleRevised" || e.EventType = "UnknownRevised"
+        let isRevision (e: WireEvent) = e.EventType = "EvidenceRevised" || e.EventType = "ObservationRevised" || isDetailsRevision e
         let groups =
             events
             |> List.fold (fun acc e -> match acc with (g: WireEvent list) :: rest when (List.head g).CorrelationId = e.CorrelationId -> (g @ [ e ]) :: rest | _ -> [ e ] :: acc) []
@@ -446,7 +459,8 @@ module Wire =
                 (s.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || s.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 && (match Uri.TryCreate(s, UriKind.Absolute) with | true, _ -> true | _ -> false)
             | _ -> false
-        let rec go (lifecycle: string) (observations: Set<string>) (evidence: Map<string, bool>) (rest: WireEvent list list) =
+        let openUnknown = set [ "identified"; "investigating" ]
+        let rec go (lifecycle: string) (observations: Set<string>) (evidence: Map<string, bool>) (unknowns: Map<string, string>) (rest: WireEvent list list) =
             match rest with
             | [] -> None
             | g :: tail ->
@@ -459,6 +473,7 @@ module Wire =
                         let shapeOk =
                             match g with
                             | [ r ] when isRevision r -> true
+                            | [ _; r ] when isDetailsRevision r -> false
                             | [ c; r ] when c.EventType = "EvidenceAdmitted" && r.EventType = "EvidenceRevised" -> text "evidenceId" c.Payload = text "evidenceId" r.Payload
                             | [ c; r ] when c.EventType = "ObservationRecorded" && r.EventType = "ObservationRevised" -> text "observationId" c.Payload = text "observationId" r.Payload
                             | _ -> false
@@ -473,6 +488,11 @@ module Wire =
                                 elif field "source" c.Payload <> field "source" r.Payload then fail "EVIDENCE.REVISION_MISMATCH"
                                 else None
                             | [ c; _ ] -> if field "original" c.Payload <> field "original" r.Payload then fail "OBSERVATION.REVISION_MISMATCH" else None
+                            | _ when r.EventType = "InvestigationTitleRevised" -> None
+                            | _ when r.EventType = "UnknownRevised" ->
+                                match unknowns.TryFind(text "unknownId" r.Payload |> Option.defaultValue "") with
+                                | Some state when openUnknown.Contains state -> None
+                                | _ -> fail "HISTORY.INADMISSIBLE_EVENT"
                             | _ when r.EventType = "EvidenceRevised" ->
                                 match evidence.TryFind(text "evidenceId" r.Payload |> Option.defaultValue "") with
                                 | None -> fail "HISTORY.INADMISSIBLE_EVENT"
@@ -482,21 +502,23 @@ module Wire =
                 match verdict with
                 | Some v -> Some v
                 | None ->
-                    let lifecycle', observations', evidence' =
+                    let lifecycle', observations', evidence', unknowns' =
                         g
                         |> List.fold
-                            (fun (l, o: Set<string>, ev: Map<string, bool>) e ->
+                            (fun (l, o: Set<string>, ev: Map<string, bool>, u: Map<string, string>) e ->
                                 let id n = text n e.Payload |> Option.defaultValue ""
                                 match e.EventType with
-                                | "InvestigationStarted" -> "draft", o.Add(id "observationId"), ev
-                                | "LifecycleChanged" -> (text "to" e.Payload |> Option.defaultValue l), o, ev
-                                | "ObservationRecorded" -> l, o.Add(id "observationId"), ev
-                                | "EvidenceAdmitted" -> l, o, ev.Add(id "evidenceId", false)
-                                | "EvidenceSuperseded" -> l, o, ev.Add(id "evidenceId", true)
-                                | _ -> l, o, ev)
-                            (lifecycle, observations, evidence)
-                    go lifecycle' observations' evidence' tail
-        go "draft" Set.empty Map.empty groups
+                                | "InvestigationStarted" -> "draft", o.Add(id "observationId"), ev, u
+                                | "LifecycleChanged" -> (text "to" e.Payload |> Option.defaultValue l), o, ev, u
+                                | "ObservationRecorded" -> l, o.Add(id "observationId"), ev, u
+                                | "EvidenceAdmitted" -> l, o, ev.Add(id "evidenceId", false), u
+                                | "EvidenceSuperseded" -> l, o, ev.Add(id "evidenceId", true), u
+                                | "UnknownIdentified" when not (u.ContainsKey(id "unknownId")) -> l, o, ev, u.Add(id "unknownId", "identified")
+                                | "UnknownTransitioned" when u.ContainsKey(id "unknownId") -> l, o, ev, u.Add(id "unknownId", id "state")
+                                | _ -> l, o, ev, u)
+                            (lifecycle, observations, evidence, unknowns)
+                    go lifecycle' observations' evidence' unknowns' tail
+        go "draft" Set.empty Map.empty Map.empty groups
 
     /// Verifies a file set as a reader would (stages 2-14, 16, 17); stage 1 is the caller's (the three paths).
     let verify (expectedId: string) (files: FileSet) : Result<WireInvestigation, StageRefusal> =
@@ -601,7 +623,7 @@ module Wire =
                                                         elif (List.head events).EventType <> "InvestigationStarted" then
                                                             refuse "CAUSA.HISTORY_INADMISSIBLE" "events.ndjson" (Some 1) "HISTORY.NO_START"
                                                         else
-                                                            match (if version = "1.1.0" then revisionRules events else None) with
+                                                            match (if holdsV110 version then revisionRules events else None) with
                                                             | Some(v, domainCode) -> refuse "CAUSA.HISTORY_INADMISSIBLE" "events.ndjson" (Some(int v)) domainCode
                                                             | None ->
                                                             // the rest of stage 15 is the engine's (not evaluated here); stages 16 and 17
@@ -704,6 +726,8 @@ module DomainWire =
         | InvestigationVerificationFailed reason -> ok (lifecycleChanged Lifecycle.AwaitingVerification "active" "verificationFailed" (Some reason))
         | ObservationRecorded p -> tso p.ObservedAt |> Result.map (fun at -> "ObservationRecorded", Json.Object [ "observationId", g p.ObservationId; "original", s p.Original; "observedAt", at ])
         | ObservationRevised p -> ok ("ObservationRevised", [ "observationId", g p.ObservationId; "original", s p.Original; "source", so p.Source ])
+        | InvestigationTitleRevised p -> ok ("InvestigationTitleRevised", [ "title", s p.Title; "reason", so p.Reason ])
+        | UnknownRevised p -> ok ("UnknownRevised", [ "unknownId", g p.UnknownId; "question", s p.Question ])
         | HypothesisRecorded p -> ok ("HypothesisRecorded", [ "hypothesisId", g (hid p.HypothesisId); "statement", s p.Statement; "mechanism", so p.Mechanism ])
         | HypothesisMarkedPlausible t -> ok ("HypothesisTransitioned", transition t "plausible" "markPlausible")
         | HypothesisMarkedSupported t -> ok ("HypothesisTransitioned", transition t "supported" "markSupported")
@@ -798,6 +822,8 @@ module DomainWire =
                     | c -> failwithf "lifecycle command %s" c
                 | "ObservationRecorded" -> ObservationRecorded { ObservationId = gid "observationId" p; Original = net "original" p; ObservedAt = tim "observedAt" p }
                 | "ObservationRevised" -> ObservationRevised { ObservationId = gid "observationId" p; Original = net "original" p; Source = neto "source" p }
+                | "InvestigationTitleRevised" -> InvestigationTitleRevised { Title = net "title" p; Reason = neto "reason" p }
+                | "UnknownRevised" -> UnknownRevised { UnknownId = gid "unknownId" p; Question = net "question" p }
                 | "HypothesisRecorded" -> HypothesisRecorded { HypothesisId = HypothesisId(gid "hypothesisId" p); Statement = net "statement" p; Mechanism = neto "mechanism" p }
                 | "HypothesisTransitioned" ->
                     let t = transitionOf p
@@ -945,7 +971,7 @@ module StorageCodecs =
         |> Json.text
         |> Option.bind (fun s -> match Guid.TryParse s with | true, g -> Some(InvestigationId g) | _ -> None)
 
-    let private versionOf (history: EventEnvelope list) = match history with e :: _ -> e.Provenance.FormatVersion | [] -> "1.1.0"
+    let private versionOf (history: EventEnvelope list) = match history with e :: _ -> e.Provenance.FormatVersion | [] -> StorageVersion.v120
 
     /// The file set of a whole history; Error when an event has no wire form in the investigation's version.
     let encodeHistory (id: InvestigationId) (history: EventEnvelope list) : Result<FileSet, string> =

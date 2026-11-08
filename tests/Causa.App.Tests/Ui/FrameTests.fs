@@ -48,7 +48,7 @@ module FrameTests =
           Stored = NotRequested
           Section = OverviewSection NotRequested
           Drafts = { Values = Map.empty; Errors = []; OpenEditor = None }
-          Details = { Open = false; Form = { Title = ""; ProblemStatement = ""; Question = "" }; Errors = []; Edit = NotOffered; SaveDetails = NotOffered; Cancel = NotOffered }
+          Details = { Open = false; Form = { Title = ""; ProblemStatement = ""; Question = "" }; Errors = []; Edit = NotOffered; SaveDetails = NotOffered; Cancel = NotOffered; Status = "" }
           Save = Some(save UnsavedKind)
           State = ScreenReady }
 

@@ -96,6 +96,21 @@ module Decide =
             decideWith
                 (if Map.containsKey o.ObservationId i.Observations then [] else [ Blockers.notFound "observation" o.ObservationId ])
                 (fun () -> [ ObservationRevised { ObservationId = o.ObservationId; Original = o.Original; Source = o.Source } ])
+        | ReviseTitle t ->
+            // INV-034: the title is revised verbatim; a value equal to the current one changes nothing and is refused.
+            decideWith
+                (if t.Title = i.Title then [ Blockers.make "DETAILS.UNCHANGED" "The title is unchanged." ] else [])
+                (fun () -> [ InvestigationTitleRevised { Title = t.Title; Reason = t.Reason } ])
+        | ReviseUnknown u ->
+            // INV-034: the question is revised, not superseded, so the unknown keeps its id; only an open unknown.
+            let blockers =
+                match Map.tryFind u.UnknownId i.Unknowns with
+                | None -> [ Blockers.notFound "unknown" u.UnknownId ]
+                | Some x when x.State <> UnknownState.Identified && x.State <> UnknownState.Investigating ->
+                    [ Blockers.make "UNKNOWN.NOT_OPEN" (sprintf "Only an identified or investigating unknown can be revised; this one is %A." x.State) ]
+                | Some x when x.Question = u.Question -> [ Blockers.make "DETAILS.UNCHANGED" "The question is unchanged." ]
+                | Some _ -> []
+            decideWith blockers (fun () -> [ UnknownRevised { UnknownId = u.UnknownId; Question = u.Question } ])
         | RecordHypothesis h ->
             decideWith
                 (fresh "hypothesis" (Map.containsKey h.HypothesisId i.Hypotheses) h.HypothesisId @ Policies.repetition i h.Statement)

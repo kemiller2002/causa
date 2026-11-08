@@ -261,6 +261,10 @@ type EvidenceRelationship =
 
 type Unknown = { UnknownId: Guid; Question: NonEmptyText; Materiality: Materiality }
 type UnknownTransition = { UnknownId: Guid; State: UnknownState; Basis: NonEmptyText }
+/// causa-storage 1.2.0 InvestigationTitleRevised {title, reason}: the title kept verbatim, with an optional reason.
+type InvestigationTitleRevision = { Title: NonEmptyText; Reason: NonEmptyText option }
+/// causa-storage 1.2.0 UnknownRevised {unknownId, question}: the question revised, never superseded (the id is kept).
+type UnknownRevision = { UnknownId: Guid; Question: NonEmptyText }
 type Assumption = { AssumptionId: Guid; Proposition: NonEmptyText; Materiality: Materiality }
 type AssumptionTransition = { AssumptionId: Guid; State: AssumptionState }
 
@@ -363,6 +367,10 @@ type RelateEvidence =
       Rationale: NonEmptyText option }
 
 type IdentifyUnknown = { UnknownId: Guid; Question: NonEmptyText; Materiality: Materiality }
+/// INV-034: a new title (causa-storage 1.2.0), with an optional reason. A group of its own.
+type ReviseTitle = { Title: NonEmptyText; Reason: NonEmptyText option }
+/// INV-034: an open unknown's question revised (causa-storage 1.2.0); the unknown keeps its id. A group of its own.
+type ReviseUnknown = { UnknownId: Guid; Question: NonEmptyText }
 type RecordAssumption = { AssumptionId: Guid; Proposition: NonEmptyText; Materiality: Materiality }
 type RecordContradiction = { ContradictionId: Guid; Statement: NonEmptyText; EvidenceIds: Guid list; Materiality: Materiality }
 
@@ -416,6 +424,9 @@ type CoreCommand =
     | AcceptProposal of ProposalId
     | RejectProposal of ProposalId * reason: NonEmptyText
     | AttachExtension of ExtensionEnvelope
+    /// causa-storage 1.2.0 (owner-approved contract change): INV-034 title and question revisions.
+    | ReviseTitle of ReviseTitle
+    | ReviseUnknown of ReviseUnknown
 type Command =
     | Core of CoreCommand
     | Extension of SemanticId * payloadJson: string
@@ -482,6 +493,9 @@ type CoreEvent =
     | ProposalAccepted of ProposalId * targetId: Guid
     | ProposalRejected of ProposalId * reason: NonEmptyText
     | ExtensionAttached of ExtensionEnvelope
+    /// causa-storage 1.2.0 (owner-approved contract change): InvestigationTitleRevised and UnknownRevised.
+    | InvestigationTitleRevised of InvestigationTitleRevision
+    | UnknownRevised of UnknownRevision
 type CommandEnvelope = { CommandId: Guid; Investigation: InvestigationId; ExpectedVersion: AggregateVersion option; Command: Command }
 type EventPayload =
     | CoreEvent of CoreEvent

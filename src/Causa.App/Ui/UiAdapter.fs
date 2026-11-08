@@ -65,7 +65,12 @@ type Local =
       DeployFailure: string option
       /// The content editors' fields as typed (observation INV-024/025, hypothesis INV-026/011), before submit.
       Content: Map<FieldId, string>
-      ContentErrors: ValidationError list }
+      ContentErrors: ValidationError list
+      /// The details editor (INV-034) while it is open: the title, problem statement and question as typed.
+      Details: DetailsForm option
+      DetailsErrors: ValidationError list
+      /// Save details recorded revisions that are not saved yet (the editor's "not saved yet" line).
+      DetailsRevised: bool }
 
 type AdapterState = { Model: Model; Local: Local }
 
@@ -284,6 +289,103 @@ module WorkspaceAnalysis =
               Current = (s = current) })
 
 
+/// The investigation details INV-034 edits (title INV-002, problem statement INV-001, primary question INV-023), read
+/// from a replayed Investigation, and the commands a changed details form describes. Pure.
+[<RequireQualifiedAccess>]
+module InvestigationDetails =
+    /// A stable identifier derived from another and a purpose (UiAdapter.derivedId), so the same command always
+    /// produces the same ids. SHA-256, not MD5: MD5 is not available in the browser (.NET WebAssembly).
+    let derivedId (from: Guid) (purpose: string) =
+        let bytes = SHA256.HashData(Encoding.UTF8.GetBytes(from.ToString("D") + "/" + purpose)) |> Array.truncate 16
+        bytes[6] <- (bytes[6] &&& 0x0Fuy) ||| 0x30uy
+        bytes[8] <- (bytes[8] &&& 0x3Fuy) ||| 0x80uy
+        Guid(bytes)
+
+    /// The causa-storage version the investigation is stored in: its first event's (one investigation, one version).
+    let storageVersion (i: Investigation) : string option =
+        i.Timeline |> List.tryHead |> Option.map (fun e -> e.Provenance.FormatVersion)
+
+    /// The start's observation (INV-008: the problem statement), as last revised (ReviseObservation keeps its id).
+    let startObservation (i: Investigation) : ObservationEntity option =
+        i.Timeline
+        |> List.tryPick (fun e ->
+            match e.Payload with
+            | CoreEvent(InvestigationStarted s) -> Some s.ObservationId
+            | _ -> None)
+        |> Option.bind (fun id -> Map.tryFind id i.Observations)
+
+    /// P19 = A: the primary question is the informational unknown recorded with the start (the earliest one); a
+    /// revision keeps its id, so the revised question is read from the same unknown.
+    let primaryQuestion (i: Investigation) : UnknownEntity option =
+        i.Unknowns
+        |> Map.toList
+        |> List.map snd
+        |> List.filter (fun u -> u.Materiality = Materiality.Informational)
+        |> List.sortBy (fun u -> u.Provenance.RecordedAt)
+        |> List.tryHead
+
+    let problem (i: Investigation) = startObservation i |> Option.map (fun o -> NonEmptyText.value o.Original) |> Option.defaultValue ""
+
+    /// The current details, as the editor opens with them.
+    let form (i: Investigation) : DetailsForm =
+        { Title = NonEmptyText.value i.Title
+          ProblemStatement = problem i
+          Question = primaryQuestion i |> Option.map (fun u -> NonEmptyText.value u.Question) |> Option.defaultValue "" }
+
+    let withField (field: FieldId) (value: string) (f: DetailsForm) =
+        if field = Fields.detailsTitle then { f with Title = value }
+        elif field = Fields.detailsProblem then { f with ProblemStatement = value }
+        elif field = Fields.detailsQuestion then { f with Question = value }
+        else f
+
+    /// Whether INV-034 is offered for this investigation (UI-004). Only an investigation stored in causa-storage 1.2.0
+    /// can hold a changed title or question; an older one keeps its version (owner decision: never upgraded in place),
+    /// so the edit is unavailable there with that reason. Otherwise the kernel's capability decides.
+    let availability (i: Investigation) : Availability =
+        let version = storageVersion i |> Option.defaultValue StorageVersion.v120
+        if not (EventRegistry.representableIn version (InvestigationTitleRevised { Title = i.Title; Reason = None })) then
+            Unavailable(
+                sprintf
+                    "Details cannot be edited here: this investigation is stored in causa-storage %s, which cannot record a changed title or question (CAUSA.UNREPRESENTABLE). Investigations started now are stored in %s and can be edited."
+                    version
+                    StorageVersion.v120
+            )
+        else
+            match Capabilities.evaluate Policies.coreDefault i |> List.tryFind (fun c -> c.Id = "ReviseTitle") with
+            | Some c when not c.Blockers.IsEmpty -> Unavailable c.Blockers.Head.Message
+            | _ -> Available
+
+    /// The catalog rules (UIF-DETAILS-*: INV-019/020/021, INV-023) and what storage requires of a revision: a title is
+    /// never blank, and a recorded question can be revised but not removed.
+    let validate (i: Investigation) (f: DetailsForm) : ValidationError list =
+        DetailsForm.validate f
+        @ [ if String.IsNullOrWhiteSpace f.Title then
+                { Field = Fields.detailsTitle; Rule = Required; Message = "Title cannot be blank: enter a title." }
+            if String.IsNullOrWhiteSpace f.Question && (primaryQuestion i).IsSome then
+                { Field = Fields.detailsQuestion; Rule = Required
+                  Message = "Primary investigative question cannot be removed once recorded: enter the question." } ]
+
+    /// The changed details as commands, each a command group of its own (contract v1.2.0 section 4.5), built from the
+    /// command id it will carry. Unchanged values produce nothing; every value is kept verbatim.
+    let commands (i: Investigation) (f: DetailsForm) : (Guid -> CoreCommand) list =
+        [ match NonEmptyText.create f.Title with
+          | Some t when t <> i.Title -> fun (_: Guid) -> ReviseTitle { Title = t; Reason = None }
+          | _ -> ()
+          match startObservation i, NonEmptyText.create f.ProblemStatement with
+          | Some o, Some p when p <> o.Original -> fun (_: Guid) -> ReviseObservation { ObservationId = o.Id; Original = p; Source = o.Source }
+          | _ -> ()
+          match primaryQuestion i, NonEmptyText.create f.Question with
+          | Some u, Some q when q <> u.Question -> fun (_: Guid) -> ReviseUnknown { UnknownId = u.Id; Question = q }
+          // No question was recorded at the start: the first one is recorded as the start records it (P19 = A).
+          | None, Some q ->
+              fun (commandId: Guid) ->
+                  IdentifyUnknown { UnknownId = derivedId commandId "primary-question"; Question = q; Materiality = Materiality.Informational }
+          | _ -> () ]
+
+    /// The editor's line after Save details, while the change is not saved yet (the content editors' wording).
+    let notSavedYet = "Details changed. Your changes are not saved yet: select Save to keep them."
+
+
 [<RequireQualifiedAccess>]
 module UiAdapter =
     /// Total over the frozen SM-SAVE states: an eighth state, or a missing one, fails to compile (PERSIST-031).
@@ -299,12 +401,7 @@ module UiAdapter =
 
     /// A stable identifier derived from another and a purpose (the start command and its first observation), so the
     /// same submission always produces the same command (idempotent retries; Decide reports Duplicate).
-    let derivedId (from: Guid) (purpose: string) =
-        // SHA-256, not MD5: MD5 is not available in the browser (.NET WebAssembly).
-        let bytes = SHA256.HashData(Encoding.UTF8.GetBytes(from.ToString("D") + "/" + purpose)) |> Array.truncate 16
-        bytes[6] <- (bytes[6] &&& 0x0Fuy) ||| 0x30uy
-        bytes[8] <- (bytes[8] &&& 0x3Fuy) ||| 0x80uy
-        Guid(bytes)
+    let derivedId (from: Guid) (purpose: string) = InvestigationDetails.derivedId from purpose
 
     let workingCopy (config: AdapterConfig) =
         WorkspaceAddress.workingCopy [] config.Run |> Option.bind Writable.ofAddress
@@ -542,6 +639,52 @@ module UiAdapter =
                     fx
                 | _ -> s, []
 
+    let private closeDetails (local: Local) = { local with Details = None; DetailsErrors = [] }
+
+    /// INV-034: the editor opens with the current details, only where the edit is offered (Available).
+    let private editDetails (config: AdapterConfig) (s: AdapterState) =
+        match sessionOfRoute s |> Option.map (fun ref -> config.InvestigationOf s.Model ref) with
+        | Some(Ok(Some i)) when InvestigationDetails.availability i = Available ->
+            { s with Local = { s.Local with Details = Some(InvestigationDetails.form i); DetailsErrors = []; DetailsRevised = false } }, []
+        | _ -> s, []
+
+    /// UIA-SAVE-DETAILS: validate, then send the changed details as separate command groups (ReviseTitle,
+    /// ReviseObservation, ReviseUnknown), each at the version the previous one left (ExpectedVersion = the current
+    /// version). A refusal stops the rest and keeps the editor open with what was typed; nothing is stripped.
+    let private saveDetails (config: AdapterConfig) (engine: Engine) (s: AdapterState) =
+        match sessionOfRoute s, s.Local.Details with
+        | Some ref, Some form ->
+            match config.InvestigationOf s.Model ref with
+            | Ok(Some i) ->
+                match InvestigationDetails.availability i, InvestigationDetails.validate i form with
+                | Unavailable reason, _ -> { s with Local = { closeDetails s.Local with Announcements = s.Local.Announcements @ [ Assertive, reason ] } }, []
+                | NotOffered, _ -> { s with Local = closeDetails s.Local }, []
+                | Available, (_ :: _ as errors) -> { s with Local = { s.Local with DetailsErrors = errors } }, []
+                | Available, [] ->
+                    let send (st: AdapterState, fx: HostEffect list, ok: bool) (build: Guid -> CoreCommand) =
+                        if not ok then st, fx, ok
+                        else
+                            match config.InvestigationOf st.Model ref with
+                            | Ok(Some current) ->
+                                let commandId = CommandIds.at (config.Now())
+                                let envelope =
+                                    { CommandId = commandId; Investigation = ref.Id; ExpectedVersion = Some current.Version; Command = Core(build commandId) }
+                                let st2, fx2 = step engine (Msg.DomainCommand envelope) st
+                                let advanced =
+                                    match config.InvestigationOf st2.Model ref with
+                                    | Ok(Some after) -> after.Version <> current.Version
+                                    | _ -> false
+                                st2, fx @ fx2, advanced
+                            | _ -> st, fx, false
+                    match InvestigationDetails.commands i form with
+                    | [] -> { s with Local = closeDetails s.Local }, []
+                    | builders ->
+                        let s2, fx, ok = builders |> List.fold send (s, [], true)
+                        if ok then { s2 with Local = { closeDetails s2.Local with DetailsRevised = true } }, fx
+                        else s2, fx
+            | _ -> s, []
+        | _ -> s, []
+
     let private currentRef (s: AdapterState) =
         match s.Local.Route with
         | WorkspaceRoute(t, _) ->
@@ -571,6 +714,12 @@ module UiAdapter =
                 | StartRoute, StartRoute -> s2.Local
                 | StartRoute, _ -> freshStart config s2.Local
                 | _ -> s2.Local
+            // The details editor belongs to one investigation: another route closes it, another investigation also
+            // forgets its "not saved yet" line.
+            let local =
+                match r, s.Local.Route with
+                | WorkspaceRoute(a, _), WorkspaceRoute(b, _) when a = b -> closeDetails local
+                | _ -> { closeDetails local with DetailsRevised = false }
             { s2 with Local = { local with Route = r } }, fx
         | UiIntent.Input(f, v, _) when Connection.fields |> List.exists (fun x -> x.Field = f) ->
             { s with Local = { s.Local with Form = Connection.withField f v s.Local.Form } }, []
@@ -578,6 +727,10 @@ module UiAdapter =
             { s with Local = { s.Local with Start = StartForm.withField f v s.Local.Start; Submission = Submission.NotSubmitted } }, []
         | UiIntent.Input(f, v, _) when ContentForms.observation @ ContentForms.hypothesis |> List.exists (fun x -> x.Field = f) ->
             { s with Local = { s.Local with Content = s.Local.Content |> Map.add f v } }, []
+        | UiIntent.Input(f, v, _) when DetailsForm.fields |> List.exists (fun x -> x.Field = f) ->
+            match s.Local.Details with
+            | Some d -> { s with Local = { s.Local with Details = Some(InvestigationDetails.withField f v d) } }, []
+            | None -> s, []
         | UiIntent.Input _ -> s, []
         | UiIntent.Secret(_, c) ->
             { s with Local = { s.Local with Credential = Some c; Form = { s.Local.Form with CredentialEntered = true } } }, []
@@ -586,9 +739,12 @@ module UiAdapter =
         | UiIntent.Activate(a, _) when a = Actions.startInvestigation -> start config engine s
         | UiIntent.Activate(a, _) when a = Actions.recordObservation -> recordContent config engine Observation s
         | UiIntent.Activate(a, _) when a = Actions.recordHypothesis -> recordContent config engine Hypothesis s
+        | UiIntent.Activate(a, _) when a = Actions.editDetails -> editDetails config s
+        | UiIntent.Activate(a, _) when a = Actions.saveDetails -> saveDetails config engine s
         | UiIntent.Activate(a, _) when a = Actions.cancelEditor ->
+            // INV-036: closes the editor (the details editor too); nothing entered is recorded or written.
             let cleared = [ Fields.observationText; Fields.observationSource; Fields.hypothesisStatement; Fields.hypothesisExplanation ]
-            { s with Local = { s.Local with Content = cleared |> List.fold (fun m f -> Map.remove f m) s.Local.Content; ContentErrors = [] } }, []
+            { s with Local = { closeDetails s.Local with Content = cleared |> List.fold (fun m f -> Map.remove f m) s.Local.Content; ContentErrors = [] } }, []
         | UiIntent.Activate(a, _) when a = Actions.cancelStart -> cancelStart config engine s
         | UiIntent.Activate(a, _) when a = Actions.save || a = ActionId "UIA-SAVE-RETRY" ->
             match currentRef s with
@@ -781,22 +937,10 @@ module UiAdapter =
     /// The frame of an investigation the kernel projected (UI-013: every value at one version).
     let frameOf (target: RouteTarget) (section: Section) (ref: InvestigationRef) (i: Investigation) : WorkspaceFrame =
         let at v = AsProjected(Understood.projected i.Version v)
-        let problem =
-            i.Timeline
-            |> List.tryPick (fun e ->
-                match e.Payload with
-                | CoreEvent(InvestigationStarted s) -> Some(NonEmptyText.value s.Original)
-                | _ -> None)
-            |> Option.defaultValue ""
-        // P19 = A: the primary question is the informational unknown recorded with the start.
-        let question =
-            i.Unknowns
-            |> Map.toList
-            |> List.map snd
-            |> List.filter (fun u -> u.Materiality = Materiality.Informational)
-            |> List.sortBy (fun u -> u.Provenance.RecordedAt)
-            |> List.tryHead
-            |> Option.map (fun u -> at (NonEmptyText.value u.Question))
+        // INV-008: the start's observation as last revised (ReviseObservation), so an edited problem statement shows.
+        let problem = InvestigationDetails.problem i
+        // P19 = A: the primary question is the informational unknown recorded with the start, as last revised.
+        let question = InvestigationDetails.primaryQuestion i |> Option.map (fun u -> at (NonEmptyText.value u.Question))
         let (InvestigationId g) = i.Id
         { Ref = ref
           Identifier = g.ToString "D"
@@ -830,19 +974,30 @@ module UiAdapter =
               Save = save
               State = state }
         let empty frame state save details = emptyWith (sectionView NotRequested) frame state save details
-        let closedDetails form = { Open = false; Form = form; Errors = []; Edit = NotOffered; SaveDetails = NotOffered; Cancel = NotOffered }
+        let closedDetails form = { Open = false; Form = form; Errors = []; Edit = NotOffered; SaveDetails = NotOffered; Cancel = NotOffered; Status = "" }
+        /// INV-034 on an editable investigation: offered (or unavailable with the reason), open while the user edits.
+        let detailsOf (editable: bool) (i: Investigation) (save: SavePresentation option) =
+            let current = InvestigationDetails.form i
+            if not editable then closedDetails current
+            else
+                let edit = InvestigationDetails.availability i
+                let unsaved = save |> Option.exists (fun p -> p.Kind = UnsavedKind || p.Kind = OfflineKind)
+                match s.Local.Details with
+                | Some typed when edit = Available ->
+                    { Open = true; Form = typed; Errors = s.Local.DetailsErrors; Edit = edit; SaveDetails = Available; Cancel = Available; Status = "" }
+                | _ ->
+                    { closedDetails current with
+                        Edit = edit
+                        Status = (if s.Local.DetailsRevised && unsaved then InvestigationDetails.notSavedYet else "") }
         let blank = closedDetails { Title = ""; ProblemStatement = ""; Question = "" }
         match s.Model.Sessions |> Map.tryFindKey (fun ref _ -> ref.Id = target.Id && ref.Address.Workspace = Workspace target.Workspace) with
         | Some ref ->
             match config.InvestigationOf s.Model ref with
             | Ok(Some i) ->
                 let frame = frameOf target section ref i
-                let details =
-                    closedDetails
-                        { Title = frame.Title
-                          ProblemStatement = (match frame.ProblemStatement with AsProjected u -> Understood.value u | AsStored v -> Visible.value v)
-                          Question = frame.Question |> Option.map (function AsProjected u -> Understood.value u | AsStored v -> Visible.value v) |> Option.defaultValue "" }
-                let v = emptyWith (analysisOf (WorkspaceAnalysis.contentActions i) i) (Ready frame) ScreenReady (Some(savePresentation config s s.Model.Sessions[ref])) details
+                let save = Some(savePresentation config s s.Model.Sessions[ref])
+                let details = detailsOf true i save
+                let v = emptyWith (analysisOf (WorkspaceAnalysis.contentActions i) i) (Ready frame) ScreenReady save details
                 { v with Drafts = { Values = s.Local.Content; Errors = s.Local.ContentErrors; OpenEditor = None } }
             | Ok None -> let f = UiFailure.InvestigationNotFound target in empty (Failed f) (ScreenFailed f) None blank
             | Error reason -> let f = UiFailure.InvalidData reason in empty (Failed f) (ScreenFailed f) None blank
@@ -870,13 +1025,9 @@ module UiAdapter =
                                   Conflict = None
                                   NotSaved = [] }
                         else None
-                    let details =
-                        closedDetails
-                            { Title = frame.Title
-                              ProblemStatement = (match frame.ProblemStatement with AsProjected u -> Understood.value u | AsStored v -> Visible.value v)
-                              Question = frame.Question |> Option.map (function AsProjected u -> Understood.value u | AsStored v -> Visible.value v) |> Option.defaultValue "" }
                     // A saved working copy is editable on a writable connection (its first edit opens a session).
                     let editable = ref.Address.Role = WorkspaceRole.WorkingCopy && s.Model.Connection = Connected true
+                    let details = detailsOf editable v.Investigation save
                     let actions = if editable then WorkspaceAnalysis.contentActions v.Investigation else Map.empty
                     let view = emptyWith (analysisOf actions v.Investigation) (Ready frame) ScreenReady save details
                     if editable then { view with Drafts = { Values = s.Local.Content; Errors = s.Local.ContentErrors; OpenEditor = None } } else view
@@ -957,7 +1108,10 @@ module UiAdapter =
               ListFailure = None
               DeployFailure = None
               Content = Map.empty
-              ContentErrors = [] } },
+              ContentErrors = []
+              Details = None
+              DetailsErrors = []
+              DetailsRevised = false } },
         effects
 
     /// The frozen Engine as a UiBackend. Effects are the frozen HostEffect, performed by the browser host.

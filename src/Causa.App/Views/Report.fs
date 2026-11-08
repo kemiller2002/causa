@@ -34,6 +34,8 @@ module InvestigationWorkspace =
                   (ScreenStates.activity remote)
               OverviewSectionView.bindings view
               ConclusionsView.bindings view
+              CausesView.bindings view
+              CorrectionsView.bindings view
               HypothesesSectionView.bindings view
               EvidenceSectionView.bindings view
               CausalAnalysisSectionView.bindings view

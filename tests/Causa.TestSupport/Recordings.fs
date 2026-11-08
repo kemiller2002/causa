@@ -55,9 +55,12 @@ module Recordings =
           { Form = "graphql-rate-limited"; ObservedIn = kd; Operation = mutation; Status = 200; Headers = graphql
             Body = """{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}"""
             ExpectedClass = GhRateSecondary }
-          { Form = "graphql-unprocessable"; ObservedIn = kd; Operation = mutation; Status = 200; Headers = graphql
-            Body = """{"data":{"createCommitOnBranch":null},"errors":[{"type":"UNPROCESSABLE","path":["createCommitOnBranch"],"message":"A path was requested for deletion which does not exist as of commit oid"}]}"""
+          { Form = "graphql-unprocessable"; ObservedIn = "github-error-matrix.json GH-VALIDATION (GraphQL UNPROCESSABLE); message illustrative"; Operation = mutation; Status = 200; Headers = graphql
+            Body = """{"data":{"createCommitOnBranch":null},"errors":[{"type":"UNPROCESSABLE","path":["createCommitOnBranch"],"message":"The commit could not be processed."}]}"""
             ExpectedClass = GhValidation }
+          { Form = "graphql-not-found-deleted-path"; ObservedIn = "governed gate run 42402357707 (real GitHub): deleting a path absent at the expected head is refused with GraphQL type NOT_FOUND; the message text was not captured by that run's evidence"; Operation = mutation; Status = 200; Headers = graphql
+            Body = """{"data":{"createCommitOnBranch":null},"errors":[{"type":"NOT_FOUND","path":["createCommitOnBranch"],"message":"A path was requested for deletion which does not exist as of the expected head."}]}"""
+            ExpectedClass = GhNotFound }
           { Form = "graphql-not-found-branch"; ObservedIn = kd; Operation = mutation; Status = 200; Headers = graphql
             Body = """{"data":{"createCommitOnBranch":null},"errors":[{"type":"NOT_FOUND","path":["createCommitOnBranch"],"message":"Could not resolve to a Ref with the name 'refs/heads/missing'."}]}"""
             ExpectedClass = GhNotFound }
@@ -134,7 +137,7 @@ module Recordings =
             Body = """{"type":"file","encoding":"none","size":1500000,"name":"events.ndjson","path":"workspaces/demo/x/events.ndjson","content":"","sha":"3b18e512dba79e4c8300dd08aeb37f8e728b8dad"}"""
             ExpectedClass = GhLargeFile }
           { Form = "rest-contents-file-cached"; ObservedIn = "Rehearsal 7 R7L-19: cache headers on mutable reads"; Operation = Operation.ReadFile(RepoPath "workspaces/demo/x/a.json"); Status = 200
-            Headers = rest @ [ "cache-control", "private, max-age=60, s-maxage=60"; "etag", "W/\"0b1c\""; "vary", "Accept, Authorization, Cookie, X-GitHub-OTP" ]
+            Headers = rest @ [ "cache-control", "private, max-age=60, s-maxage=60"; "etag", "W/\"0b1c\"" ]
             Body = """{"type":"file","encoding":"base64","size":2,"name":"a.json","path":"workspaces/demo/x/a.json","content":"e30=\n","sha":"9e26dfeeb6e641a33dae4961196235bdb965b21b"}"""
             ExpectedClass = Success }
           { Form = "rest-ref-head"; ObservedIn = kd; Operation = Operation.ReadHead; Status = 200; Headers = rest @ [ "cache-control", "private, max-age=60, s-maxage=60" ]
@@ -155,7 +158,7 @@ module Recordings =
     /// cookies, request ids and everything else are dropped.
     let keptHeaders =
         set [ "content-type"; "x-ratelimit-limit"; "x-ratelimit-remaining"; "x-ratelimit-reset"; "x-ratelimit-used"; "x-ratelimit-resource"
-              "retry-after"; "cache-control"; "etag"; "last-modified"; "vary"; "x-github-api-version-selected" ]
+              "retry-after"; "cache-control"; "etag"; "last-modified"; "x-github-api-version-selected" ]
 
     let sanitizeHeaders (headers: (string * string) list) =
         headers |> List.filter (fun (k, _) -> keptHeaders.Contains(k.ToLowerInvariant()))
@@ -183,11 +186,34 @@ module LiveEnv =
         | Read
         | Write
 
+    /// Variables a test sets for its own flow only (AsyncLocal): the process environment is never changed, so a test
+    /// that checks a missing secret cannot make a concurrently running live test BLOCKED (gate run 42402357707).
+    let private overrides = Threading.AsyncLocal<Map<string, string option> option>()
+
+    /// Runs `f` with these variables set (Some) or unset (None) for the calling flow alone.
+    let withVariables (values: (string * string option) list) (f: unit -> 'a) : 'a =
+        let before = overrides.Value
+        let current = defaultArg before Map.empty
+        overrides.Value <- Some(values |> List.fold (fun m (k, v) -> Map.add k v m) current)
+        try
+            f ()
+        finally
+            overrides.Value <- before
+
     let private env (name: string) =
-        match Environment.GetEnvironmentVariable name with
-        | null -> None
-        | v when String.IsNullOrWhiteSpace v -> None
-        | v -> Some(v.Trim())
+        let raw =
+            match overrides.Value |> Option.bind (Map.tryFind name) with
+            | Some value -> value
+            | None ->
+                match Environment.GetEnvironmentVariable name with
+                | null -> None
+                | v -> Some v
+        match raw with
+        | Some v when not (String.IsNullOrWhiteSpace v) -> Some(v.Trim())
+        | _ -> None
+
+    /// A variable as the live harness sees it (the calling flow's overrides first).
+    let variable (name: string) = env name
 
     let tokenVariable =
         function

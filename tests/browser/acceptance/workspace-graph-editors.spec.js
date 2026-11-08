@@ -118,6 +118,10 @@ test('at 390 px a working copy admits evidence, links it to a hypothesis as supp
   await expect(back).toContainText(content);
   await expect(back).toContainText(`supports “${hyp}”. Why: ${why}`);
   await expect(back).toContainText('1 supporting');
+  // The hypothesis card names the evidence and its kind without opening anything (J2-05).
+  await openSection(fresh.page, 'Hypotheses');
+  const hcard = fresh.page.getByRole('article').filter({ hasText: hyp });
+  await expect(hcard.getByText(`\u201c${label}\u201d supports it.`)).toBeVisible();
   // Causal Analysis: the hypothesis panel, open, with that supporting card.
   await openSection(fresh.page, 'Causal Analysis');
   const panel = fresh.page.locator('details.causa-focus__details').filter({ has: fresh.page.locator('summary', { hasText: hyp }) });

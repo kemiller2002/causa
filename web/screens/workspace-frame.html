@@ -232,7 +232,8 @@
                   <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
-                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>How the evidence bears on it</strong></p><p class="causa-item__text" data-text="bearings"></p></div></template>
+                  <template data-if="hasRationale"><details class="causa-item__more"><summary>Why: the rationale for each</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
                 </article></li>
               </template>
             </ul>
@@ -246,7 +247,8 @@
                   <p class="causa-item__text causa-item__text--lead" data-text="statement"></p>
                   <template data-if="hasExplanation"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="explanation"></span></p></template>
                   <p class="causa-item__note"><strong>Evidence:</strong> <span data-text="evidence"></span></p>
-                  <template data-if="hasAssessments"><details class="causa-item__more"><summary>How the evidence bears on it</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
+                  <template data-if="hasAssessments"><div class="causa-item__assessments"><p class="causa-item__note"><strong>How the evidence bears on it</strong></p><p class="causa-item__text" data-text="bearings"></p></div></template>
+                  <template data-if="hasRationale"><details class="causa-item__more"><summary>Why: the rationale for each</summary><p class="causa-item__text" data-text="assessments"></p></details></template>
                 </article></li>
               </template>
             </ul>

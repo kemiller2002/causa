@@ -85,6 +85,19 @@ module SectionData =
         |> List.map (fun l -> sprintf "%s \u201c%s\u201d.%s" (kindVerb l.Kind) l.HypothesisStatement (why l))
         |> String.concat "\n"
 
+    /// On a hypothesis card, always visible: one short line per current assessment naming the evidence and its kind,
+    /// "“<evidence>” contradicts it." (J2-05 reads the labels without opening anything); the rationale is behind a
+    /// disclosure (hypothesisAssessments).
+    let hypothesisBearings (links: LinkCard list) =
+        links
+        |> List.filter (fun l -> l.Current)
+        |> List.map (fun l -> sprintf "\u201c%s\u201d %s it." l.EvidenceLabel (kindVerb l.Kind))
+        |> String.concat "\n"
+
+    /// Whether any current assessment on a card has a rationale to disclose.
+    let hasRationale (links: LinkCard list) =
+        links |> List.exists (fun l -> l.Current && l.Rationale.Trim() <> "")
+
     /// On a hypothesis card the evidence is named: "“<evidence>” contradicts it. Why: …".
     let hypothesisAssessments (links: LinkCard list) =
         links

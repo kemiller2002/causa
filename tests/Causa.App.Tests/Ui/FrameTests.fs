@@ -341,6 +341,13 @@ module GraphEditorTests =
         let h = bind HypothesesView (projection offered links 0) noDrafts (Some SavedKind)
         let hcard = rows h "hypotheses.items" |> List.head
         Assert.Equal("“Gauge e1” supports it. Why: the trace rises first", cell hcard "assessments")
+        // Always visible on the hypothesis card: the evidence label and its kind; only the rationale is disclosed.
+        Assert.Equal("“Gauge e1” supports it.", cell hcard "bearings")
+        Assert.Equal("True", cell hcard "hasRationale")
+        let silent = bind HypothesesView (projection offered [ { link "e1" "h1" (CatalogKind Contradicts) with Rationale = " " } ] 0) noDrafts (Some SavedKind)
+        let scard = rows silent "hypotheses.items" |> List.head
+        Assert.Equal("“Gauge e1” contradicts it.", cell scard "bearings")
+        Assert.Equal("False", cell scard "hasRationale")
         let incon = bind EvidenceView (projection offered [ link "e1" "h1" (CatalogKind Inconclusive) ] 0) noDrafts (Some SavedKind)
         Assert.StartsWith("is inconclusive about", rows incon "evidence.items" |> List.head |> fun r -> cell r "assessments")
 

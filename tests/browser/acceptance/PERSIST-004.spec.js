@@ -132,12 +132,14 @@ test('PERSIST-004-O3', async ({ context }) => {
   await save(a);
   const b = await context.newPage();
   await connect(b);
+  // setup: a working-copy listing names ids only; each card's title arrives with its own load, so wait for it
+  await expect(b.getByRole('link', { name: v.title })).toBeVisible({ timeout: 60000 });
   await b.getByRole('link', { name: v.title }).click();
   await expect(saveState(b)).toHaveText(/^\s*Saved\s*$/, { timeout: 20000 });
   // both tabs change and save: GitHub decides, one Saved and one Conflict, never a lock
   for (const p of [a, b]) {
-    await p.getByRole('button', { name: /add observation|record observation/i }).first().click();
-    await p.getByLabel(/observation/i).first().fill(mark('p004o3'));
+    await p.getByRole('button', { name: /(add|record) an? observation/i }).first().click();
+    await p.getByRole('textbox', { name: /observation text/i }).fill(mark('p004o3'));
     await p.getByRole('button', { name: /^(add|record)/i }).last().click();
   }
   await save(a);

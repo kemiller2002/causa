@@ -123,12 +123,14 @@ test('PERSIST-002-O3', async ({ context }) => {
   await save(a);
   const b = await context.newPage();
   await connect(b);
+  // setup: a working-copy listing names ids only; each card's title arrives with its own load, so wait for it
+  await expect(b.getByRole('link', { name: v.title })).toBeVisible({ timeout: 60000 });
   await b.getByRole('link', { name: v.title }).click();
   await expect(b.getByText(v.problem).first()).toBeVisible({ timeout: 20000 });
   // an unsaved change in A never appears in B
-  await a.getByRole('button', { name: /add observation|record observation/i }).first().click();
+  await a.getByRole('button', { name: /(add|record) an? observation/i }).first().click();
   const text = mark('p002o3-unsaved');
-  await a.getByLabel(/observation/i).first().fill(text);
+  await a.getByRole('textbox', { name: /observation text/i }).fill(text);
   await a.getByRole('button', { name: /^(add|record)/i }).last().click();
   await expect(saveState(a)).toHaveText(/Unsaved/);
   await expect(b.getByText(text)).toHaveCount(0);

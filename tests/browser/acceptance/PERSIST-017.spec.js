@@ -109,13 +109,18 @@ test('PERSIST-017-O1', async ({ page, context }) => {
 });
 
 test('PERSIST-017-O2', async ({ page, context }) => {
+  // setup: the other tab connects and finishes its listing first. The listing loads each working-copy card to show
+  // its title, so an investigation the other tab has listed is loaded; the one under test is created afterwards in
+  // the first tab and saved, so the other tab has never loaded it.
+  const other = await context.newPage();
+  await connect(other);
   await connect(page);
   const v = await start(page, 'p017o2');
   await save(page);
-  const other = await context.newPage();
-  await connect(other);
+  const workspace = new URL(page.url()).hash;
   await goOffline(context);
-  await other.getByRole('link', { name: v.title }).click();
+  // opened in the other tab (an in-app navigation: a reload would start the tab afresh)
+  await other.evaluate((hash) => { window.location.hash = hash; }, workspace);
   await expect(other.getByText(/unavailable offline/i).first()).toBeVisible({ timeout: 20000 });
   await expect(other.getByText(/not found|empty/i)).toHaveCount(0);
 });

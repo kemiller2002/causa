@@ -81,6 +81,25 @@ module Fields =
     /// The link editor's evidence and hypothesis choosers (J2-04 picks them by combobox name; INV-030 names the action).
     let linkEvidence = FieldId "UIF-LINK-EVIDENCE"
     let linkHypothesis = FieldId "UIF-LINK-HYPOTHESIS"
+    /// The cause editor (feature/causes-actions: RecordCausalAssertion; no catalog entry names these fields, so their
+    /// ids are UIF-* and their labels are the kernel's words: outcome, hypothesis, cause role, mechanism).
+    let causeOutcome = FieldId "UIF-CAUSE-OUTCOME"
+    let causeHypothesis = FieldId "UIF-CAUSE-HYPOTHESIS"
+    let causeRole = FieldId "UIF-CAUSE-ROLE"
+    let causeMechanism = FieldId "UIF-CAUSE-MECHANISM"
+    /// The corrective action editor (feature/causes-actions: RecordCorrectiveAction; R7.1, R7.2, S12).
+    let correctiveKind = FieldId "UIF-CORRECTIVE-KIND"
+    let correctiveDescription = FieldId "UIF-CORRECTIVE-DESCRIPTION"
+    let correctiveCause = FieldId "UIF-CORRECTIVE-CAUSE"
+    /// The causes a conclusion names (RecordConclusion.CauseIds): the drafted ids, space-separated. Changed only by the
+    /// toggle action UIA-CONCLUSION-CAUSE, never typed.
+    let conclusionCauses = FieldId "UIF-CONCLUSION-CAUSES"
+    /// The hypothesis status editor (R2.3: why the change occurred and what evidence caused it). No catalog entry names
+    /// these fields. The hypothesis and the change are set by a card's status action, never typed.
+    let statusReason = FieldId "UIF-STATUS-REASON"
+    let statusEvidence = FieldId "UIF-STATUS-EVIDENCE"
+    let statusHypothesis = FieldId "UIF-STATUS-HYPOTHESIS"
+    let statusChange = FieldId "UIF-STATUS-CHANGE"
     // investigation-workspace details editor (INV-034 edits INV-001, INV-002, INV-023; the identifier is unchanged)
     let detailsTitle = FieldId "UIF-DETAILS-TITLE"
     let detailsProblem = FieldId "UIF-DETAILS-PROBLEM"
@@ -107,6 +126,23 @@ module Actions =
     /// J2-06 activates "Reassess"; INV-030's note requires reassessment; no catalog entry names the action (CF-02).
     let reassess = ActionId "UIA-REASSESS"
     let saveDetails = ActionId "UIA-SAVE-DETAILS"
+    /// feature/causes-actions: no catalog entry names these actions (the catalog has no cause or corrective-action ids).
+    let recordCause = ActionId "UIA-RECORD-CAUSE"
+    let recordCorrectiveAction = ActionId "UIA-RECORD-CORRECTIVE-ACTION"
+    /// Adds a cause to, or removes it from, the conclusion draft (the row key is the cause id): a toggle button with
+    /// aria-pressed, because a button is never re-sent by the form's submit (Limen 0.9.1 legacy protocol).
+    let toggleConclusionCause = ActionId "UIA-CONCLUSION-CAUSE"
+    /// A hypothesis card's status actions (row key: the hypothesis id); each opens the status editor for that change.
+    let markPlausible = ActionId "UIA-MARK-PLAUSIBLE"
+    let markSupported = ActionId "UIA-MARK-SUPPORTED"
+    let falsifyHypothesis = ActionId "UIA-FALSIFY-HYPOTHESIS"
+    let reopenHypothesis = ActionId "UIA-REOPEN-HYPOTHESIS"
+    /// The status editor's submit: sends the change the editor holds.
+    let recordStatus = ActionId "UIA-RECORD-STATUS"
+    /// A cause card's Confirm cause (row key: the cause id): ConfirmCause.
+    let confirmCause = ActionId "UIA-CONFIRM-CAUSE"
+    /// The four status actions in their order, with the change word the editor stores.
+    let hypothesisTransitions = [ markPlausible, "markPlausible"; markSupported, "markSupported"; falsifyHypothesis, "falsify"; reopenHypothesis, "reopen" ]
     let retryLoad = ActionId "UIA-RETRY-LOAD"
     /// The seven-state indicator's own actions (frozen IF41-VIEW SaveAction).
     let saveIndicator = ActionId "UIA-SAVE-INDICATOR"
@@ -542,7 +578,30 @@ module ContentForms =
             Rules = [ Required; OneOf [ "plausibleExplanation"; "leadingExplanation"; "supportedCause"; "confirmedCause"; "acceptedWithResidualUncertainty" ] ] }
           { Field = Fields.residualUncertainty; Label = "Residual uncertainty"; Component = TextArea; Rules = [ MaxLength 10000 ] } ]
 
-    let all = observation @ hypothesis @ evidence @ link @ conclusion
+    /// The kernel's cause roles (CauseRole; R6.3 distinguishes root cause from contributing factors), as stored.
+    let causeRoles = [ "rootCause"; "contributingFactor"; "trigger"; "enablingCondition" ]
+
+    let cause : FieldSpec list =
+        [ { Field = Fields.causeOutcome; Label = "Outcome it explains"; Component = TextArea; Rules = [ Required; MinLength 1; MaxLength 10000 ] }
+          { Field = Fields.causeHypothesis; Label = "Hypothesis"; Component = Select; Rules = [ Required ] }
+          { Field = Fields.causeRole; Label = "Cause role"; Component = RadioGroup; Rules = [ Required; OneOf causeRoles ] }
+          { Field = Fields.causeMechanism; Label = "Mechanism"; Component = TextArea; Rules = [ MaxLength 10000 ] } ]
+
+    /// The kernel's corrective action kinds (CorrectiveActionKind; R7.2, S12-O8), as stored.
+    let correctiveKinds = [ "mitigation"; "workaround"; "correction"; "prevention" ]
+
+    let correctiveAction : FieldSpec list =
+        [ { Field = Fields.correctiveDescription; Label = "Corrective action"; Component = TextArea; Rules = [ Required; MinLength 1; MaxLength 10000 ] }
+          { Field = Fields.correctiveKind; Label = "Corrective action kind"; Component = RadioGroup; Rules = [ Required; OneOf correctiveKinds ] }
+          // S12-O3: the target causal assertion is required.
+          { Field = Fields.correctiveCause; Label = "Cause it addresses"; Component = Select; Rules = [ Required ] } ]
+
+    let hypothesisStatus : FieldSpec list =
+        [ { Field = Fields.statusReason; Label = "Reason for the change"; Component = TextArea; Rules = [ Required; MinLength 1; MaxLength 10000 ] }
+          // Required by the kernel for every change but Mark plausible (R2.3, R2.5); the kernel's refusal says so.
+          { Field = Fields.statusEvidence; Label = "Evidence for the change"; Component = Select; Rules = [] } ]
+
+    let all = observation @ hypothesis @ evidence @ link @ conclusion @ cause @ correctiveAction @ hypothesisStatus
 
     let kindValue k =
         match k with
@@ -576,6 +635,18 @@ module ActionContracts =
           a Actions.reassess Screens.workspace "Reassess" Button DataEditable
               [ Fields.linkEvidence; Fields.linkHypothesis; Fields.relationshipKind; Fields.relationshipRationale ] "a new current assessment; the earlier one stays in the history"
           a Actions.recordConclusion Screens.workspace "Record a conclusion" Button DataEditable [ Fields.conclusionStatement; Fields.conclusionStrength; Fields.residualUncertainty ] "a conclusion snapshot; the investigation is not resolved"
+          a Actions.recordCause Screens.workspace "Record a cause" Button DataEditable
+              [ Fields.causeOutcome; Fields.causeHypothesis; Fields.causeRole; Fields.causeMechanism ] "RecordCausalAssertion; the cause is listed as proposed"
+          a Actions.recordCorrectiveAction Screens.workspace "Record a corrective action" Button DataEditable
+              [ Fields.correctiveDescription; Fields.correctiveKind; Fields.correctiveCause ] "RecordCorrectiveAction; listed under Corrective Actions as proposed"
+          a Actions.markPlausible Screens.workspace "Mark plausible" Button DataEditable [] "opens the status editor for MarkHypothesisPlausible"
+          a Actions.markSupported Screens.workspace "Mark supported" Button DataEditable [] "opens the status editor for MarkHypothesisSupported"
+          a Actions.falsifyHypothesis Screens.workspace "Falsify" Button DataEditable [] "opens the status editor for FalsifyHypothesis"
+          a Actions.reopenHypothesis Screens.workspace "Reopen" Button DataEditable [] "opens the status editor for ReopenHypothesis"
+          a Actions.recordStatus Screens.workspace "Record status change" Button DataEditable [ Fields.statusReason; Fields.statusEvidence ]
+              "the hypothesis's new state, with the reason and evidence (R2.3); its earlier state stays in the history (R2.4)"
+          a Actions.confirmCause Screens.workspace "Confirm cause" Button DataEditable [] "ConfirmCause; the cause is confirmed under the core policy"
+          a Actions.toggleConclusionCause Screens.workspace "Cause the conclusion names" Button DataEditable [] "adds the cause to the conclusion draft, or removes it"
           // Catalog name "Edit investigation details"; the button reads "Edit details" (the governed INV-START probe).
           a Actions.editDetails Screens.workspace "Edit details" Button DataEditable [] "opens the details editor (causa-storage 1.2.0 investigations)"
           a Actions.saveDetails Screens.workspace "Save details" Button DataEditable [ Fields.detailsTitle; Fields.detailsProblem; Fields.detailsQuestion ] "details changed; the identifier is unchanged"

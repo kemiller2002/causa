@@ -14,6 +14,21 @@ module HypothesesSectionView =
         | "Superseded" -> "neutral"
         | _ -> "info"
 
+    /// One status action of a card (UIA-MARK-PLAUSIBLE ...): offered, disabled, and the kernel's reason when disabled.
+    let transitionCells (h: HypothesisCard) (prefix: string) (action: ActionId) =
+        let a = h.Transitions |> Map.tryFind action |> Option.defaultValue NotOffered
+        [ Bind.cellFlag (prefix + "Offered") (match a with NotOffered -> false | _ -> true)
+          Bind.cellFlag (prefix + "Disabled") (match a with Available -> false | _ -> true) ]
+
+    /// The kernel's reasons for the status actions shown but unavailable, one line each: "Mark supported: <reason>".
+    let transitionNotes (h: HypothesisCard) =
+        [ Actions.markPlausible, "Mark plausible"; Actions.markSupported, "Mark supported"; Actions.falsifyHypothesis, "Falsify"; Actions.reopenHypothesis, "Reopen" ]
+        |> List.choose (fun (a, label) ->
+            match h.Transitions |> Map.tryFind a with
+            | Some(Unavailable reason) -> Some(sprintf "%s: %s" label reason)
+            | _ -> None)
+        |> String.concat "\n"
+
     let bindings (view: WorkspaceView) : Bindings =
         let hs = SectionData.analysis view.Section |> Option.map (fun a -> a.Hypotheses) |> Option.defaultValue []
         Bind.ofList(
@@ -31,4 +46,11 @@ module HypothesesSectionView =
                           Bind.cellText "bearings" (SectionData.hypothesisBearings h.Links)
                           Bind.cellText "assessments" (SectionData.hypothesisAssessments h.Links)
                           Bind.cellFlag "hasRationale" (SectionData.hasRationale h.Links)
-                          Bind.cellFlag "hasAssessments" (h.Links |> List.exists (fun l -> l.Current)) ] ])
+                          Bind.cellFlag "hasAssessments" (h.Links |> List.exists (fun l -> l.Current))
+                          Bind.cellFlag "hasStatusActions" (not h.Transitions.IsEmpty)
+                          Bind.cellText "statusNotes" (transitionNotes h)
+                          Bind.cellFlag "hasStatusNotes" (transitionNotes h <> "") ]
+                        @ transitionCells h "plausible" Actions.markPlausible
+                        @ transitionCells h "supported" Actions.markSupported
+                        @ transitionCells h "falsify" Actions.falsifyHypothesis
+                        @ transitionCells h "reopen" Actions.reopenHypothesis ])

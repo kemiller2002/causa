@@ -278,3 +278,125 @@ module KernelTests =
         Assert.Equal<EventEnvelope list>(draft.Timeline, projection.Timeline)
         let explained = Capabilities.evaluate Policies.coreDefault draft |> List.find (fun c -> c.Id = "ResolveInvestigation")
         Assert.NotEmpty explained.Blockers
+
+/// feature/causes-actions: the command paths the workspace's cause, corrective action and conclusion editors send
+/// (RecordCausalAssertion, RecordCorrectiveAction, RecordConclusion with CauseIds), each refusal paired with the legal
+/// case it differs from, and every event they emit storable in causa-storage 1.2.0 (the version new investigations
+/// are written in).
+module CauseCorrectionTests =
+    open Build
+
+    let private cause (h: HypothesisId) role outcome =
+        { CauseId = CausalAssertionId(id ()); Outcome = text outcome; Members = [ { HypothesisId = h; Role = role } ]; Mechanism = Some(text "the chain breaks") }
+
+    let private eventsOf (before: Investigation) (after: Investigation) =
+        after.Timeline
+        |> List.filter (fun e -> e.Version > before.Version)
+        |> List.choose (fun e -> match e.Payload with CoreEvent c -> Some c | _ -> None)
+
+    [<Fact>]
+    let ``RecordCausalAssertion records a proposed cause with its member in its role, in one event`` () =
+        let s, h = withHypothesis (active ()) "The disk filled up"
+        let c = cause h CauseRole.RootCause "The export stopped"
+        let after = ok s (RecordCausalAssertion c)
+        match eventsOf s after with
+        | [ CausalAssertionRecorded recorded ] ->
+            Assert.Equal(c.CauseId, recorded.CauseId)
+            Assert.Equal<CausalMember list>(c.Members, recorded.Members)
+        | other -> failwithf "expected one CausalAssertionRecorded, got %A" other
+        let entity = after.Causes.[c.CauseId]
+        Assert.Equal(CauseState.CauseProposed, entity.State)
+        Assert.Equal(text "The export stopped", entity.Outcome)
+        Assert.Equal(Some(text "the chain breaks"), entity.Mechanism)
+
+    [<Fact>]
+    let ``RecordCausalAssertion refuses no member, an unknown hypothesis, a falsified member and a reused id`` () =
+        let s, h = withHypothesis (active ()) "The disk filled up"
+        let legal = cause h CauseRole.RootCause "The export stopped"
+        Assert.Contains("CAUSE.MEMBERS_REQUIRED", blockedCodes s (RecordCausalAssertion { legal with Members = [] }))
+        Assert.Contains("ENTITY.NOT_FOUND", blockedCodes s (RecordCausalAssertion(cause (HypothesisId(id ())) CauseRole.RootCause "x")))
+        let s2, e = withEvidence s
+        let falsified = ok s2 (FalsifyHypothesis { HypothesisId = h; Reason = text "plenty of space"; EvidenceIds = [ e ] })
+        Assert.Contains("CAUSE.MEMBER_EXCLUDED", blockedCodes falsified (RecordCausalAssertion legal))
+        let recorded = ok s (RecordCausalAssertion legal)
+        Assert.Contains("ID.DUPLICATE", blockedCodes recorded (RecordCausalAssertion legal))
+        Assert.Equal(1, recorded.Causes.Count)
+
+    [<Fact>]
+    let ``RecordCausalAssertion is offered once a hypothesis can take part, and not before`` () =
+        let s = active ()
+        Assert.DoesNotContain("RecordCausalAssertion", Capabilities.available Policies.coreDefault s)
+        let s, _ = withHypothesis s "The disk filled up"
+        Assert.Contains("RecordCausalAssertion", Capabilities.available Policies.coreDefault s)
+
+    [<Fact>]
+    let ``RecordCorrectiveAction records a proposed action against a cause and refuses an unknown cause`` () =
+        let s, h = withHypothesis (active ()) "The disk filled up"
+        let c = cause h CauseRole.RootCause "The export stopped"
+        let s = ok s (RecordCausalAssertion c)
+        let fix = CorrectiveActionId(id ())
+        let command = { CorrectiveActionId = fix; Kind = CorrectiveActionKind.Mitigation; Description = text "Rotate the logs nightly"; TargetCauseIds = [ c.CauseId ] }
+        Assert.Contains("ENTITY.NOT_FOUND", blockedCodes s (RecordCorrectiveAction { command with TargetCauseIds = [ CausalAssertionId(id ()) ] }))
+        Assert.Contains("ID.REPEATED", blockedCodes s (RecordCorrectiveAction { command with TargetCauseIds = [ c.CauseId; c.CauseId ] }))
+        let after = ok s (RecordCorrectiveAction command)
+        match eventsOf s after with
+        | [ CorrectiveActionRecorded recorded ] -> Assert.Equal<CausalAssertionId list>([ c.CauseId ], recorded.TargetCauseIds)
+        | other -> failwithf "expected one CorrectiveActionRecorded, got %A" other
+        let entity = after.CorrectiveActions.[fix]
+        Assert.Equal(CorrectiveActionState.CorrectionProposed, entity.State)
+        Assert.Equal(CorrectiveActionKind.Mitigation, entity.Kind)
+
+    [<Fact>]
+    let ``a conclusion names the causes it rests on; confirmedCause needs every named cause confirmed`` () =
+        let s, h, _ = supported ()
+        let c = cause h CauseRole.RootCause "Checkout fails"
+        let s = ok s (RecordCausalAssertion c)
+        let conclusion strength causes =
+            RecordConclusion { ConclusionId = id (); Statement = text "The certificate expired."; Strength = strength; CauseIds = causes; ResidualUncertainty = None }
+        // Before: CauseIds was always empty, so confirmedCause was refused for want of causes.
+        Assert.Contains("CONCLUSION.CAUSE_NOT_CONFIRMED", blockedCodes s (conclusion ConclusionStrength.ConfirmedCause []))
+        // Naming a proposed cause is not enough for confirmedCause (R6.1)...
+        Assert.Contains("CONCLUSION.CAUSE_NOT_CONFIRMED", blockedCodes s (conclusion ConclusionStrength.ConfirmedCause [ c.CauseId ]))
+        // ...a cause the investigation does not hold is refused...
+        Assert.Contains("ENTITY.NOT_FOUND", blockedCodes s (conclusion ConclusionStrength.SupportedCause [ CausalAssertionId(id ()) ]))
+        // ...while a supported-cause conclusion may name it, and the cause ids are kept.
+        let supportedAfter = ok s (conclusion ConclusionStrength.SupportedCause [ c.CauseId ])
+        match eventsOf s supportedAfter with
+        | [ ConclusionRecorded recorded ] -> Assert.Equal<CausalAssertionId list>([ c.CauseId ], recorded.CauseIds)
+        | other -> failwithf "expected one ConclusionRecorded, got %A" other
+        // Once the cause is confirmed, the confirmed-cause conclusion naming it is allowed.
+        let confirmed = ok s (ConfirmCause { CauseId = c.CauseId })
+        match eventsOf s confirmed with
+        | [ CauseConfirmed _ ] -> ()
+        | other -> failwithf "expected one CauseConfirmed, got %A" other
+        let after = ok confirmed (conclusion ConclusionStrength.ConfirmedCause [ c.CauseId ])
+        Assert.Equal(1, after.Conclusions.Count)
+
+    [<Fact>]
+    let ``every event the cause, corrective action and conclusion editors emit is storable in causa-storage 1.2.0`` () =
+        let s, h, _ = supported ()
+        let c = cause h CauseRole.ContributingFactor "Checkout fails"
+        let s1 = ok s (RecordCausalAssertion c)
+        let s2 = ok s1 (ConfirmCause { CauseId = c.CauseId })
+        let s3 = ok s2 (RecordCorrectiveAction { CorrectiveActionId = CorrectiveActionId(id ()); Kind = CorrectiveActionKind.Prevention; Description = text "Alert 30 days before expiry"; TargetCauseIds = [ c.CauseId ] })
+        let s4 = ok s3 (RecordConclusion { ConclusionId = id (); Statement = text "Expired."; Strength = ConclusionStrength.ConfirmedCause; CauseIds = [ c.CauseId ]; ResidualUncertainty = None })
+        let emitted = eventsOf s s4
+        Assert.Equal(4, emitted.Length)
+        for e in emitted do
+            Assert.True(EventRegistry.representableIn StorageVersion.v120 e, sprintf "%A is not storable in 1.2.0" e)
+            Assert.True(EventRegistry.representableIn StorageVersion.v100 e, sprintf "%A needs more than 1.0.0" e)
+
+    [<Fact>]
+    let ``every hypothesis status change the status editor sends is one HypothesisTransitioned storable in 1.2.0`` () =
+        let s, h = withHypothesis (active ()) "The disk filled up"
+        let s, e = withEvidence s
+        let s1 = ok s (MarkHypothesisPlausible { HypothesisId = h; Reason = text "fits"; EvidenceIds = [] })
+        let s2 = ok s1 (MarkHypothesisSupported { HypothesisId = h; Reason = text "capture"; EvidenceIds = [ e ] })
+        let s3 = ok s2 (FalsifyHypothesis { HypothesisId = h; Reason = text "clean disk failed"; EvidenceIds = [ e ] })
+        let s4, fresh = withEvidence s3
+        let s5 = ok s4 (ReopenHypothesis { HypothesisId = h; Reason = text "hotfix"; EvidenceIds = [ fresh ] })
+        let emitted = (eventsOf s s3) @ (eventsOf s4 s5)
+        Assert.Equal(4, emitted.Length)
+        for ev in emitted do
+            Assert.True(EventRegistry.representableIn StorageVersion.v120 ev, sprintf "%A is not storable in 1.2.0" ev)
+            Assert.Equal(Some "HypothesisTransitioned", EventRegistry.kindOf ev |> Option.map (fun x -> x.EventType))

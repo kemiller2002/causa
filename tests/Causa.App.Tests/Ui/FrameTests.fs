@@ -155,13 +155,15 @@ module GraphEditorTests =
 
     let private projection (actions: (ActionId * Availability) list) (links: LinkCard list) (conclusions: int) : AnalysisProjection =
         { Observations = []
-          Hypotheses = [ { Id = "h1"; Statement = "Valve h1"; State = "Proposed"; Explanation = None; Links = links } ]
+          Hypotheses = [ { Id = "h1"; Statement = "Valve h1"; State = "Proposed"; Explanation = None; Links = links; Transitions = Map.empty } ]
           Evidence =
             [ { Id = "e1"; Label = Some "Gauge e1"; Content = "reads 40"; SourceReference = None; SourceUrl = None; Category = None; CapturedAt = None; Links = links }
               { Id = "e2"; Label = None; Content = "unlabelled content"; SourceReference = None; SourceUrl = None; Category = None; CapturedAt = None; Links = [] } ]
           Relationships = links
           Timeline = []
-          Conclusions = [ for i in 1..conclusions -> { Id = sprintf "c%d" i; Statement = "c"; Strength = "Leading explanation"; ResidualUncertainty = None; RecordedAtVersion = None } ]
+          Conclusions = [ for i in 1..conclusions -> { Id = sprintf "c%d" i; Statement = "c"; Strength = "Leading explanation"; ResidualUncertainty = None; RecordedAtVersion = None; Causes = [] } ]
+          Causes = []
+          CorrectiveActionItems = []
           NextSteps = []
           UnresolvedContradictions = Known 0
           CorrectiveActionsSupported = false

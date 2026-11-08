@@ -73,6 +73,10 @@ module Fields =
     let evidenceUrl = FieldId "INV-029"
     let relationshipKind = FieldId "INV-031"
     let conclusionStatement = FieldId "INV-033"
+    /// The required choice groups (ODR-V416-RC3 A: nothing selected at first) and the optional residual uncertainty.
+    let evidenceCategory = FieldId "INV-045"
+    let conclusionStrength = FieldId "INV-046"
+    let conclusionResidual = FieldId "INV-047"
     let relationshipRationale = FieldId "INV-038"
     /// The link editor's evidence and hypothesis choosers (J2-04 picks them by combobox name; INV-030 names the action).
     let linkEvidence = FieldId "UIF-LINK-EVIDENCE"
@@ -517,10 +521,13 @@ module ContentForms =
 
     let evidence : FieldSpec list =
         [ { Field = Fields.evidenceLabel; Label = "Evidence label"; Component = TextInput; Rules = [ Required; MinLength 1; MaxLength 200 ] }
-          { Field = Fields.evidenceSource; Label = "Evidence source reference"; Component = TextInput; Rules = [ MaxLength 10000 ] }
+          // INV-028: required, 1..10000 (the kernel's AdmitEvidence needs a source).
+          { Field = Fields.evidenceSource; Label = "Evidence source reference"; Component = TextInput; Rules = [ Required; MinLength 1; MaxLength 10000 ] }
           { Field = Fields.evidenceUrl; Label = "Evidence source URL"; Component = UrlInput; Rules = [ MaxLength 2000; Pattern SafeUrl.pattern ] }
           // INV-012 has no validation block; required: true.
-          { Field = Fields.evidenceContent; Label = "Evidence original content"; Component = TextArea; Rules = [ Required ] } ]
+          { Field = Fields.evidenceContent; Label = "Evidence original content"; Component = TextArea; Rules = [ Required ] }
+          { Field = Fields.evidenceCategory; Label = "Evidence category"; Component = RadioGroup
+            Rules = [ Required; OneOf [ "directObservation"; "measurement"; "log"; "document"; "experimentResult"; "testimony"; "externalReference" ] ] } ]
 
     let link : FieldSpec list =
         [ { Field = Fields.linkEvidence; Label = "Evidence"; Component = Select; Rules = [ Required ] }
@@ -530,7 +537,10 @@ module ContentForms =
           { Field = Fields.relationshipRationale; Label = "Evidence relationship rationale"; Component = TextArea; Rules = [ Required; MinLength 1; MaxLength 10000 ] } ]
 
     let conclusion : FieldSpec list =
-        [ { Field = Fields.conclusionStatement; Label = "Conclusion statement"; Component = TextArea; Rules = [ Required; MinLength 1; MaxLength 10000 ] } ]
+        [ { Field = Fields.conclusionStatement; Label = "Conclusion statement"; Component = TextArea; Rules = [ Required; MinLength 1; MaxLength 10000 ] }
+          { Field = Fields.conclusionStrength; Label = "Conclusion strength"; Component = RadioGroup
+            Rules = [ Required; OneOf [ "plausibleExplanation"; "leadingExplanation"; "supportedCause"; "confirmedCause"; "acceptedWithResidualUncertainty" ] ] }
+          { Field = Fields.conclusionResidual; Label = "Residual uncertainty"; Component = TextArea; Rules = [ MaxLength 10000 ] } ]
 
     let all = observation @ hypothesis @ evidence @ link @ conclusion
 
@@ -560,12 +570,12 @@ module ActionContracts =
           a Actions.recordObservation Screens.workspace "Record an observation" Button DataEditable [ Fields.observationText; Fields.observationSource ] "RecordObservation; the text is listed"
           a Actions.recordHypothesis Screens.workspace "Record a hypothesis" Button DataEditable [ Fields.hypothesisStatement ] "RecordHypothesis; it is listed"
           a Actions.recordEvidence Screens.workspace "Record evidence" Button DataEditable
-              [ Fields.evidenceLabel; Fields.evidenceSource; Fields.evidenceUrl; Fields.evidenceContent ] "AdmitEvidence; it is listed"
+              [ Fields.evidenceLabel; Fields.evidenceSource; Fields.evidenceUrl; Fields.evidenceContent; Fields.evidenceCategory ] "AdmitEvidence; it is listed"
           a Actions.linkEvidence Screens.workspace "Link evidence to a hypothesis" Button DataEditable
               [ Fields.linkEvidence; Fields.linkHypothesis; Fields.relationshipKind; Fields.relationshipRationale ] "RelateEvidence; shown on the evidence and the hypothesis"
           a Actions.reassess Screens.workspace "Reassess" Button DataEditable
               [ Fields.linkEvidence; Fields.linkHypothesis; Fields.relationshipKind; Fields.relationshipRationale ] "a new current assessment; the earlier one stays in the history"
-          a Actions.recordConclusion Screens.workspace "Record a conclusion" Button DataEditable [ Fields.conclusionStatement ] "a conclusion snapshot; the investigation is not resolved"
+          a Actions.recordConclusion Screens.workspace "Record a conclusion" Button DataEditable [ Fields.conclusionStatement; Fields.conclusionStrength; Fields.conclusionResidual ] "a conclusion snapshot; the investigation is not resolved"
           a Actions.editDetails Screens.workspace "Edit investigation details" Button DataEditable [] "opens the details editor"
           a Actions.saveDetails Screens.workspace "Save details" Button DataEditable [ Fields.detailsTitle; Fields.detailsProblem; Fields.detailsQuestion ] "details changed; the identifier is unchanged"
           a Actions.cancelEditor Screens.workspace "Cancel" Button DataEditable [] "closes the editor; nothing entered is recorded or written"

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "causa-t0",
-  "nextSeq": 32,
+  "nextSeq": 33,
   "items": [
     {
       "id": "COND-MISSION-001",
@@ -671,6 +671,27 @@
       "createdByActor": {
         "kind": "agent",
         "id": "claude",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0032",
+      "title": "Record a code-quality metrics baseline for main c8831ba (size, test ratio, complexity, duplication, functional style) against industry benchmarks",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-11-08T12:42:31.896Z",
+      "updatedAt": "2026-11-08T12:42:45Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
         "provider": "anthropic",
         "model": "unknown",
         "runtime": "claude-code"

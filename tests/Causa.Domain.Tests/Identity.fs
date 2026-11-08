@@ -385,3 +385,18 @@ module CauseCorrectionTests =
         for e in emitted do
             Assert.True(EventRegistry.representableIn StorageVersion.v120 e, sprintf "%A is not storable in 1.2.0" e)
             Assert.True(EventRegistry.representableIn StorageVersion.v100 e, sprintf "%A needs more than 1.0.0" e)
+
+    [<Fact>]
+    let ``every hypothesis status change the status editor sends is one HypothesisTransitioned storable in 1.2.0`` () =
+        let s, h = withHypothesis (active ()) "The disk filled up"
+        let s, e = withEvidence s
+        let s1 = ok s (MarkHypothesisPlausible { HypothesisId = h; Reason = text "fits"; EvidenceIds = [] })
+        let s2 = ok s1 (MarkHypothesisSupported { HypothesisId = h; Reason = text "capture"; EvidenceIds = [ e ] })
+        let s3 = ok s2 (FalsifyHypothesis { HypothesisId = h; Reason = text "clean disk failed"; EvidenceIds = [ e ] })
+        let s4, fresh = withEvidence s3
+        let s5 = ok s4 (ReopenHypothesis { HypothesisId = h; Reason = text "hotfix"; EvidenceIds = [ fresh ] })
+        let emitted = (eventsOf s s3) @ (eventsOf s4 s5)
+        Assert.Equal(4, emitted.Length)
+        for ev in emitted do
+            Assert.True(EventRegistry.representableIn StorageVersion.v120 ev, sprintf "%A is not storable in 1.2.0" ev)
+            Assert.Equal(Some "HypothesisTransitioned", EventRegistry.kindOf ev |> Option.map (fun x -> x.EventType))

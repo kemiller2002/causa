@@ -21,7 +21,7 @@ let private projection (evidence: int) (hypotheses: int) (links: LinkCard list) 
     { Observations = []
       Hypotheses =
         [ for i in 1..hypotheses ->
-              { Id = sprintf "h%d" i; Statement = sprintf "Hypothesis %d with a statement long enough to be truncated in its node" i; State = "Proposed"; Explanation = None; Links = [] } ]
+              { Id = sprintf "h%d" i; Statement = sprintf "Hypothesis %d with a statement long enough to be truncated in its node" i; State = "Proposed"; Explanation = None; Links = []; Transitions = Map.empty } ]
       Evidence =
         [ for i in 1..evidence ->
               { Id = sprintf "e%d" i; Label = Some(sprintf "Evidence %d" i); Content = "content"; SourceReference = None; SourceUrl = None; Category = None; CapturedAt = None; Links = [] } ]

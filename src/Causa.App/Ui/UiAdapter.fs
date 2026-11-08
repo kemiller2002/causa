@@ -237,7 +237,57 @@ module WorkspaceAnalysis =
         | Actor.System id -> text id
         | Actor.Agent(id, _, _) -> text id
 
+    /// What the kernel would decide for this command now, at the investigation's version (pure: Decide only).
+    let probe (i: Investigation) (command: CoreCommand) : Decision =
+        let envelope = { CommandId = Guid.Empty; Investigation = i.Id; ExpectedVersion = Some i.Version; Command = Core command }
+        Kernel.kernel.Decide Policies.coreDefault { ActorId = "causa-user" } (Some i) envelope
+
+    /// The evidence a status change's probe cites: every item the kernel could accept for it (Supported counts only
+    /// usable evidence; Falsify and Reopen any; Reopen's own rule then asks for one admitted after the falsification).
+    let private probeEvidence (i: Investigation) (change: string) =
+        match change with
+        | "markPlausible" -> []
+        | "markSupported" -> i.Evidence |> Map.toList |> List.map fst |> List.filter (Policies.isUsableEvidence i)
+        | _ -> i.Evidence |> Map.toList |> List.map fst
+
+    /// The status command a change word names (Presentation's Actions.hypothesisTransitions).
+    let statusCommand (change: string) (h: HypothesisId) (reason: NonEmptyText) (evidence: Guid list) : CoreCommand option =
+        match change with
+        | "markPlausible" -> Some(MarkHypothesisPlausible { HypothesisId = h; Reason = reason; EvidenceIds = evidence })
+        | "markSupported" -> Some(MarkHypothesisSupported { HypothesisId = h; Reason = reason; EvidenceIds = evidence })
+        | "falsify" -> Some(FalsifyHypothesis { HypothesisId = h; Reason = reason; EvidenceIds = evidence })
+        | "reopen" -> Some(ReopenHypothesis { HypothesisId = h; Reason = reason; EvidenceIds = evidence })
+        | _ -> None
+
+    /// A decision as an availability: allowed is Available, a refusal is Unavailable with the kernel's first reason.
+    let private availabilityOf (d: Decision) =
+        match d with
+        | Allowed _ -> Available
+        | Blocked(b :: _) -> Unavailable b.Message
+        | Blocked [] -> Unavailable "The engine refused this change."
+        | _ -> Unavailable "This change cannot be made now."
+
+    /// R2.3-R2.5 on one hypothesis: each status change its state allows (the kernel's transition table), Available or
+    /// Unavailable with the kernel's reason; a change the state does not allow is not offered.
+    let transitions (i: Investigation) (h: HypothesisEntity) : Map<ActionId, Availability> =
+        let reason = NonEmptyText.create "probe" |> Option.get
+        Actions.hypothesisTransitions
+        |> List.choose (fun (action, change) ->
+            statusCommand change h.Id reason (probeEvidence i change)
+            |> Option.bind (fun command ->
+                match probe i command with
+                | Blocked bs when bs |> List.exists (fun b -> b.Code = "HYPOTHESIS.ILLEGAL_TRANSITION" || b.Code = "INVESTIGATION.NOT_OPEN") -> None
+                | d -> Some(action, availabilityOf d)))
+        |> Map.ofList
+
+    /// Confirm cause on one cause: offered while it is proposed or reopened, as the kernel's cause gate decides.
+    let confirmation (i: Investigation) (c: CauseEntity) : Availability =
+        if c.State <> CauseState.CauseProposed && c.State <> CauseState.CauseReopened then NotOffered
+        else availabilityOf (probe i (ConfirmCause { CauseId = c.Id }))
+
     let ofInvestigation (actions: Map<ActionId, Availability>) (i: Investigation) : AnalysisProjection =
+        // Only an editable investigation (one whose content actions are offered) offers status changes and Confirm.
+        let editable = not actions.IsEmpty
         let allLinks = links i
         let observations =
             i.Observations
@@ -255,7 +305,8 @@ module WorkspaceAnalysis =
                   Statement = text h.Statement
                   State = hypothesisState h.State
                   Explanation = textOpt h.Mechanism
-                  Links = allLinks |> List.filter (fun l -> l.Hypothesis.Id = hid h.Id) })
+                  Links = allLinks |> List.filter (fun l -> l.Hypothesis.Id = hid h.Id)
+                  Transitions = (if editable then transitions i h else Map.empty) })
         let evidence =
             i.Evidence
             |> Map.toList
@@ -306,7 +357,8 @@ module WorkspaceAnalysis =
                     |> List.map (fun m ->
                         { Hypothesis = { Kind = HypothesisEntity; Id = hid m.HypothesisId }
                           HypothesisStatement = i.Hypotheses |> Map.tryFind m.HypothesisId |> Option.map (fun h -> text h.Statement) |> Option.defaultValue "Hypothesis not on record"
-                          Role = causeRole m.Role }) })
+                          Role = causeRole m.Role })
+                  Confirm = (if editable then confirmation i c else NotOffered) })
         let corrective =
             i.CorrectiveActions
             |> Map.toList
@@ -886,6 +938,85 @@ module UiAdapter =
                         fx
                 | _ -> s, []
 
+    /// The status editor's own fields: what a card's status action sets and what Record status change or Cancel clears.
+    let statusFields = [ Fields.statusHypothesis; Fields.statusChange; Fields.statusReason; Fields.statusEvidence ]
+
+    /// A card's status action (row key: the hypothesis id): opens the status editor for that change, empty.
+    let openStatus (change: string) (hypothesis: string) (s: AdapterState) =
+        let content = statusFields |> List.fold (fun m f -> Map.remove f m) s.Local.Content
+        { s with
+            Local =
+                { s.Local with
+                    Content = content |> Map.add Fields.statusHypothesis hypothesis |> Map.add Fields.statusChange change
+                    ContentErrors = [] } },
+        []
+
+    /// The command the status editor describes, checked by the kernel before it is sent: a refusal puts the kernel's own
+    /// reasons into ContentErrors and sends nothing (the editor stays open with what was typed). Pure.
+    let statusDecision (i: Investigation) (value: FieldId -> string) : Result<CoreCommand, ValidationError list> =
+        let err f m = { Field = f; Rule = Required; Message = m }
+        let hypothesis =
+            match Guid.TryParse(value Fields.statusHypothesis) with
+            | true, g when i.Hypotheses.ContainsKey(HypothesisId g) -> Ok(HypothesisId g)
+            | _ -> Error(err Fields.statusReason "Choose a status action on a hypothesis of this investigation.")
+        let evidence =
+            match value Fields.statusEvidence with
+            | "" -> Ok []
+            | v ->
+                match Guid.TryParse v with
+                | true, g when i.Evidence.ContainsKey g -> Ok [ g ]
+                | _ -> Error(err Fields.statusEvidence "Choose evidence from this investigation.")
+        match hypothesis, evidence, NonEmptyText.create (value Fields.statusReason) with
+        | Ok h, Ok ev, Some reason ->
+            match WorkspaceAnalysis.statusCommand (value Fields.statusChange) h reason ev with
+            | None -> Error [ err Fields.statusReason "Choose a status action on a hypothesis of this investigation." ]
+            | Some command ->
+                match WorkspaceAnalysis.probe i command with
+                | Blocked bs ->
+                    Error(bs |> List.map (fun b -> err (if b.Code.Contains "EVIDENCE" then Fields.statusEvidence else Fields.statusReason) b.Message))
+                | _ -> Ok command
+        | h, e, r ->
+            let failed x = match x with Error x -> [ x ] | Ok _ -> []
+            Error(failed h @ failed e @ (if r.IsNone then [ err Fields.statusReason "Reason for the change is required." ] else []))
+
+    /// Sends one kernel command at the investigation's current version.
+    let private send (config: AdapterConfig) (engine: Engine) (ref: InvestigationRef) (i: Investigation) (command: CoreCommand) (s: AdapterState) =
+        let envelope = { CommandId = CommandIds.at (config.Now()); Investigation = ref.Id; ExpectedVersion = Some i.Version; Command = Core command }
+        step engine (Msg.DomainCommand envelope) s
+
+    /// UIA-RECORD-STATUS: validate, ask the kernel, then send; the editor closes once sent.
+    let private recordStatus (config: AdapterConfig) (engine: Engine) (s: AdapterState) =
+        match sessionOfRoute s with
+        | None -> s, []
+        | Some ref ->
+            match Validation.checkAll ContentForms.hypothesisStatus s.Local.Content with
+            | _ :: _ as errors -> { s with Local = { s.Local with ContentErrors = errors } }, []
+            | [] ->
+                match config.InvestigationOf s.Model ref with
+                | Ok(Some i) ->
+                    let value f = s.Local.Content |> Map.tryFind f |> Option.defaultValue ""
+                    match statusDecision i value with
+                    | Error errors -> { s with Local = { s.Local with ContentErrors = errors } }, []
+                    | Ok command ->
+                        let s2, fx = send config engine ref i command s
+                        { s2 with Local = { s2.Local with Content = statusFields |> List.fold (fun m f -> Map.remove f m) s2.Local.Content; ContentErrors = [] } }, fx
+                | _ -> s, []
+
+    /// UIA-CONFIRM-CAUSE (row key: the cause id): ConfirmCause, sent only when the kernel's cause gate allows it;
+    /// otherwise the gate's reason is announced and nothing is sent.
+    let private confirmCause (config: AdapterConfig) (engine: Engine) (cause: string) (s: AdapterState) =
+        match sessionOfRoute s, Guid.TryParse cause with
+        | Some ref, (true, g) ->
+            match config.InvestigationOf s.Model ref with
+            | Ok(Some i) ->
+                let command = ConfirmCause { CauseId = CausalAssertionId g }
+                match WorkspaceAnalysis.probe i command with
+                | Blocked(b :: _) -> { s with Local = { s.Local with Announcements = s.Local.Announcements @ [ Assertive, b.Message ] } }, []
+                | Allowed _ -> send config engine ref i command s
+                | _ -> s, []
+            | _ -> s, []
+        | _ -> s, []
+
     let private closeDetails (local: Local) = { local with Details = None; DetailsErrors = [] }
 
     /// INV-034: the editor opens with the current details, only where the edit is offered (Available).
@@ -991,6 +1122,10 @@ module UiAdapter =
         | UiIntent.Activate(a, _) when a = Actions.recordConclusion -> recordContent config engine Conclusion s
         | UiIntent.Activate(a, _) when a = Actions.recordCause -> recordContent config engine Cause s
         | UiIntent.Activate(a, _) when a = Actions.recordCorrectiveAction -> recordContent config engine CorrectiveAction s
+        | UiIntent.Activate(a, Some hypothesis) when Actions.hypothesisTransitions |> List.exists (fun (x, _) -> x = a) ->
+            openStatus (Actions.hypothesisTransitions |> List.find (fun (x, _) -> x = a) |> snd) hypothesis s
+        | UiIntent.Activate(a, _) when a = Actions.recordStatus -> recordStatus config engine s
+        | UiIntent.Activate(a, Some cause) when a = Actions.confirmCause -> confirmCause config engine cause s
         | UiIntent.Activate(a, Some cause) when a = Actions.toggleConclusionCause ->
             let current = s.Local.Content |> Map.tryFind Fields.conclusionCauses |> Option.defaultValue ""
             { s with Local = { s.Local with Content = s.Local.Content |> Map.add Fields.conclusionCauses (toggleCause cause current) } }, []
@@ -999,7 +1134,7 @@ module UiAdapter =
         | UiIntent.Activate(a, _) when a = Actions.cancelEditor ->
             // INV-036: closes the open editor (the details editor too); nothing entered is recorded or written.
             // Every content draft (observation, hypothesis, evidence, link, conclusion, cause, corrective action) is cleared with it.
-            let cleared = (ContentForms.all |> List.map (fun x -> x.Field)) @ [ Fields.conclusionCauses ]
+            let cleared = (ContentForms.all |> List.map (fun x -> x.Field)) @ [ Fields.conclusionCauses ] @ statusFields
             { s with Local = { closeDetails s.Local with Content = cleared |> List.fold (fun m f -> Map.remove f m) s.Local.Content; ContentErrors = [] } }, []
         | UiIntent.Activate(a, _) when a = Actions.cancelStart -> cancelStart config engine s
         | UiIntent.Activate(a, _) when a = Actions.save || a = ActionId "UIA-SAVE-RETRY" ->

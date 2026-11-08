@@ -525,7 +525,12 @@ type HypothesisCard =
       /// The hypothesis's lifecycle word as the domain states it.
       State: string
       Explanation: string option
-      Links: LinkCard list }
+      Links: LinkCard list
+      /// Additive (feature/causes-actions, owner-approved): the status changes this hypothesis can take now (UIA-MARK-
+      /// PLAUSIBLE, UIA-MARK-SUPPORTED, UIA-FALSIFY-HYPOTHESIS, UIA-REOPEN-HYPOTHESIS), as the kernel decides them: a
+      /// change its state does not allow is absent; one the kernel refuses for another reason is Unavailable with that
+      /// reason. Empty on a frozen demonstration.
+      Transitions: Map<ActionId, Availability> }
 
 type EvidenceCard =
     { Id: string
@@ -565,7 +570,16 @@ type CauseMemberCard = { Hypothesis: EntityRef; HypothesisStatement: string; Rol
 
 /// Additive (feature/causes-actions). A causal assertion (STATE-TRANSITION-TABLES section 10, S11): the outcome it
 /// explains, its members with their roles, its mechanism and its state in words as the domain states it.
-type CauseCard = { Id: string; Outcome: string; Mechanism: string option; State: string; Members: CauseMemberCard list }
+type CauseCard =
+    { Id: string
+      Outcome: string
+      Mechanism: string option
+      State: string
+      Members: CauseMemberCard list
+      /// Additive (owner-approved): Confirm cause (UIA-CONFIRM-CAUSE) as the kernel's cause gate decides it: Available
+      /// when ConfirmCause would be allowed, Unavailable with the gate's first reason otherwise, NotOffered on a frozen
+      /// demonstration or once the cause is confirmed or superseded.
+      Confirm: Availability }
 
 /// Additive (feature/causes-actions). A corrective action (R7.1, S12): its kind (S12-O8: mitigation, workaround,
 /// correction or prevention, always in words), what it does, its state in words and the causes it targets (outcomes).

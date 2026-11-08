@@ -266,3 +266,7 @@ html:has(.causa-workspace) { scroll-behavior: auto; }
   font-weight: var(--ef-type-weight-strong, 600);
 }
 .causa-toggle[aria-pressed="true"]::before { content: "\2713\00a0" / ""; }
+
+/* A hypothesis card's status actions and a cause card's Confirm cause: at least 44 px targets that wrap at 390 px. */
+.causa-status-actions { gap: var(--ef-primitive-space-2); }
+.causa-status-action { min-block-size: var(--ef-layout-target-min); min-inline-size: var(--ef-layout-target-min); }

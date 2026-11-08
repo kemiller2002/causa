@@ -158,6 +158,19 @@ module ContentEditors =
                 Bind.cellText "state" c.State
                 Bind.cellText "pressed" (if List.contains c.Id chosen then "true" else "false") ] ]
 
+    let private statusFields =
+        [ "reason", Fields.statusReason
+          "evidence", Fields.statusEvidence ]
+
+    /// The status editor's words for each change: its heading verb and what the evidence must be (the kernel's rules).
+    let statusChangeText (change: string) =
+        match change with
+        | "markPlausible" -> Some("Mark plausible", "Optional: the evidence that makes it plausible.")
+        | "markSupported" -> Some("Mark supported", "Required: evidence that supports it and is still current.")
+        | "falsify" -> Some("Falsify", "Required: the evidence that falsifies it. A falsified hypothesis stays in the history.")
+        | "reopen" -> Some("Reopen", "Required: evidence admitted after it was falsified.")
+        | _ -> None
+
     /// The evidence words a picker shows: its label, or its content when no label was recorded (causa-storage 1.0.0).
     let evidenceName (e: EvidenceCard) =
         e.Label |> Option.filter (fun l -> l.Trim() <> "") |> Option.defaultValue e.Content
@@ -179,6 +192,16 @@ module ContentEditors =
         let causeHypotheses =
             a |> Option.map (fun a -> a.Hypotheses |> List.filter causeEligible |> List.map (fun h -> h.Id, h.Statement)) |> Option.defaultValue []
         let causeOptions = causesOnRecord |> List.map (fun c -> c.Id, c.Outcome)
+        let statusChange = draft view.Drafts Fields.statusChange
+        let statusTarget =
+            a
+            |> Option.bind (fun a -> a.Hypotheses |> List.tryFind (fun h -> h.Id = draft view.Drafts Fields.statusHypothesis))
+        let statusOpen = statusTarget.IsSome && (statusChangeText statusChange).IsSome
+        let statusAvailability =
+            match statusTarget, Actions.hypothesisTransitions |> List.tryFind (fun (_, c) -> c = statusChange) with
+            | Some h, Some(action, _) -> h.Transitions |> Map.tryFind action |> Option.defaultValue NotOffered
+            | _ -> NotOffered
+        let changed = count (fun a -> a.Hypotheses |> List.filter (fun h -> h.State <> "Proposed") |> List.length)
         let cause = availability actions Actions.recordCause
         let corrective = availability actions Actions.recordCorrectiveAction
         let obsStatus = statusLine "observations" unsaved (empty [ "text", Fields.observationText; "source", Fields.observationSource ]) observations
@@ -217,6 +240,19 @@ module ContentEditors =
             @ [ Bind.items "editor.conclusion.strengths" (choiceRows "strength" (draft view.Drafts PendingFields.conclusionStrength) conclusionStrengths)
                 Bind.flag "editor.conclusion.causes-present" (not causesOnRecord.IsEmpty)
                 Bind.items "editor.conclusion.causes" (causeToggleRows (draft view.Drafts Fields.conclusionCauses) causesOnRecord) ]
+            @ form "editor.status" "" statusAvailability statusFields view.Drafts
+            @ [ Bind.flag "editor.status.open" (statusOpen && statusAvailability <> NotOffered)
+                Bind.text
+                    "editor.status.heading"
+                    (match statusTarget, statusChangeText statusChange with
+                     | Some h, Some(verb, _) -> sprintf "%s: \u201c%s\u201d" verb h.Statement
+                     | _ -> "")
+                Bind.text "editor.status.evidence-help" (statusChangeText statusChange |> Option.map snd |> Option.defaultValue "")
+                Bind.items "editor.status.evidence-options" (pickerRows (draft view.Drafts Fields.statusEvidence) evidenceOptions)
+                Bind.flag "editor.status.evidence-unchosen" ((draft view.Drafts Fields.statusEvidence) = "")
+                Bind.text
+                    "hypotheses.status-saved"
+                    (if statusOpen then "" else statusAt "on each hypothesis card above" "status changes" unsaved true changed) ]
             @ form "editor.cause" (statusLine "causes" unsaved (empty causeFields) causesOnRecord.Length) cause causeFields view.Drafts
             @ [ Bind.items "editor.cause.roles" (choiceRows "role" (draft view.Drafts Fields.causeRole) causeRoles)
                 Bind.items "editor.cause.hypothesis-options" (pickerRows (draft view.Drafts Fields.causeHypothesis) causeHypotheses)

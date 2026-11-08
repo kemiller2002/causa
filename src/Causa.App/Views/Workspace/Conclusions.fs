@@ -48,7 +48,11 @@ module CausesView =
                           Bind.cellText "tone" (stateTone c.State)
                           Bind.cellText "members" (members c)
                           Bind.cellText "mechanism" (c.Mechanism |> Option.defaultValue "")
-                          Bind.cellFlag "hasMechanism" c.Mechanism.IsSome ] ] ]
+                          Bind.cellFlag "hasMechanism" c.Mechanism.IsSome
+                          // Confirm cause only when the kernel's cause gate allows it; otherwise its reason, in words.
+                          Bind.cellFlag "confirmOffered" (c.Confirm = Available)
+                          Bind.cellText "confirmNote" (match c.Confirm with Unavailable r -> "Cannot be confirmed yet: " + r | _ -> "")
+                          Bind.cellFlag "hasConfirmNote" (match c.Confirm with Unavailable _ -> true | _ -> false) ] ] ]
 
 /// The corrective actions on record (Corrective Actions section). S12-O8: the kind is always shown in words, and each
 /// kind has its own tone, so a mitigation or workaround is never mistaken for a correction.

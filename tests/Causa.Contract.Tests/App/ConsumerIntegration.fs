@@ -832,6 +832,158 @@ type CausesCorrectiveActions() =
         Assert.False(none.Actions.ContainsKey Actions.recordCause)
         Assert.False(none.Actions.ContainsKey Actions.recordCorrectiveAction)
 
+/// feature/causes-actions (task 2): hypothesis status (MarkHypothesisPlausible, MarkHypothesisSupported,
+/// FalsifyHypothesis, ReopenHypothesis; R2.3-R2.5) from a card's status action and the status editor, and Confirm cause
+/// (ConfirmCause) on a cause card: offered as the kernel decides, the kernel's own reason when it refuses, nothing sent
+/// on a refusal, the command at the investigation's current version.
+type HypothesisStatusAndConfirm() =
+    let input f v st = Fixture.ui.Dispatch (UiIntent.Input(f, v, None)) st |> fst
+    let act a st = Fixture.ui.Dispatch (UiIntent.Activate(a, None)) st |> fst
+    let actOn a key st = Fixture.ui.Dispatch (UiIntent.Activate(a, Some key)) st |> fst
+    let ref =
+        let writable = UiAdapter.workingCopy Fixture.config |> Option.get
+        { Address = Writable.address writable; Id = InvestigationId Fixture.identifier }
+    let investigation (s: AdapterState) =
+        match Update.investigationOf Fixture.backend s.Model ref with
+        | Ok(Some i) -> i
+        | other -> failwithf "%A" other
+    let analysis (s: AdapterState) =
+        match (Fixture.ui.Project s).Screen with
+        | WorkspaceScreen v -> Causa.App.Views.Workspace.SectionData.analysis v.Section |> Option.get
+        | other -> failwithf "%A" other
+    let lastEnvelope (s: AdapterState) = s.Model.Sessions[ref].Unsaved |> List.last
+    let hypothesis (s: AdapterState) = (analysis s).Hypotheses |> List.exactlyOne
+    let state (s: AdapterState) = (investigation s).Hypotheses |> Map.toList |> List.exactlyOne |> snd |> fun h -> h.State
+    let withHypothesis () =
+        Fixture.started () |> input Fields.hypothesisStatement "The disk filled up." |> act Actions.recordHypothesis
+    let admit label (s: AdapterState) =
+        s
+        |> input Fields.evidenceLabel label
+        |> input Fields.evidenceSource "ops capture"
+        |> input Fields.evidenceContent (label + " content")
+        |> input Fields.evidenceCategory "measurement"
+        |> act Actions.recordEvidence
+    let evidenceId label (s: AdapterState) = ((analysis s).Evidence |> List.find (fun e -> e.Label = Some label)).Id
+    let change action reason (evidence: string option) (s: AdapterState) =
+        let h = (hypothesis s).Id
+        let opened = s |> actOn action h |> input Fields.statusReason reason
+        let opened = match evidence with Some e -> opened |> input Fields.statusEvidence e | None -> opened
+        opened |> act Actions.recordStatus
+    let supportedWithLink () =
+        let s = withHypothesis () |> admit "df at 02:10"
+        let e = evidenceId "df at 02:10" s
+        let linked =
+            s
+            |> input Fields.linkEvidence e
+            |> input Fields.linkHypothesis (hypothesis s).Id
+            |> input Fields.relationshipKind "supports"
+            |> input Fields.relationshipRationale "A full disk stops every write."
+            |> act Actions.linkEvidence
+        linked |> change Actions.markPlausible "It fits the timing." None |> change Actions.markSupported "The capture shows /var full." (Some e), e
+
+    [<Fact>]
+    member _.``a proposed hypothesis offers Mark plausible, and Falsify only with the kernel's reason while no evidence exists``() =
+        let h = hypothesis (withHypothesis ())
+        Assert.Equal(Some Available, h.Transitions.TryFind Actions.markPlausible)
+        Assert.Equal(Some(Unavailable "Falsifying a hypothesis must cite the evidence that caused it (R2.3)."), h.Transitions.TryFind Actions.falsifyHypothesis)
+        // The kernel's transition table: Proposed cannot go straight to Supported, and only a falsified one reopens.
+        Assert.False(h.Transitions.ContainsKey Actions.markSupported)
+        Assert.False(h.Transitions.ContainsKey Actions.reopenHypothesis)
+        let withEvidence = withHypothesis () |> admit "log"
+        Assert.Equal(Some Available, (hypothesis withEvidence).Transitions.TryFind Actions.falsifyHypothesis)
+
+    [<Fact>]
+    member _.``Mark plausible records the reason at the current version and closes the editor``() =
+        let s = withHypothesis ()
+        let i1 = investigation s
+        let opened = s |> actOn Actions.markPlausible (hypothesis s).Id
+        Assert.Equal(Some "markPlausible", opened.Local.Content.TryFind Fields.statusChange)
+        let done' = opened |> input Fields.statusReason "It fits the timing." |> act Actions.recordStatus
+        Assert.Empty(done'.Local.ContentErrors)
+        Assert.Equal(HypothesisState.Plausible, state done')
+        Assert.Equal(Some i1.Version, (lastEnvelope done').ExpectedVersion)
+        match (lastEnvelope done').Command with
+        | Core(MarkHypothesisPlausible m) -> Assert.Equal("It fits the timing.", NonEmptyText.value m.Reason)
+        | other -> Assert.Fail(sprintf "%A" other)
+        for f in UiAdapter.statusFields do
+            Assert.False(done'.Local.Content.ContainsKey f, sprintf "%A was not cleared" f)
+
+    [<Fact>]
+    member _.``a status change the kernel refuses shows the kernel's reason in the editor and sends nothing``() =
+        let s = withHypothesis () |> admit "df" |> change Actions.markPlausible "fits" None
+        let before = s.Model.Sessions
+        // No reason: the editor's own rule.
+        let noReason = s |> actOn Actions.markSupported (hypothesis s).Id |> act Actions.recordStatus
+        Assert.Contains(noReason.Local.ContentErrors, fun e -> e.Field = Fields.statusReason)
+        // No evidence: the kernel's R2.3 rule, in its own words.
+        let noEvidence = s |> actOn Actions.markSupported (hypothesis s).Id |> input Fields.statusReason "It is supported." |> act Actions.recordStatus
+        Assert.Contains(noEvidence.Local.ContentErrors, fun e -> e.Field = Fields.statusEvidence && e.Message = "Marking a hypothesis supported must cite the evidence that caused it (R2.3).")
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, noEvidence.Model.Sessions)
+        // The editor keeps what was typed.
+        Assert.Equal(Some "It is supported.", noEvidence.Local.Content.TryFind Fields.statusReason)
+
+    [<Fact>]
+    member _.``Mark supported with evidence, Falsify, then Reopen only with evidence admitted after the falsification``() =
+        let s, e = supportedWithLink ()
+        Assert.Equal(HypothesisState.Supported, state s)
+        let falsified = s |> change Actions.falsifyHypothesis "A clean disk still failed." (Some e)
+        Assert.Equal(HypothesisState.Falsified, state falsified)
+        let h = hypothesis falsified
+        Assert.Equal(Some(Unavailable "Reopening needs evidence admitted after the hypothesis was falsified (R2.5)."), h.Transitions.TryFind Actions.reopenHypothesis)
+        let refused = falsified |> change Actions.reopenHypothesis "Look again." (Some e)
+        Assert.Contains(refused.Local.ContentErrors, fun x -> x.Message = "Reopening needs evidence admitted after the hypothesis was falsified (R2.5).")
+        Assert.Equal(HypothesisState.Falsified, state refused)
+        let fresh = refused |> act Actions.cancelEditor |> admit "new capture"
+        Assert.Equal(Some Available, (hypothesis fresh).Transitions.TryFind Actions.reopenHypothesis)
+        let reopened = fresh |> change Actions.reopenHypothesis "A hotfix was deployed." (Some(evidenceId "new capture" fresh))
+        Assert.Equal(HypothesisState.Plausible, state reopened)
+        // R2.4: the falsification stays in the history.
+        let history = ((investigation reopened).Hypotheses |> Map.toList |> List.exactlyOne |> snd).History
+        Assert.Contains(history, fun c -> c.To = HypothesisState.Falsified)
+
+    [<Fact>]
+    member _.``Confirm cause is offered only when the cause gate allows it; then a Confirmed cause conclusion naming it is recorded``() =
+        let recordCause (s: AdapterState) =
+            s
+            |> input Fields.causeOutcome "The export stopped."
+            |> input Fields.causeHypothesis (hypothesis s).Id
+            |> input Fields.causeRole "rootCause"
+            |> act Actions.recordCause
+        let proposed = withHypothesis () |> recordCause
+        let card = (analysis proposed).Causes |> List.exactlyOne
+        match card.Confirm with
+        | Unavailable reason -> Assert.Contains("not supported", reason)
+        | other -> Assert.Fail(sprintf "Confirm should be unavailable, was %A" other)
+        // Confirming anyway sends nothing.
+        let before = proposed.Model.Sessions
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, (proposed |> actOn Actions.confirmCause card.Id).Model.Sessions)
+        let s, _ = supportedWithLink ()
+        let s = recordCause s
+        let card = (analysis s).Causes |> List.exactlyOne
+        Assert.Equal(Available, card.Confirm)
+        let i1 = investigation s
+        let confirmed = s |> actOn Actions.confirmCause card.Id
+        Assert.Equal(Some i1.Version, (lastEnvelope confirmed).ExpectedVersion)
+        let after = (analysis confirmed).Causes |> List.exactlyOne
+        Assert.Equal("Confirmed", after.State)
+        Assert.Equal(NotOffered, after.Confirm)
+        let concluded =
+            confirmed
+            |> actOn Actions.toggleConclusionCause card.Id
+            |> input Fields.conclusionStatement "The full disk stopped the export."
+            |> input Fields.conclusionStrength "confirmedCause"
+            |> input Fields.residualUncertainty "Why /var filled is open."
+            |> act Actions.recordConclusion
+        let c = (investigation concluded).Conclusions |> Map.toList |> List.exactlyOne |> snd
+        Assert.Equal(ConclusionStrength.ConfirmedCause, c.Strength)
+        Assert.Equal<CausalAssertionId list>([ CausalAssertionId(Guid card.Id) ], c.CauseIds)
+
+    [<Fact>]
+    member _.``a frozen demonstration offers no status action and no Confirm cause``() =
+        let s, _ = supportedWithLink ()
+        let none = Causa.App.Ui.WorkspaceAnalysis.ofInvestigation Map.empty (investigation s)
+        Assert.All(none.Hypotheses, fun h -> Assert.True(h.Transitions.IsEmpty))
+
 /// feature/causes-actions, end to end through the storage codec: a cause, a corrective action for it and a conclusion
 /// naming it are saved to the (stateful fake) repository and read back in the same tab after reopening from the list.
 type CausesSaveAndReopen() =

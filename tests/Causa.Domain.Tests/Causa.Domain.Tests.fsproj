@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Identity.fs" />
+    <Compile Include="DetailsRevision.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Causa.Domain/Causa.Domain.fsproj" />

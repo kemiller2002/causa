@@ -550,7 +550,26 @@ type TimelineItem =
 
 /// v4.1.6 (RC-6 A): Strength is the stored conclusionStrength, shown with the residual uncertainty
 /// (INVESTIGATION-SEMANTICS: "conclusion strength and residual uncertainty are visible together").
-type ConclusionCard = { Id: string; Statement: string; Strength: string; ResidualUncertainty: string option; RecordedAtVersion: int64 option }
+type ConclusionCard =
+    { Id: string
+      Statement: string
+      Strength: string
+      ResidualUncertainty: string option
+      RecordedAtVersion: int64 option
+      /// Additive (feature/causes-actions): the outcomes of the causes the conclusion names (ConclusionRecorded.causeIds),
+      /// in the order it names them; empty when it names none.
+      Causes: string list }
+
+/// Additive (feature/causes-actions). One member of a causal explanation: a hypothesis in a cause role (R6.3).
+type CauseMemberCard = { Hypothesis: EntityRef; HypothesisStatement: string; Role: string }
+
+/// Additive (feature/causes-actions). A causal assertion (STATE-TRANSITION-TABLES section 10, S11): the outcome it
+/// explains, its members with their roles, its mechanism and its state in words as the domain states it.
+type CauseCard = { Id: string; Outcome: string; Mechanism: string option; State: string; Members: CauseMemberCard list }
+
+/// Additive (feature/causes-actions). A corrective action (R7.1, S12): its kind (S12-O8: mitigation, workaround,
+/// correction or prevention, always in words), what it does, its state in words and the causes it targets (outcomes).
+type CorrectiveActionCard = { Id: string; Kind: string; Description: string; State: string; Causes: string list }
 
 /// UI-032: a domain-derived next step linked to its record; never invented.
 type NextStep = { Text: string; Target: EntityRef; Action: ActionId option }
@@ -563,6 +582,10 @@ type AnalysisProjection =
       Relationships: LinkCard list
       Timeline: TimelineItem list
       Conclusions: ConclusionCard list
+      /// Additive (feature/causes-actions): the causal assertions, oldest first.
+      Causes: CauseCard list
+      /// Additive (feature/causes-actions): the corrective actions, oldest first (shown when CorrectiveActionsSupported).
+      CorrectiveActionItems: CorrectiveActionCard list
       NextSteps: NextStep list
       UnresolvedContradictions: Count
       CorrectiveActionsSupported: bool

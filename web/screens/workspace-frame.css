@@ -247,3 +247,22 @@ html:has(.causa-workspace) { scroll-behavior: auto; }
 @media (min-width: 40rem) and (min-height: 36rem) {
   html:has(.causa-workspace) { scroll-padding-block-start: calc(var(--ef-layout-header-offset) + var(--ef-layout-target-min)); }
 }
+
+/* The conclusion editor's cause toggles (RecordConclusion.CauseIds): toggle buttons with aria-pressed, each at least a
+   44 px target; a pressed one says so in words (the mark) as well as in its border. Its text wraps at 390 px. */
+.causa-cause-toggles { margin: 0; }
+.causa-cause-toggles__list { list-style: none; margin: 0; padding: 0; gap: var(--ef-primitive-space-2); }
+.causa-cause-toggles__list > li { min-inline-size: 0; max-inline-size: 100%; }
+.causa-toggle {
+  min-block-size: var(--ef-layout-target-min);
+  min-inline-size: var(--ef-layout-target-min);
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.causa-toggle[aria-pressed="true"] {
+  border: 2px solid var(--ef-color-accent-primary);
+  font-weight: var(--ef-type-weight-strong, 600);
+}
+.causa-toggle[aria-pressed="true"]::before { content: "\2713\00a0" / ""; }

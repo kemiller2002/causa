@@ -27,7 +27,9 @@ let private projection (evidence: int) (hypotheses: int) (links: LinkCard list) 
               { Id = sprintf "e%d" i; Label = Some(sprintf "Evidence %d" i); Content = "content"; SourceReference = None; SourceUrl = None; Category = None; CapturedAt = None; Links = [] } ]
       Relationships = links
       Timeline = []
-      Conclusions = [ for i in 1..conclusions -> { Id = sprintf "c%d" i; Statement = "Conclusion"; Strength = "Confirmed cause"; ResidualUncertainty = None; RecordedAtVersion = None } ]
+      Conclusions = [ for i in 1..conclusions -> { Id = sprintf "c%d" i; Statement = "Conclusion"; Strength = "Confirmed cause"; ResidualUncertainty = None; RecordedAtVersion = None; Causes = [] } ]
+      Causes = []
+      CorrectiveActionItems = []
       NextSteps = []
       UnresolvedContradictions = Known 0
       CorrectiveActionsSupported = false

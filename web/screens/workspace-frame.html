@@ -209,6 +209,9 @@
                     <template data-if="hasResidual">
                       <p class="causa-item__note"><strong>Residual uncertainty:</strong> <span data-text="residual"></span></p>
                     </template>
+                    <template data-if="hasCauses">
+                      <p class="causa-item__note"><strong>Causes it names:</strong> <span data-text="causes"></span></p>
+                    </template>
                   </li>
                 </template>
               </ul>
@@ -284,6 +287,17 @@
                 </label>
               </template>
             </fieldset>
+            <template data-if="editor.conclusion.causes-present">
+            <div class="ef-field causa-cause-toggles" role="group" aria-labelledby="causa-conclusion-causes-label" aria-describedby="causa-conclusion-causes-help">
+              <p class="ef-field__label" id="causa-conclusion-causes-label">Causes this conclusion names</p>
+              <p class="ef-field__description" id="causa-conclusion-causes-help">Optional. Select a cause to name it, and select it again to remove it. A Confirmed cause conclusion must name causes, and every one must be confirmed.</p>
+              <ul class="ef-cluster causa-cause-toggles__list">
+                <template data-each="editor.conclusion.causes" data-key="key">
+                  <li><button class="ef-button causa-toggle" type="button" data-event="UIA-CONCLUSION-CAUSE" data-bind-aria-pressed="pressed" data-text="label"></button></li>
+                </template>
+              </ul>
+            </div>
+            </template>
             <div class="ef-field">
               <label class="ef-field__label" for="causa-conclusion-residual">Residual uncertainty</label>
               <p class="ef-field__description" id="causa-conclusion-residual-help">What is still uncertain. Needed while any unknown is open, and the investigation's primary question stays open until it is resolved, so fill this in; also needed for Accepted with residual uncertainty.</p>
@@ -867,6 +881,140 @@
               </details>
             </template>
             </div>
+          </template>
+          <h3 class="causa-section__subtitle" id="causa-sec-causes">Causes</h3>
+          <template data-if="causes.present">
+            <ul class="ef-stack causa-list" aria-labelledby="causa-sec-causes">
+              <template data-each="causes.items" data-key="key">
+                <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="state"></span></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="outcome"></pre>
+                  <pre class="causa-item__text" data-text="members"></pre>
+                  <template data-if="hasMechanism"><p class="causa-item__note"><strong>Mechanism:</strong> <span data-text="mechanism"></span></p></template>
+                </article></li>
+              </template>
+            </ul>
+          </template>
+          <template data-if="editor.cause.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="UIA-RECORD-CAUSE" novalidate aria-labelledby="causa-ed-cause" aria-describedby="causa-ed-cause-lead">
+            <h3 id="causa-ed-cause" class="causa-section__subtitle">Record a cause</h3>
+            <p class="causa-item__note" id="causa-ed-cause-lead">A cause names the outcome it explains and the hypothesis that explains it, in its role. It is recorded as proposed.</p>
+            <p class="causa-item__note" data-text="editor.cause.missing"></p>
+            <template data-if="editor.cause.ready">
+            <div class="ef-stack">
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-cause-outcome">Outcome it explains</label>
+              <textarea id="causa-cause-outcome" rows="3" aria-required="true" data-on="input" data-event="UIF-CAUSE-OUTCOME" data-bind-value="editor.cause.outcome"></textarea>
+            </div>
+            <div class="ef-select-field">
+              <label class="ef-field__label" for="causa-cause-hypothesis">Hypothesis</label>
+              <span class="ef-select">
+                <select id="causa-cause-hypothesis" class="ef-select__input" aria-required="true" data-on="change" data-event="UIF-CAUSE-HYPOTHESIS">
+                  <option value="" data-bind-selected="editor.cause.hypothesis-unchosen">Choose a hypothesis</option>
+                  <template data-each="editor.cause.hypothesis-options" data-key="key"><option data-bind-value="key" data-bind-selected="selected" data-text="label"></option></template>
+                </select>
+                <span class="ef-select__indicator" aria-hidden="true"></span>
+              </span>
+            </div>
+            <fieldset class="ef-choice-group causa-choices">
+              <legend class="ef-choice-group__legend">Cause role</legend>
+              <template data-each="editor.cause.roles" data-key="key">
+                <label class="ef-choice">
+                  <input type="radio" name="causa-cause-role" data-on="change" data-event="UIF-CAUSE-ROLE" data-bind-value="key" data-bind-aria-label="name" data-bind-aria-describedby="describedBy" data-bind-checked="checked">
+                  <span class="ef-choice__content"><strong data-text="label"></strong><span data-bind-id="describedBy" data-text="description"></span></span>
+                </label>
+              </template>
+            </fieldset>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-cause-mechanism">Mechanism</label>
+              <p class="ef-field__description" id="causa-cause-mechanism-help">Optional. How the cause produced the outcome.</p>
+              <textarea id="causa-cause-mechanism" rows="3" aria-describedby="causa-cause-mechanism-help" data-on="input" data-event="UIF-CAUSE-MECHANISM" data-bind-value="editor.cause.mechanism"></textarea>
+            </div>
+            </div>
+            </template>
+            <template data-if="editor.cause.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.cause.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.cause.unavailable"></p>
+            <p class="causa-editor__status" role="status" data-text="editor.cause.status"></p>
+            <template data-if="editor.cause.ready">
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.cause.disabled">Record a cause</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+            </template>
+          </form>
+          </template>
+        </section>
+      </template>
+
+      <template data-if="section.corrective-actions">
+        <section class="ef-stack causa-section" aria-labelledby="causa-sec-corrective">
+          <h2 id="causa-sec-corrective" class="causa-section__title">Corrective Actions</h2>
+          <p class="causa-section__lead">What is being done about each cause: a mitigation or workaround limits the harm, a correction removes the cause, a prevention stops it happening again.</p>
+          <template data-if="corrective.present">
+            <ul class="ef-stack causa-list" aria-label="Corrective actions">
+              <template data-each="corrective.items" data-key="key">
+                <li class="causa-list__entry"><article class="ef-card causa-item" data-bind-data-tone="tone">
+                  <p class="causa-item__meta"><span class="ef-badge causa-tag" data-bind-data-tone="tone" data-text="kind"></span> <span class="causa-item__note" data-text="state"></span></p>
+                  <pre class="causa-item__text causa-item__text--lead" data-text="description"></pre>
+                  <template data-if="hasCauses"><p class="causa-item__note"><strong>Addresses:</strong> <span data-text="causes"></span></p></template>
+                </article></li>
+              </template>
+            </ul>
+          </template>
+          <template data-if="editor.corrective.offered">
+          <form class="ef-form ef-stack causa-panel causa-editor" data-event="UIA-RECORD-CORRECTIVE-ACTION" novalidate aria-labelledby="causa-ed-corrective" aria-describedby="causa-ed-corrective-lead">
+            <h3 id="causa-ed-corrective" class="causa-section__subtitle">Record a corrective action</h3>
+            <p class="causa-item__note" id="causa-ed-corrective-lead">Say what will be done about a cause, and what kind of action it is. It is recorded as proposed.</p>
+            <p class="causa-item__note" data-text="editor.corrective.missing"></p>
+            <template data-if="editor.corrective.ready">
+            <div class="ef-stack">
+            <div class="ef-select-field">
+              <label class="ef-field__label" for="causa-corrective-cause">Cause it addresses</label>
+              <span class="ef-select">
+                <select id="causa-corrective-cause" class="ef-select__input" aria-required="true" data-on="change" data-event="UIF-CORRECTIVE-CAUSE">
+                  <option value="" data-bind-selected="editor.corrective.cause-unchosen">Choose a cause</option>
+                  <template data-each="editor.corrective.cause-options" data-key="key"><option data-bind-value="key" data-bind-selected="selected" data-text="label"></option></template>
+                </select>
+                <span class="ef-select__indicator" aria-hidden="true"></span>
+              </span>
+            </div>
+            <div class="ef-field">
+              <label class="ef-field__label" for="causa-corrective-description">Corrective action</label>
+              <textarea id="causa-corrective-description" rows="3" aria-required="true" data-on="input" data-event="UIF-CORRECTIVE-DESCRIPTION" data-bind-value="editor.corrective.description"></textarea>
+            </div>
+            <fieldset class="ef-choice-group causa-choices">
+              <legend class="ef-choice-group__legend">Corrective action kind</legend>
+              <template data-each="editor.corrective.kinds" data-key="key">
+                <label class="ef-choice">
+                  <input type="radio" name="causa-corrective-kind" data-on="change" data-event="UIF-CORRECTIVE-KIND" data-bind-value="key" data-bind-aria-label="name" data-bind-aria-describedby="describedBy" data-bind-checked="checked">
+                  <span class="ef-choice__content"><strong data-text="label"></strong><span data-bind-id="describedBy" data-text="description"></span></span>
+                </label>
+              </template>
+            </fieldset>
+            </div>
+            </template>
+            <template data-if="editor.corrective.errors-present">
+              <div class="ef-validation-summary" role="alert">
+                <ul class="ef-validation-summary__list">
+                  <template data-each="editor.corrective.errors" data-key="field"><li data-text="message"></li></template>
+                </ul>
+              </div>
+            </template>
+            <p class="causa-item__note" data-text="editor.corrective.unavailable"></p>
+            <p class="causa-editor__status" role="status" data-text="editor.corrective.status"></p>
+            <template data-if="editor.corrective.ready">
+            <div class="ef-cluster causa-editor__actions">
+              <button class="ef-button causa-action-primary" type="submit" data-bind-disabled="editor.corrective.disabled">Record a corrective action</button>
+              <button class="ef-button" type="button" data-event="INV-036">Cancel</button>
+            </div>
+            </template>
+          </form>
           </template>
         </section>
       </template>

@@ -81,6 +81,8 @@ type ContentKind =
     | Evidence
     | Relationship
     | Conclusion
+    | Cause
+    | CorrectiveAction
 
 /// The analysis the workspace sections render, read from a replayed Investigation (Data Understood once the adapter
 /// wraps it with Understood.projected at the investigation's version). Pure; it invents nothing: a value the domain
@@ -135,6 +137,45 @@ module WorkspaceAnalysis =
         | ConclusionStrength.ConfirmedCause -> "Confirmed cause"
         | ConclusionStrength.AcceptedWithResidualUncertainty -> "Accepted with residual uncertainty"
 
+    let causeState (s: CauseState) =
+        match s with
+        | CauseState.CauseProposed -> "Proposed"
+        | CauseState.CauseConfirmed -> "Confirmed"
+        | CauseState.CauseReopened -> "Reopened"
+        | CauseState.CauseSuperseded -> "Superseded"
+
+    let causeRole (r: CauseRole) =
+        match r with
+        | CauseRole.RootCause -> "Root cause"
+        | CauseRole.ContributingFactor -> "Contributing factor"
+        | CauseRole.Trigger -> "Trigger"
+        | CauseRole.EnablingCondition -> "Enabling condition"
+
+    let correctiveKind (k: CorrectiveActionKind) =
+        match k with
+        | CorrectiveActionKind.Mitigation -> "Mitigation"
+        | CorrectiveActionKind.Workaround -> "Workaround"
+        | CorrectiveActionKind.Correction -> "Correction"
+        | CorrectiveActionKind.Prevention -> "Prevention"
+
+    let correctiveState (s: CorrectiveActionState) =
+        match s with
+        | CorrectiveActionState.CorrectionProposed -> "Proposed"
+        | CorrectiveActionState.CorrectionApproved -> "Approved"
+        | CorrectiveActionState.CorrectionInProgress -> "In progress"
+        | CorrectiveActionState.CorrectionImplemented -> "Implemented"
+        | CorrectiveActionState.CorrectionAwaitingVerificationOfEffect -> "Awaiting verification of effect"
+        | CorrectiveActionState.CorrectionVerifiedEffective -> "Verified effective"
+        | CorrectiveActionState.CorrectionVerificationFailed -> "Verification failed"
+        | CorrectiveActionState.CorrectionReworkRequired -> "Rework required"
+        | CorrectiveActionState.CorrectionCancelled -> "Cancelled"
+
+    let private cid (CausalAssertionId g) = guid g
+
+    /// The outcome of each cause an id names, in order; an id this investigation does not hold says so.
+    let private causeOutcomes (i: Investigation) (ids: CausalAssertionId list) =
+        ids |> List.map (fun id -> i.Causes |> Map.tryFind id |> Option.map (fun c -> text c.Outcome) |> Option.defaultValue "Cause not on record")
+
     let private evidenceLabel (e: EvidenceEntity) =
         match e.Label with
         | Some l -> text l
@@ -177,6 +218,8 @@ module WorkspaceAnalysis =
             | EvidenceAdmitted ev -> "Evidence admitted: " + text ev.Content
             | FindingRecorded f -> "Finding recorded: " + text f.OriginalResult
             | ConclusionRecorded c -> "Conclusion recorded: " + text c.Statement
+            | CausalAssertionRecorded c -> "Cause recorded: " + text c.Outcome
+            | CorrectiveActionRecorded c -> "Corrective action recorded: " + text c.Description
             | UnknownIdentified u -> "Unknown identified: " + text u.Question
             | other ->
                 let case, _ = Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(other, typeof<CoreEvent>)
@@ -246,7 +289,36 @@ module WorkspaceAnalysis =
                   Statement = text c.Statement
                   Strength = conclusionStrength c.Strength
                   ResidualUncertainty = textOpt c.ResidualUncertainty
-                  RecordedAtVersion = Some(version c.RecordedAtVersion) })
+                  RecordedAtVersion = Some(version c.RecordedAtVersion)
+                  Causes = causeOutcomes i c.CauseIds })
+        let causes =
+            i.Causes
+            |> Map.toList
+            |> List.map snd
+            |> List.sortBy (fun c -> c.Provenance.RecordedAt)
+            |> List.map (fun c ->
+                { Id = cid c.Id
+                  Outcome = text c.Outcome
+                  Mechanism = textOpt c.Mechanism
+                  State = causeState c.State
+                  Members =
+                    c.Members
+                    |> List.map (fun m ->
+                        { Hypothesis = { Kind = HypothesisEntity; Id = hid m.HypothesisId }
+                          HypothesisStatement = i.Hypotheses |> Map.tryFind m.HypothesisId |> Option.map (fun h -> text h.Statement) |> Option.defaultValue "Hypothesis not on record"
+                          Role = causeRole m.Role }) })
+        let corrective =
+            i.CorrectiveActions
+            |> Map.toList
+            |> List.map snd
+            |> List.sortBy (fun c -> c.Provenance.RecordedAt)
+            |> List.map (fun c ->
+                let (CorrectiveActionId g) = c.Id
+                { Id = guid g
+                  Kind = correctiveKind c.Kind
+                  Description = text c.Description
+                  State = correctiveState c.State
+                  Causes = causeOutcomes i c.TargetCauseIds })
         let openContradictions =
             i.Contradictions |> Map.filter (fun _ c -> (c.State <> ContradictionState.ContradictionResolved && c.State <> ContradictionState.ContradictionAcceptedResidual)) |> Map.count
         { Observations = observations
@@ -255,9 +327,11 @@ module WorkspaceAnalysis =
           Relationships = allLinks
           Timeline = timeline
           Conclusions = conclusions
+          Causes = causes
+          CorrectiveActionItems = corrective
           NextSteps = []
           UnresolvedContradictions = Known openContradictions
-          CorrectiveActionsSupported = false
+          CorrectiveActionsSupported = true
           Actions = actions }
 
     /// The content actions an editable investigation offers, as the kernel's capabilities state them (UI-004): available,
@@ -274,7 +348,9 @@ module WorkspaceAnalysis =
               Actions.recordHypothesis, of' "RecordHypothesis"
               Actions.recordEvidence, of' "AdmitEvidence"
               Actions.linkEvidence, of' "RelateEvidence"
-              Actions.recordConclusion, of' "RecordConclusion" ]
+              Actions.recordConclusion, of' "RecordConclusion"
+              Actions.recordCause, of' "RecordCausalAssertion"
+              Actions.recordCorrectiveAction, of' "RecordCorrectiveAction" ]
 
     /// The sections that have something to show, in the fixed order (UI-029-O2); the Overview always.
     let sections (target: RouteTarget) (current: Section) (offered: bool) (i: Investigation) : NavLink<Section> list =
@@ -282,13 +358,15 @@ module WorkspaceAnalysis =
             match s with
             | Overview -> true
             // The causal graph also for a working copy once it holds a hypothesis (a fresh investigation's graph).
-            | CausalAnalysis -> not i.Relationships.IsEmpty || (offered && not i.Hypotheses.IsEmpty)
+            // and wherever a cause is on record (the causes are listed there).
+            | CausalAnalysis -> not i.Relationships.IsEmpty || not i.Causes.IsEmpty || (offered && not i.Hypotheses.IsEmpty)
             // Evidence also when it can be admitted here (an editable working copy), so the first Add evidence form is reachable.
             | EvidenceSection -> not i.Evidence.IsEmpty || offered
             // Hypotheses also when one can be recorded here (an editable working copy).
             | HypothesesSection -> not i.Hypotheses.IsEmpty || offered
             | TimelineSection -> not i.Timeline.IsEmpty
-            | CorrectiveActions -> false
+            // UI-029-O2 "where supported": with corrective actions on record, or where one can be recorded here.
+            | CorrectiveActions -> not i.CorrectiveActions.IsEmpty || offered
         Navigation.sections
         |> List.filter has
         |> List.map (fun s ->
@@ -634,6 +712,31 @@ module UiAdapter =
         | "inconclusive" -> Some Causa.Domain.RelationshipKind.Inconclusive
         | _ -> None
 
+    let causeRoleOf (v: string) =
+        match v with
+        | "rootCause" -> Some CauseRole.RootCause
+        | "contributingFactor" -> Some CauseRole.ContributingFactor
+        | "trigger" -> Some CauseRole.Trigger
+        | "enablingCondition" -> Some CauseRole.EnablingCondition
+        | _ -> None
+
+    let correctiveKindOf (v: string) =
+        match v with
+        | "mitigation" -> Some CorrectiveActionKind.Mitigation
+        | "workaround" -> Some CorrectiveActionKind.Workaround
+        | "correction" -> Some CorrectiveActionKind.Correction
+        | "prevention" -> Some CorrectiveActionKind.Prevention
+        | _ -> None
+
+    /// The cause ids a conclusion draft names (Fields.conclusionCauses: space-separated, in the order chosen).
+    let draftedCauses (value: string) : string list =
+        value.Split(' ', StringSplitOptions.RemoveEmptyEntries) |> List.ofArray
+
+    /// The conclusion draft with this cause added, or removed when it is already named. Pure.
+    let toggleCause (cause: string) (value: string) : string =
+        let current = draftedCauses value
+        (if List.contains cause current then current |> List.filter ((<>) cause) else current @ [ cause ]) |> String.concat " "
+
     /// The editor a record action submits: its form spec (what is validated) and every field it owns (what is cleared).
     let contentForm (kind: ContentKind) : FieldSpec list * FieldId list =
         let ids (specs: FieldSpec list) = specs |> List.map (fun f -> f.Field)
@@ -642,7 +745,9 @@ module UiAdapter =
         | Hypothesis -> ContentForms.hypothesisOnRecord, ids ContentForms.hypothesis
         | Evidence -> ContentForms.evidence, ids ContentForms.evidence
         | Relationship -> ContentForms.link, ids ContentForms.link
-        | Conclusion -> ContentForms.conclusion, ids ContentForms.conclusion
+        | Conclusion -> ContentForms.conclusion, ids ContentForms.conclusion @ [ Fields.conclusionCauses ]
+        | Cause -> ContentForms.cause, ids ContentForms.cause
+        | CorrectiveAction -> ContentForms.correctiveAction, ids ContentForms.correctiveAction
 
     /// The kernel command an editor's valid values describe, or the field errors that stop it (a chooser naming an
     /// evidence item or hypothesis this investigation does not hold). Pure.
@@ -696,7 +801,63 @@ module UiAdapter =
             match conclusionStrengthOf (value Fields.conclusionStrength) with
             | None -> Error [ notChosen Fields.conclusionStrength "a conclusion strength" ]
             | Some strength ->
-                Ok(Core(RecordConclusion { ConclusionId = derivedId cmdId "conclusion"; Statement = required Fields.conclusionStatement; Strength = strength; CauseIds = []; ResidualUncertainty = text Fields.residualUncertainty }))
+                // Only causes this investigation holds; one it no longer lists is a field error, never dropped silently.
+                let chosen = draftedCauses (value Fields.conclusionCauses)
+                let causes =
+                    chosen
+                    |> List.choose (fun c ->
+                        match Guid.TryParse c with
+                        | true, g when i.Causes.ContainsKey(CausalAssertionId g) -> Some(CausalAssertionId g)
+                        | _ -> None)
+                if causes.Length <> chosen.Length then Error [ notChosen Fields.conclusionCauses "the causes" ]
+                else
+                    Ok(Core(RecordConclusion { ConclusionId = derivedId cmdId "conclusion"; Statement = required Fields.conclusionStatement; Strength = strength; CauseIds = causes; ResidualUncertainty = text Fields.residualUncertainty }))
+        | Cause ->
+            let hypothesis =
+                match Guid.TryParse(value Fields.causeHypothesis) with
+                | true, g when i.Hypotheses.ContainsKey(HypothesisId g) -> Ok(HypothesisId g)
+                | _ -> Error(notChosen Fields.causeHypothesis "a hypothesis")
+            let role =
+                match causeRoleOf (value Fields.causeRole) with
+                | Some r -> Ok r
+                | None -> Error(notChosen Fields.causeRole "a cause role")
+            match hypothesis, role with
+            | Ok h, Ok r ->
+                Ok(
+                    Core(
+                        RecordCausalAssertion
+                            { CauseId = CausalAssertionId(derivedId cmdId "cause")
+                              Outcome = required Fields.causeOutcome
+                              Members = [ { HypothesisId = h; Role = r } ]
+                              Mechanism = text Fields.causeMechanism }
+                    )
+                )
+            | h, r ->
+                let failed x = match x with Error e -> [ e ] | Ok _ -> []
+                Error(failed h @ failed r)
+        | CorrectiveAction ->
+            let kind =
+                match correctiveKindOf (value Fields.correctiveKind) with
+                | Some k -> Ok k
+                | None -> Error(notChosen Fields.correctiveKind "a corrective action kind")
+            let cause =
+                match Guid.TryParse(value Fields.correctiveCause) with
+                | true, g when i.Causes.ContainsKey(CausalAssertionId g) -> Ok(CausalAssertionId g)
+                | _ -> Error(notChosen Fields.correctiveCause "a cause")
+            match kind, cause with
+            | Ok k, Ok c ->
+                Ok(
+                    Core(
+                        RecordCorrectiveAction
+                            { CorrectiveActionId = CorrectiveActionId(derivedId cmdId "corrective-action")
+                              Kind = k
+                              Description = required Fields.correctiveDescription
+                              TargetCauseIds = [ c ] }
+                    )
+                )
+            | k, c ->
+                let failed x = match x with Error e -> [ e ] | Ok _ -> []
+                Error(failed k @ failed c)
 
     /// INV-014 / INV-009 / UIA-RECORD-EVIDENCE / INV-030 / INV-032: validate the editor (errors go to ContentErrors),
     /// then send the kernel the command at the investigation's current version; the editor's drafts clear once sent.
@@ -828,12 +989,17 @@ module UiAdapter =
         | UiIntent.Activate(a, _) when a = Actions.recordEvidence -> recordContent config engine Evidence s
         | UiIntent.Activate(a, _) when a = Actions.linkEvidence -> recordContent config engine Relationship s
         | UiIntent.Activate(a, _) when a = Actions.recordConclusion -> recordContent config engine Conclusion s
+        | UiIntent.Activate(a, _) when a = Actions.recordCause -> recordContent config engine Cause s
+        | UiIntent.Activate(a, _) when a = Actions.recordCorrectiveAction -> recordContent config engine CorrectiveAction s
+        | UiIntent.Activate(a, Some cause) when a = Actions.toggleConclusionCause ->
+            let current = s.Local.Content |> Map.tryFind Fields.conclusionCauses |> Option.defaultValue ""
+            { s with Local = { s.Local with Content = s.Local.Content |> Map.add Fields.conclusionCauses (toggleCause cause current) } }, []
         | UiIntent.Activate(a, _) when a = Actions.editDetails -> editDetails config s
         | UiIntent.Activate(a, _) when a = Actions.saveDetails -> saveDetails config engine s
         | UiIntent.Activate(a, _) when a = Actions.cancelEditor ->
             // INV-036: closes the open editor (the details editor too); nothing entered is recorded or written.
-            // Every content draft (observation, hypothesis, evidence, link, conclusion) is cleared with it.
-            let cleared = ContentForms.all |> List.map (fun x -> x.Field)
+            // Every content draft (observation, hypothesis, evidence, link, conclusion, cause, corrective action) is cleared with it.
+            let cleared = (ContentForms.all |> List.map (fun x -> x.Field)) @ [ Fields.conclusionCauses ]
             { s with Local = { closeDetails s.Local with Content = cleared |> List.fold (fun m f -> Map.remove f m) s.Local.Content; ContentErrors = [] } }, []
         | UiIntent.Activate(a, _) when a = Actions.cancelStart -> cancelStart config engine s
         | UiIntent.Activate(a, _) when a = Actions.save || a = ActionId "UIA-SAVE-RETRY" ->

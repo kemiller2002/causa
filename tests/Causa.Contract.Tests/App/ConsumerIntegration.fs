@@ -513,7 +513,9 @@ type ReopenAfterSave() =
             saved
             |> go (UiIntent.Navigate InvestigationsRoute)
             |> go (UiIntent.Navigate(WorkspaceRoute(target, Overview)))
-        Assert.Equal<Section list>([ Overview; CausalAnalysis; EvidenceSection; HypothesesSection; TimelineSection ], sections reopened)
+        // Corrective Actions is supported (feature/causes-actions): an editable working copy lists it, so the first
+        // corrective action can be recorded there (UI-029-O2 "where supported").
+        Assert.Equal<Section list>([ Overview; CausalAnalysis; EvidenceSection; HypothesesSection; TimelineSection; CorrectiveActions ], sections reopened)
 
 /// The evidence, link and conclusion editors (UIA-RECORD-EVIDENCE, INV-030, INV-032): availability from the kernel's
 /// capabilities, validation into ContentErrors, the command at the investigation's version, Cancel clears the drafts.
@@ -652,6 +654,279 @@ type EvidenceLinkConclusion() =
             |> act Actions.cancelEditor
         Assert.True(cancelled.Local.Content.IsEmpty)
         Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, cancelled.Model.Sessions)
+
+/// feature/causes-actions: the cause editor (RecordCausalAssertion), the corrective action editor
+/// (RecordCorrectiveAction) and the conclusion editor's cause toggles (RecordConclusion.CauseIds): availability from the
+/// kernel's capabilities, validation into ContentErrors, the command at the investigation's current version, drafts
+/// cleared once sent, and the projection's cards.
+type CausesCorrectiveActions() =
+    let input f v st = Fixture.ui.Dispatch (UiIntent.Input(f, v, None)) st |> fst
+    let act a st = Fixture.ui.Dispatch (UiIntent.Activate(a, None)) st |> fst
+    let toggle (cause: string) st = Fixture.ui.Dispatch (UiIntent.Activate(Actions.toggleConclusionCause, Some cause)) st |> fst
+    let ref =
+        let writable = UiAdapter.workingCopy Fixture.config |> Option.get
+        { Address = Writable.address writable; Id = InvestigationId Fixture.identifier }
+    let investigation (s: AdapterState) =
+        match Update.investigationOf Fixture.backend s.Model ref with
+        | Ok(Some i) -> i
+        | other -> failwithf "%A" other
+    let analysis (s: AdapterState) =
+        match (Fixture.ui.Project s).Screen with
+        | WorkspaceScreen v -> Causa.App.Views.Workspace.SectionData.analysis v.Section |> Option.get
+        | other -> failwithf "%A" other
+    let sections (s: AdapterState) =
+        match (Fixture.ui.Project s).Screen with
+        | WorkspaceScreen v ->
+            match v.Frame with
+            | Ready f -> f.Sections |> List.map (fun l -> l.Destination)
+            | other -> failwithf "%A" other
+        | other -> failwithf "%A" other
+    let lastEnvelope (s: AdapterState) = s.Model.Sessions[ref].Unsaved |> List.last
+    let hypothesisId (s: AdapterState) =
+        let (HypothesisId h) = (investigation s).Hypotheses |> Map.toList |> List.exactlyOne |> fst
+        h.ToString "D"
+    let withHypothesis () =
+        Fixture.started () |> input Fields.hypothesisStatement "The disk filled up." |> act Actions.recordHypothesis
+    let withCause () =
+        let s = withHypothesis ()
+        s
+        |> input Fields.causeOutcome "The nightly export stopped."
+        |> input Fields.causeHypothesis (hypothesisId s)
+        |> input Fields.causeRole "rootCause"
+        |> input Fields.causeMechanism "No space for the export file."
+        |> act Actions.recordCause
+    let causeId (s: AdapterState) =
+        let (CausalAssertionId c) = (investigation s).Causes |> Map.toList |> List.exactlyOne |> fst
+        c.ToString "D"
+
+    [<Fact>]
+    member _.``Record a cause waits for a hypothesis; Record a corrective action is offered with the kernel's capability``() =
+        let s = Fixture.started ()
+        let actions = (analysis s).Actions
+        Assert.Equal(Some(Unavailable "No hypothesis can take part in a causal explanation."), actions.TryFind Actions.recordCause)
+        Assert.Equal(Some Available, actions.TryFind Actions.recordCorrectiveAction)
+        Assert.Equal(Some Available, (analysis (withHypothesis ())).Actions.TryFind Actions.recordCause)
+        // A working copy lists Corrective Actions (supported), so its editor is reachable.
+        Assert.True((analysis s).CorrectiveActionsSupported)
+        Assert.Contains(CorrectiveActions, sections s)
+
+    [<Fact>]
+    member _.``a cause is recorded at the investigation's version, listed with its member in its role, and the form clears``() =
+        let before = withHypothesis ()
+        let i1 = investigation before
+        let s = withCause ()
+        Assert.Empty(s.Local.ContentErrors)
+        Assert.Equal(Some i1.Version, (lastEnvelope s).ExpectedVersion)
+        match (lastEnvelope s).Command with
+        | Core(RecordCausalAssertion c) ->
+            Assert.Equal("The nightly export stopped.", NonEmptyText.value c.Outcome)
+            Assert.Equal(CauseRole.RootCause, (List.exactlyOne c.Members).Role)
+        | other -> Assert.Fail(sprintf "%A" other)
+        let card = (analysis s).Causes |> List.exactlyOne
+        Assert.Equal("The nightly export stopped.", card.Outcome)
+        Assert.Equal("Proposed", card.State)
+        Assert.Equal(Some "No space for the export file.", card.Mechanism)
+        let mem = List.exactlyOne card.Members
+        Assert.Equal("Root cause", mem.Role)
+        Assert.Equal("The disk filled up.", mem.HypothesisStatement)
+        for f in [ Fields.causeOutcome; Fields.causeHypothesis; Fields.causeRole; Fields.causeMechanism ] do
+            Assert.False(s.Local.Content.ContainsKey f, sprintf "%A was not cleared" f)
+        Assert.Contains(CausalAnalysis, sections s)
+
+    [<Fact>]
+    member _.``an incomplete cause or corrective action puts its errors in ContentErrors and sends nothing``() =
+        let s = withHypothesis ()
+        let before = s.Model.Sessions
+        let cause = s |> input Fields.causeOutcome "The export stopped." |> input Fields.causeHypothesis (Guid.NewGuid().ToString()) |> act Actions.recordCause
+        Assert.Contains(cause.Local.ContentErrors, fun e -> e.Field = Fields.causeRole)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, cause.Model.Sessions)
+        let unknownHypothesis = s |> input Fields.causeOutcome "x" |> input Fields.causeHypothesis (Guid.NewGuid().ToString()) |> input Fields.causeRole "trigger" |> act Actions.recordCause
+        Assert.Contains(unknownHypothesis.Local.ContentErrors, fun e -> e.Field = Fields.causeHypothesis)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, unknownHypothesis.Model.Sessions)
+        let action = s |> input Fields.correctiveDescription "Rotate the logs." |> input Fields.correctiveKind "correction" |> act Actions.recordCorrectiveAction
+        Assert.Contains(action.Local.ContentErrors, fun e -> e.Field = Fields.correctiveCause)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, action.Model.Sessions)
+        let badKind = s |> input Fields.correctiveDescription "Rotate the logs." |> input Fields.correctiveKind "fix" |> input Fields.correctiveCause (Guid.NewGuid().ToString()) |> act Actions.recordCorrectiveAction
+        Assert.Contains(badKind.Local.ContentErrors, fun e -> e.Field = Fields.correctiveKind)
+
+    [<Fact>]
+    member _.``a corrective action is recorded against the chosen cause and listed under Corrective Actions``() =
+        let s = withCause ()
+        let i1 = investigation s
+        let cause = causeId s
+        let recorded =
+            s
+            |> input Fields.correctiveCause cause
+            |> input Fields.correctiveDescription "Rotate the export logs nightly."
+            |> input Fields.correctiveKind "mitigation"
+            |> act Actions.recordCorrectiveAction
+        Assert.Empty(recorded.Local.ContentErrors)
+        Assert.Equal(Some i1.Version, (lastEnvelope recorded).ExpectedVersion)
+        match (lastEnvelope recorded).Command with
+        | Core(RecordCorrectiveAction c) ->
+            Assert.Equal(CorrectiveActionKind.Mitigation, c.Kind)
+            Assert.Equal<CausalAssertionId list>([ CausalAssertionId(Guid cause) ], c.TargetCauseIds)
+        | other -> Assert.Fail(sprintf "%A" other)
+        let card = (analysis recorded).CorrectiveActionItems |> List.exactlyOne
+        Assert.Equal("Mitigation", card.Kind)
+        Assert.Equal("Rotate the export logs nightly.", card.Description)
+        Assert.Equal("Proposed", card.State)
+        Assert.Equal<string list>([ "The nightly export stopped." ], card.Causes)
+        Assert.False(recorded.Local.Content.ContainsKey Fields.correctiveDescription)
+
+    [<Fact>]
+    member _.``the conclusion editor names causes by toggling them; the conclusion carries their ids``() =
+        let s = withCause ()
+        let cause = causeId s
+        // Toggling twice removes it again; once names it.
+        Assert.Equal("", (s |> toggle cause |> toggle cause).Local.Content |> Map.tryFind Fields.conclusionCauses |> Option.defaultValue "")
+        let named = s |> toggle cause
+        Assert.Equal(Some cause, named.Local.Content |> Map.tryFind Fields.conclusionCauses)
+        let i1 = investigation named
+        let concluded =
+            named
+            |> input Fields.conclusionStatement "The disk filled and the export stopped."
+            |> input Fields.conclusionStrength "supportedCause"
+            |> input Fields.residualUncertainty "Why /var filled is not known."
+            |> act Actions.recordConclusion
+        Assert.Empty(concluded.Local.ContentErrors)
+        Assert.Equal(Some i1.Version, (lastEnvelope concluded).ExpectedVersion)
+        let c = (investigation concluded).Conclusions |> Map.toList |> List.exactlyOne |> snd
+        Assert.Equal<CausalAssertionId list>([ CausalAssertionId(Guid cause) ], c.CauseIds)
+        Assert.Equal<string list>([ "The nightly export stopped." ], ((analysis concluded).Conclusions |> List.exactlyOne).Causes)
+        // The drafted causes are cleared with the rest of the editor.
+        Assert.False(concluded.Local.Content.ContainsKey Fields.conclusionCauses)
+
+    [<Fact>]
+    member _.``confirmedCause naming an unconfirmed cause is refused by the kernel; nothing is recorded``() =
+        let s = withCause ()
+        let before = (investigation s).Conclusions
+        let refused =
+            s
+            |> toggle (causeId s)
+            |> input Fields.conclusionStatement "Confirmed."
+            |> input Fields.conclusionStrength "confirmedCause"
+            |> input Fields.residualUncertainty "None known."
+            |> act Actions.recordConclusion
+        Assert.Equal<Map<Guid, ConclusionEntity>>(before, (investigation refused).Conclusions)
+
+    [<Fact>]
+    member _.``Cancel clears the cause, corrective action and named-cause drafts and records nothing``() =
+        let s = withCause ()
+        let before = s.Model.Sessions
+        let cancelled =
+            s
+            |> input Fields.causeOutcome "draft"
+            |> input Fields.causeRole "trigger"
+            |> input Fields.correctiveDescription "draft"
+            |> input Fields.correctiveKind "workaround"
+            |> toggle (causeId s)
+            |> act Actions.cancelEditor
+        Assert.True(cancelled.Local.Content.IsEmpty)
+        Assert.Equal<Map<InvestigationRef, InvestigationSession>>(before, cancelled.Model.Sessions)
+
+    [<Fact>]
+    member _.``a frozen demonstration offers none of the new editors``() =
+        let i = investigation (withCause ())
+        let none = Causa.App.Ui.WorkspaceAnalysis.ofInvestigation Map.empty i
+        Assert.False(none.Actions.ContainsKey Actions.recordCause)
+        Assert.False(none.Actions.ContainsKey Actions.recordCorrectiveAction)
+
+/// feature/causes-actions, end to end through the storage codec: a cause, a corrective action for it and a conclusion
+/// naming it are saved to the (stateful fake) repository and read back in the same tab after reopening from the list.
+type CausesSaveAndReopen() =
+    [<Fact>]
+    member _.``record a cause, a corrective action and a conclusion naming the cause, save, reopen: all are read back``() =
+        let fake = Causa.TestSupport.StatefulFake()
+        let address = (WorkspaceAddress.workingCopy [] "causes").Value
+        let backend =
+            { Fixture.backend with
+                Persistence =
+                    Some
+                        { Connector = GitHubConnect.connector
+                          Machine = SaveMachines.withStorage Fixture.backend.Author
+                          Lister = GitHubLister.lister
+                          Codec = StorageCodecs.codec }
+                WorkingCopy = Some address
+                Now = fun () -> DateTimeOffset.UtcNow }
+        let engine = Update.engine backend
+        let config =
+            { Fixture.config with
+                NewIdentifier = Guid.NewGuid
+                Run = "causes"
+                Now = fun () -> DateTimeOffset.UtcNow
+                SessionLocal = false
+                CanSave = true
+                InvestigationOf = Update.investigationOf backend
+                WorkingCopy = Some address }
+        let ui = UiAdapter.backend config engine
+        let rec settle (s: AdapterState) (effects: HostEffect list) =
+            match effects with
+            | [] -> s
+            | Http r :: rest -> let s2, more = UiAdapter.browser engine (HttpCompleted(fake.Execute r)) s in settle s2 (rest @ more)
+            | _ :: rest -> settle s rest
+        let go intent s = let s2, fx = ui.Dispatch intent s in settle s2 fx
+        let analysis (s: AdapterState) =
+            match (ui.Project s).Screen with
+            | WorkspaceScreen v -> Causa.App.Views.Workspace.SectionData.analysis v.Section |> Option.get
+            | other -> failwithf "not a workspace: %A" other
+        let s0 = fst (ui.Init InvestigationsRoute)
+        let connected =
+            { s0 with
+                Local =
+                    { s0.Local with
+                        Credential = Some fake.WriteConnection.Credential
+                        Form = { Owner = fake.Owner; Repository = fake.Name; Branch = fake.Branch; CredentialEntered = true } } }
+            |> go (UiIntent.Activate(Actions.connect, None))
+        let started =
+            connected
+            |> go (UiIntent.Navigate StartRoute)
+            |> go (UiIntent.Input(Fields.problemStatement, "The nightly export stopped at 02:10.", None))
+            |> go (UiIntent.Activate(Actions.startInvestigation, None))
+        let target =
+            match started.Local.Route with
+            | WorkspaceRoute(t, _) -> t
+            | other -> failwithf "the start did not open the workspace: %A" other
+        let withHypothesis =
+            started
+            |> go (UiIntent.Input(Fields.hypothesisStatement, "The disk filled up.", None))
+            |> go (UiIntent.Activate(Actions.recordHypothesis, None))
+        let hypothesis = (analysis withHypothesis).Hypotheses |> List.exactlyOne
+        let withCause =
+            withHypothesis
+            |> go (UiIntent.Input(Fields.causeOutcome, "The nightly export stopped.", None))
+            |> go (UiIntent.Input(Fields.causeHypothesis, hypothesis.Id, None))
+            |> go (UiIntent.Input(Fields.causeRole, "rootCause", None))
+            |> go (UiIntent.Activate(Actions.recordCause, None))
+        let cause = (analysis withCause).Causes |> List.exactlyOne
+        let complete =
+            withCause
+            |> go (UiIntent.Input(Fields.correctiveCause, cause.Id, None))
+            |> go (UiIntent.Input(Fields.correctiveDescription, "Alert at 80% disk use.", None))
+            |> go (UiIntent.Input(Fields.correctiveKind, "prevention", None))
+            |> go (UiIntent.Activate(Actions.recordCorrectiveAction, None))
+            |> go (UiIntent.Activate(Actions.toggleConclusionCause, Some cause.Id))
+            |> go (UiIntent.Input(Fields.conclusionStatement, "The disk filled and stopped the export.", None))
+            |> go (UiIntent.Input(Fields.conclusionStrength, "leadingExplanation", None))
+            |> go (UiIntent.Activate(Actions.recordConclusion, None))
+        Assert.Empty(complete.Local.ContentErrors)
+        let saved = complete |> go (UiIntent.Activate(Actions.save, None))
+        Assert.True(
+            saved.Model.Sessions |> Map.forall (fun _ v -> match v.State with SaveState.Saved _ -> true | _ -> false),
+            sprintf "the save did not finish: %A" (saved.Model.Sessions |> Map.map (fun _ v -> v.State)))
+        let reopened =
+            saved
+            |> go (UiIntent.Navigate InvestigationsRoute)
+            |> go (UiIntent.Navigate(WorkspaceRoute(target, CorrectiveActions)))
+        let back = analysis reopened
+        let c = back.Causes |> List.exactlyOne
+        Assert.Equal("The nightly export stopped.", c.Outcome)
+        Assert.Equal("Root cause", (List.exactlyOne c.Members).Role)
+        let action = back.CorrectiveActionItems |> List.exactlyOne
+        Assert.Equal("Prevention", action.Kind)
+        Assert.Equal("Alert at 80% disk use.", action.Description)
+        Assert.Equal<string list>([ "The nightly export stopped." ], action.Causes)
+        Assert.Equal<string list>([ "The nightly export stopped." ], (back.Conclusions |> List.exactlyOne).Causes)
 
 /// PERSIST-018: while the tab knows it is offline, Save is still offered; the save machine then sends nothing and
 /// the investigation shows Offline.

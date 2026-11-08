@@ -167,7 +167,7 @@ test('UI-006-O5', async ({ browser }) => {
   for (const [p, text] of [[a, mine], [b, mark('ui006o5-b')]]) {
     await p.getByRole('button', { name: /(add|record) an? observation/i }).first().click();
     await p.getByRole('textbox', { name: /observation text/i }).fill(text);
-    await p.getByRole('button', { name: /^(add|record)/i }).last().click();
+    await p.getByRole('button', { name: /^(add|record) an? observation$/i }).last().click();
   }
   await save(b);
   await button(a, 'Save').click();

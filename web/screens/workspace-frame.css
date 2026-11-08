@@ -207,3 +207,7 @@ details[open] > .causa-focus__summary::before { content: "▾"; }
 .causa-save__state,
 .causa-workspace__title .causa-copy-kind,
 .causa-workspace__title .causa-copy-kind .ef-badge { font-size: var(--ef-type-size-small); }
+/* Discard unsaved changes: Forma's dialog, sized for a phone, with full-size actions. */
+.causa-discard__title { margin: 0; font-size: var(--ef-type-size-h3); }
+.causa-discard__list { margin: 0; padding-inline-start: var(--ef-layout-stack-space); }
+.causa-discard .ef-button, .causa-save__discard { min-block-size: var(--ef-layout-target-min); }

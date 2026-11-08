@@ -29,6 +29,34 @@ module SaveIndicator =
 
     let private has action (save: SavePresentation) = List.contains action save.Indicator.Actions
 
+    /// Whether this tab holds changes that Discard unsaved changes would drop: recorded but not saved (also while
+    /// offline, or after a save failed). Not while a save is in flight or its outcome is being checked, and not in a
+    /// conflict, which has its own Review.
+    let discardPossible kind =
+        match kind with
+        | UnsavedKind
+        | OfflineKind
+        | SaveFailedKind -> true
+        | SavedKind
+        | SavingKind
+        | UnknownOutcomeKind
+        | ConflictKind -> false
+
+    /// The Discard dialog's heading and explanation for each state: what would be discarded, or why nothing can be.
+    let discardCopy kind =
+        match kind with
+        | UnsavedKind
+        | OfflineKind
+        | SaveFailedKind ->
+            "Discard unsaved changes?",
+            "The changes recorded in this tab since the last save will be removed, and the investigation returns to its last saved version. This cannot be undone."
+        | SavedKind -> "Nothing to discard", "Every change in this investigation is saved."
+        | SavingKind -> "Nothing to discard yet", "A save is in progress. Once it finishes, there is nothing left to discard."
+        | UnknownOutcomeKind ->
+            "Nothing to discard yet",
+            "Causa is checking whether the last save reached your data repository. Use Check again; nothing can be discarded until the outcome is known."
+        | ConflictKind -> "Use Review instead", "This save is in conflict with a newer version. Review the conflict to choose which changes to keep."
+
     let bindings (save: SavePresentation option) : Bindings =
         match save with
         | None -> Bind.ofList [ Bind.flag "save.present" false ]
@@ -51,4 +79,8 @@ module SaveIndicator =
                   Bind.flag "save.conflict-present" s.Conflict.IsSome
                   Bind.text "save.conflict" (s.Conflict |> Option.map (fun c -> c.Explanation) |> Option.defaultValue "")
                   Bind.flag "save.not-saved-present" (not s.NotSaved.IsEmpty)
-                  Bind.items "save.not-saved" [ for n in s.NotSaved -> [ Bind.cellText "key" n; Bind.cellText "title" n ] ] ]
+                  Bind.items "save.not-saved" [ for n in s.NotSaved -> [ Bind.cellText "key" n; Bind.cellText "title" n ] ]
+                  Bind.flag "save.discard-possible" (discardPossible s.Kind)
+                  Bind.flag "save.discard-nothing" (not (discardPossible s.Kind))
+                  Bind.text "save.discard-title" (fst (discardCopy s.Kind))
+                  Bind.text "save.discard-explanation" (snd (discardCopy s.Kind)) ]

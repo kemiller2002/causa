@@ -49,7 +49,12 @@
 
     <template data-if="connection.connected">
       <section class="ef-cluster causa-connected" aria-label="Connected repository">
-        <p>Connected to <strong data-text="connection.connected-to"></strong>. <span data-text="connection.write-scope"></span></p>
+        <template data-if="connection.online">
+          <p>Connected to <strong data-text="connection.connected-to"></strong>. <span data-text="connection.write-scope"></span></p>
+        </template>
+        <template data-if="connection.offline">
+          <p role="status" data-text="connection.offline-text"></p>
+        </template>
         <p class="causa-connect__tab-note" role="note">Unsaved changes exist only in this tab and are lost when it closes. Save to keep them in your data repository.</p>
         <template data-if="list.new-offered">
           <a class="ef-button causa-action-primary" href="#/investigations/new" data-event="UIA-NEW-INVESTIGATION">New investigation</a>

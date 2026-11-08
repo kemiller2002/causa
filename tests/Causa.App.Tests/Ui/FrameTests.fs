@@ -134,3 +134,98 @@ module FrameTests =
             |> Seq.map (fun m -> m.Groups.[1].Value)
             |> Set.ofSeq
         Assert.Empty(Set.difference read written)
+
+// The save-state dialog (Discard unsaved changes) and the list's connection line while offline.
+module SaveDialogAndOfflineTests =
+    let private save kind =
+        { Kind = kind
+          Indicator =
+            { InvestigationId = InvestigationId(Guid "3f2a8c1e-0b4d-4e6f-9a7b-1c2d3e4f5a6b")
+              Label = (let w, _, _ = Language.saveState kind in w)
+              Text = ""
+              Glyph = ""
+              Actions = []
+              Politeness = Causa.Persistence.Polite
+              LastSavedCommitTime = None }
+          Save = Available
+          Conflict = None
+          NotSaved = [ "Checkout failures" ] }
+
+    let private text (b: Bindings) key =
+        match Map.tryFind key b with
+        | Some(BindingValue.Text s) -> s
+        | other -> failwithf "%s is %A" key other
+
+    let private flag (b: Bindings) key =
+        match Map.tryFind key b with
+        | Some(BindingValue.Flag f) -> f
+        | other -> failwithf "%s is %A" key other
+
+    [<Fact>]
+    let ``the Discard dialog offers Discard only while the tab holds unsaved changes, and otherwise says why`` () =
+        let all = [ SavedKind; UnsavedKind; SavingKind; OfflineKind; ConflictKind; UnknownOutcomeKind; SaveFailedKind ]
+        for kind in all do
+            let b = SaveIndicator.bindings (Some(save kind))
+            let possible = List.contains kind [ UnsavedKind; OfflineKind; SaveFailedKind ]
+            Assert.Equal(possible, flag b "save.discard-possible")
+            Assert.Equal(not possible, flag b "save.discard-nothing")
+            // Every state has a heading and an explanation: the invoker always opens a dialog that says something.
+            Assert.NotEqual<string>("", text b "save.discard-title")
+            Assert.NotEqual<string>("", text b "save.discard-explanation")
+        let saved = SaveIndicator.bindings (Some(save SavedKind))
+        Assert.Equal("Nothing to discard", text saved "save.discard-title")
+        Assert.Equal("Discard unsaved changes?", text (SaveIndicator.bindings (Some(save UnsavedKind))) "save.discard-title")
+        Assert.Contains("Review", text (SaveIndicator.bindings (Some(save ConflictKind))) "save.discard-explanation")
+
+    [<Fact>]
+    let ``the fragment declares the Discard dialog's invoker and the dialog reads only written bindings`` () =
+        let rec up (dir: DirectoryInfo | null) =
+            match dir with
+            | null -> failwith "repository root not found"
+            | d when File.Exists(Path.Combine(d.FullName, "Causa.slnx")) -> d.FullName
+            | d -> up d.Parent
+        let html = File.ReadAllText(Path.Combine(up (DirectoryInfo AppContext.BaseDirectory), "web", "screens", "workspace-frame.html"))
+        // Always enabled, always opening the dialog (Forma's dialog pattern: commandfor + show-modal).
+        Assert.Contains("type=\"button\" commandfor=\"causa-discard-dialog\" command=\"show-modal\" aria-haspopup=\"dialog\">Discard unsaved changes</button>", html)
+        Assert.Contains("<dialog class=\"ef-dialog causa-discard\" id=\"causa-discard-dialog\"", html)
+        Assert.Contains("data-event=\"UIA-DISCARD-UNSAVED\">Discard changes</button>", html)
+        let written = SaveIndicator.bindings (Some(save UnsavedKind)) |> Map.toList |> List.map fst |> Set.ofList
+        let read =
+            Text.RegularExpressions.Regex.Matches(html, "data-(?:text|if|each|bind-[a-z-]+)=\"(save\\.discard[a-z-]*)\"")
+            |> Seq.map (fun m -> m.Groups.[1].Value)
+            |> Set.ofSeq
+        Assert.NotEmpty(read)
+        Assert.Empty(Set.difference read written)
+
+    let private connection offline =
+        { State = Connected true
+          Form = { Owner = "harness"; Repository = "causa-test"; Branch = "main"; CredentialEntered = true }
+          Errors = []
+          Connect = NotOffered
+          Disconnect = Available
+          Connected = Some "harness/causa-test on main"
+          WriteScope = Writable
+          Offline = offline }
+
+    [<Fact>]
+    let ``while the tab is offline the connection line says so instead of "can save changes"`` () =
+        let online = ConnectionScreen.bindings (connection false)
+        Assert.True(flag online "connection.online")
+        Assert.False(flag online "connection.offline")
+        Assert.Equal("This token can save changes", text online "connection.write-scope")
+        let offline = ConnectionScreen.bindings (connection true)
+        Assert.False(flag offline "connection.online")
+        Assert.True(flag offline "connection.offline")
+        Assert.Equal("Offline: changes stay in this tab until the connection returns.", text offline "connection.offline-text")
+        // Not connected: neither line.
+        let off = ConnectionScreen.bindings { connection true with State = Disconnected }
+        Assert.False(flag off "connection.online")
+        Assert.False(flag off "connection.offline")
+        let rec up (dir: DirectoryInfo | null) =
+            match dir with
+            | null -> failwith "repository root not found"
+            | d when File.Exists(Path.Combine(d.FullName, "Causa.slnx")) -> d.FullName
+            | d -> up d.Parent
+        let html = File.ReadAllText(Path.Combine(up (DirectoryInfo AppContext.BaseDirectory), "web", "screens", "investigation-list.html"))
+        Assert.Contains("<template data-if=\"connection.offline\">", html)
+        Assert.Contains("data-text=\"connection.offline-text\"", html)

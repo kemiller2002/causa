@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "suites": [
+    {
+      "title": "start.spec.ts",
+      "specs": [
+        { "title": "renders the start page", "tests": [{ "status": "expected" }] },
+        { "title": "R-003-O1 graph renders", "tests": [{ "status": "expected" }, { "status": "unexpected" }] },
+        { "title": "UI-010-O1 flaky first time", "tests": [{ "status": "unexpected" }] }
+      ],
+      "suites": [
+        { "title": "nested", "specs": [{ "title": "spec with no tests" }, { "title": "R-012-O1 skipped", "tests": [{ "status": "skipped" }] }] }
+      ]
+    }
+  ]
+}

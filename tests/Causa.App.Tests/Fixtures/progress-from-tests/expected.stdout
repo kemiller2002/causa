@@ -1,0 +1,36 @@
+[
+  {
+    "kind": "implementation-started",
+    "workItem": "A",
+    "requirements": [
+      "R-001",
+      "R-002",
+      "R-003",
+      "R-008",
+      "UI-010",
+      "EXT-DATA-011"
+    ],
+    "at": "2026-11-08T12:00:00Z"
+  },
+  {
+    "kind": "implementation-started",
+    "workItem": "E",
+    "requirements": [
+      "R-010",
+      "R\u00e9-011"
+    ],
+    "at": "2026-11-08T12:00:00Z"
+  },
+  {
+    "kind": "implementation-completed",
+    "requirements": [
+      "EXT-DATA-011",
+      "R-001",
+      "R-002",
+      "R-010",
+      "UI-010"
+    ],
+    "commit": "ec88e860056d4b6c5a6e2292241c3dbc09815126",
+    "at": "2026-11-08T12:00:00Z"
+  }
+]

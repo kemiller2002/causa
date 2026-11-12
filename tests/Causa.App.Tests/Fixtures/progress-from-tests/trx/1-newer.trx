@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="2" name="newer" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Results>
+    <UnitTestResult testName="Suite.R-001-O1 works" outcome="Passed" />
+    <UnitTestResult testName="Suite.EXT-DATA-011-O2 reads the catalog" outcome="Passed" />
+  </Results>
+</TestRun>

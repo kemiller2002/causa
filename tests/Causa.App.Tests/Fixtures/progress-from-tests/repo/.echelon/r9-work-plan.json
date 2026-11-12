@@ -1,0 +1,9 @@
+{
+  "workItems": [
+    { "id": "A", "title": "merged; its own browser branch is not", "requirements": ["R-001", "R-002", "R-003", "R-008", "UI-010", "EXT-DATA-011"] },
+    { "id": "B", "title": "slice branch not merged", "requirements": ["R-004"] },
+    { "id": "C", "title": "started before", "requirements": ["R-005", "R-006", "R-012"] },
+    { "id": "D", "title": "no slice branch", "requirements": ["R-007"] },
+    { "id": "E", "title": "merged from a suffixed branch only", "requirements": ["R-010", "Ré-011"] }
+  ]
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="1" name="older" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Results>
+    <UnitTestResult testName="Suite.R-001-O1 works" outcome="Failed" />
+    <UnitTestResult testName="Suite.MappedTest" outcome="Passed" />
+    <UnitTestResult testName="Suite.Unprefixed" outcome="Passed" />
+    <UnitTestResult testName="Suite.NoObligations" outcome="Failed" />
+    <UnitTestResult testName="Suite.R-003-O1 saves" outcome="Passed" />
+    <UnitTestResult testName="Suite.R-004-O1 passes but B is not started" outcome="Passed" />
+    <UnitTestResult testName="Suite.R-012-O1 and R-005-O1 together" outcome="Passed" />
+    <UnitTestResult testName="Suite.x_R-008-O1 is not a word boundary" outcome="Passed" />
+    <UnitTestResult testName="Suite.R-007-O1 passes but D has no branch" outcome="Passed" />
+    <UnitTestResult outcome="Passed" />
+    <Nested><UnitTestResult testName="Suite.Nested R-006-O1" outcome="NotExecuted" /></Nested>
+  </Results>
+  <UnitTestResult xmlns="urn:other" testName="Suite.R-003-O1 other namespace is ignored" outcome="Failed" />
+</TestRun>

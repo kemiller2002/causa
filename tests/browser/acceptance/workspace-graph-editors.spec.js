@@ -138,6 +138,51 @@ test('at 390 px a working copy admits evidence, links it to a hypothesis as supp
   await context.close();
 });
 
+// A working copy with hypotheses and no evidence yet (the owner's "Checkout page outage" shape): Causal Analysis is
+// listed; at 1280 px the full graph is open on arrival with every hypothesis drawn and noted "No evidence linked yet";
+// at 390 px every hypothesis has its panel, each saying so, and the page never scrolls sideways.
+test('a working copy with hypotheses and no evidence shows its graph and says no evidence is linked yet', async ({ browser }) => {
+  const { context, page, errors } = await connected(browser, { width: 1280, height: 900 });
+  const tag = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const hyps = [`ne-hyp-a-${tag}`, `ne-hyp-b-${tag}`];
+  await page.getByRole('link', { name: /new investigation/i }).first().click();
+  await page.getByLabel('Problem statement', { exact: true }).fill(`ne-problem-${tag}`);
+  await page.getByLabel('Title', { exact: true }).fill(`ne-title-${tag}`);
+  await page.getByLabel('Primary investigative question', { exact: true }).fill(`ne-question-${tag}`);
+  await page.getByRole('button', { name: 'Start investigation', exact: true }).click();
+  await openSection(page, 'Hypotheses');
+  for (const h of hyps) {
+    await page.getByLabel('Hypothesis statement', { exact: true }).fill(h);
+    await page.getByRole('button', { name: 'Record a hypothesis', exact: true }).click();
+    await expect(page.getByRole('article').filter({ hasText: h })).toBeVisible();
+  }
+  await openSection(page, 'Causal Analysis');
+  await expect(page.getByRole('heading', { level: 3, name: 'Causal graph', exact: true })).toBeVisible();
+  const picture = page.getByRole('img', { name: /^Causal graph:/ });
+  await expect(picture).toBeVisible();
+  await expect(picture).toHaveAttribute('aria-label', /to 2 hypotheses by 0 assessments.* 2 hypotheses have no evidence linked yet\./);
+  const figure = page.locator('figure.causa-graph');
+  await expect(figure.locator('rect.causa-graph__node--hypothesis')).toHaveCount(2);
+  await expect(figure.locator('text.causa-graph__note')).toHaveText(['No evidence linked yet', 'No evidence linked yet']);
+  // Every hypothesis has its panel, each saying no evidence is linked yet, on its summary (seen while closed).
+  const panels = page.locator('details.causa-focus__details');
+  await expect(panels).toHaveCount(2);
+  for (const h of hyps) {
+    const panel = panels.filter({ has: page.locator('summary', { hasText: h }) });
+    await expect(panel.locator('.causa-focus__counts')).toHaveText('No evidence linked yet');
+  }
+  await expect(panels.first().getByText(/^No evidence linked yet\. /)).toBeVisible();
+  // At 390 px: the panels are the view, the full graph collapsed, nothing wider than the screen.
+  await page.setViewportSize(PHONE);
+  await expect(panels.first()).toBeVisible();
+  await expect(figure).toBeHidden();
+  await expect(page.locator('summary', { hasText: 'Show full graph' })).toBeVisible();
+  expect(await overflow(page), 'horizontal overflow at 390 px').toBeLessThanOrEqual(0);
+  expect(await touchTargets(page), 'touch targets under 44 px at 390 px').toEqual([]);
+  expect(errors, 'page errors').toEqual([]);
+  await context.close();
+});
+
 // A frozen demonstration offers none of the three editors (UI-004: forms render only when the action is offered).
 test('a frozen demonstration at 390 px shows no evidence, link or conclusion editor', async ({ browser }) => {
   const { context, page, errors } = await connected(browser, PHONE);

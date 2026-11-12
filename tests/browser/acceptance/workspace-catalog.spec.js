@@ -145,10 +145,11 @@ test('Apollo 11 causal graph draws every assessment and keeps its relationship i
   const nav = page.getByRole('navigation', { name: 'Investigation sections' });
   await nav.getByRole('link', { name: 'Causal Analysis', exact: true }).click();
   await expect(nav.getByRole('link', { name: 'Causal Analysis', exact: true })).toHaveAttribute('aria-current', 'page');
-  // The full graph sits behind "Show full graph".
-  await page.locator('summary', { hasText: 'Show full graph' }).click();
+  // On a desktop the full graph is open on arrival, under its own heading: no "Show full graph" to find first.
+  await expect(page.getByRole('heading', { level: 3, name: 'Causal graph', exact: true })).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('summary', { hasText: 'Show full graph' })).toBeHidden();
   const picture = page.getByRole('img', { name: /^Causal graph:/ });
-  await expect(picture).toBeAttached({ timeout: 20000 });
+  await expect(picture).toBeVisible({ timeout: 20000 });
   const summary = await picture.getAttribute('aria-label');
   const assessments = Number(summary.match(/by (\d+) assessments/)[1]);
   expect(assessments).toBeGreaterThan(0);
@@ -177,8 +178,8 @@ test('Apollo 11 causal graph draws every assessment and keeps its relationship i
 });
 
 
-// The phone view: one panel per hypothesis, the first open with its evidence cards, the full graph collapsed, and
-// nothing wider than the screen.
+// The phone view: one panel per hypothesis, the first open with its evidence cards, the full graph collapsed behind
+// "Show full graph" (which opens it), and nothing wider than the screen.
 test('Challenger causal analysis at 390 px: panels by hypothesis, the full graph collapsed', async ({ browser }) => {
   const { context, page, errors } = await connected(browser, { width: 390, height: 844 });
   await page.getByRole('link', { name: CASES[2].title }).first().click();
@@ -202,7 +203,14 @@ test('Challenger causal analysis at 390 px: panels by hypothesis, the full graph
     expect(box).toBeGreaterThanOrEqual(44);
   // Every tap target on the screen is at least 44 x 44 px (FL-01).
   expect(await touchTargets(page), 'touch targets under 44 px at 390 px').toEqual([]);
-  // The full graph is collapsed: its picture is not shown.
+  // The full graph is collapsed: its picture is not shown until "Show full graph" is opened.
+  await expect(page.locator('figure.causa-graph')).toBeHidden();
+  const toggle = page.locator('summary', { hasText: 'Show full graph' });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(page.getByRole('img', { name: /^Causal graph:/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 'horizontal overflow with the graph open at 390 px').toBeLessThanOrEqual(0);
+  await toggle.click();
   await expect(page.locator('figure.causa-graph')).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 'horizontal overflow at 390 px').toBeLessThanOrEqual(0);
   // Opening another panel shows its cards.

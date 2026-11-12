@@ -115,6 +115,25 @@ let ``a working copy with one hypothesis and no assessment still draws its node`
     Assert.True(g.Width > 0.0 && g.Height > 0.0)
 
 [<Fact>]
+let ``a hypothesis with no evidence linked says so beside its node and in the summary`` () =
+    // Two hypotheses, no evidence at all (a fresh working copy): both drawn, both noted, the note inside the canvas.
+    let bare = CausalGraph.layout (projection 0 2 [] 0)
+    Assert.Equal<string list>([ "hypothesis:h1"; "hypothesis:h2" ], bare.Notes |> List.map (fun n -> n.Node))
+    Assert.All(bare.Notes, fun n -> Assert.Equal("No evidence linked yet", n.Text))
+    for n in bare.Notes do
+        let node = bare.Nodes |> List.find (fun h -> h.Key = n.Node)
+        Assert.True(n.X > node.X + node.Width && n.X < bare.Width && n.Y > node.Y && n.Y < node.Y + node.Height, sprintf "%A is not beside its node" n)
+    Assert.Contains("2 hypotheses have no evidence linked yet.", CausalGraph.summary bare)
+    // With no evidence the empty evidence column is left out: the hypotheses start at the left margin.
+    Assert.All(bare.Nodes, fun n -> Assert.Equal(CausalGraph.margin, n.X))
+    // Only the hypothesis no current assessment reaches is noted; a superseded assessment does not count.
+    let partly = CausalGraph.layout (projection 2 3 [ link 1 "e1" "h1" (CatalogKind Supports) true; link 2 "e2" "h2" (CatalogKind Supports) false ] 0)
+    Assert.Equal<string list>([ "hypothesis:h2"; "hypothesis:h3" ], partly.Notes |> List.map (fun n -> n.Node))
+    // A graph where every hypothesis has evidence carries no notes and says nothing about them.
+    Assert.Empty((CausalGraph.layout sample).Notes)
+    Assert.DoesNotContain("no evidence linked", CausalGraph.summary (CausalGraph.layout sample))
+
+[<Fact>]
 let ``the words beside an evidence card never repeat: one per kind, with a count`` () =
     let p =
         projection
@@ -156,4 +175,4 @@ let ``the focused view keeps a hypothesis with nothing assessed and orders by su
         projection 3 3 [ link 1 "e1" "h3" (CatalogKind Supports) true; link 2 "e2" "h3" (CatalogKind Supports) true; link 3 "e3" "h2" (CatalogKind Supports) true ] 0
     let panels = CausalGraph.focus p
     Assert.Equal<string list>([ "h3"; "h2"; "h1" ], panels |> List.map (fun p -> p.Key))
-    Assert.Equal("No evidence assessed yet", CausalGraph.counts panels[2])
+    Assert.Equal("No evidence linked yet", CausalGraph.counts panels[2])

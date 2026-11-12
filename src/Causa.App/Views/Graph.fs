@@ -43,12 +43,17 @@ type GraphEdge =
 /// One word beside an evidence card: each kind once, with its count when several lines of that kind leave the card.
 type EdgeLabel = { Key: string; Evidence: string; Text: string; X: float; Y: float }
 
+/// A note beside a hypothesis node that no current assessment links to: the graph says so in words.
+type NodeNote = { Key: string; Node: string; Text: string; X: float; Y: float }
+
 type GraphLayout =
     { Width: float
       Height: float
       Nodes: GraphNode list
       Edges: GraphEdge list
       Labels: EdgeLabel list
+      /// Hypotheses with no evidence linked yet, each with its note.
+      Notes: NodeNote list
       /// Evidence on record that no current assessment links to a hypothesis: listed in the summary, not drawn.
       UnlinkedEvidence: int }
 
@@ -72,6 +77,8 @@ module CausalGraph =
     let margin = 16.0
     let headerHeight = 32.0
     let labelLength = 30
+    /// The words a hypothesis with no current assessment carries, in the graph and in its panel.
+    let noEvidenceText = "No evidence linked yet"
 
     let truncate (n: int) (s: string) =
         let one = s.Replace("\r", " ").Replace("\n", " ").Trim()
@@ -133,10 +140,16 @@ module CausalGraph =
             if tallest <= count then float i
             elif count = 1 then float (tallest - 1) / 2.0
             else float i * (float (tallest - 1) / float (count - 1))
+        // With no evidence linked yet the evidence column is left out, so the hypotheses start at the left edge.
+        let x column =
+            match column with
+            | GraphColumn.EvidenceColumn -> columnX column
+            | _ when linked.IsEmpty -> columnX column - (nodeWidth + columnGap)
+            | _ -> columnX column
         let node column count i key (label: string) =
             { Key = key
               Column = column
-              X = columnX column
+              X = x column
               Y = rowYAt (slot count i)
               Width = nodeWidth
               Height = nodeHeight
@@ -170,13 +183,20 @@ module CausalGraph =
                           Title = sprintf "%s %s %s" e.FullText (word.ToLowerInvariant()) h.FullText }
                 | _ -> None)
         let labels = labelsOf byKey edges
+        let notes =
+            hypothesisNodes
+            |> List.filter (fun h -> edges |> List.forall (fun e -> e.To <> h.Key))
+            |> List.map (fun h -> { Key = h.Key + ":note"; Node = h.Key; Text = noEvidenceText; X = h.X + h.Width + 8.0; Y = h.Y + h.Height / 2.0 + 4.0 })
         let rows = [ evidenceNodes.Length; hypothesisNodes.Length; conclusionNodes.Length ] |> List.max
-        let columns = if conclusionNodes.IsEmpty then 2.0 else 3.0
+        // The columns drawn; the note beside a hypothesis needs the gap to its right, a column's width.
+        let columns =
+            (if evidenceNodes.IsEmpty then 0.0 else 1.0) + 1.0 + (if conclusionNodes.IsEmpty && notes.IsEmpty then 0.0 else 1.0)
         { Width = 2.0 * margin + columns * nodeWidth + (columns - 1.0) * columnGap
           Height = rowY (max rows 1) + margin
           Nodes = nodes
           Edges = edges
           Labels = labels
+          Notes = notes
           UnlinkedEvidence = a.Evidence.Length - linked.Length }
 
     /// Panels most-supported first, then by title, then in the projection's order; within a panel supporting cards
@@ -220,7 +240,7 @@ module CausalGraph =
         |> List.filter (fun (n, _) -> n > 0)
         |> List.map (fun (n, w) -> sprintf "%d %s" n w)
         |> function
-            | [] -> "No evidence assessed yet"
+            | [] -> noEvidenceText
             | parts -> String.concat " · " parts
 
     /// How many panels the fragment has slots for; further hypotheses are named in the relationship index.
@@ -259,8 +279,9 @@ module CausalGraph =
         let count c = g.Nodes |> List.filter (fun n -> n.Column = c) |> List.length
         let kind k = g.Edges |> List.filter (fun e -> e.Kind = k) |> List.length
         let unlinked = if g.UnlinkedEvidence > 0 then sprintf " %d further evidence items have no assessment and are not drawn." g.UnlinkedEvidence else ""
+        let bare = if g.Notes.IsEmpty then "" else sprintf " %d hypotheses have no evidence linked yet." g.Notes.Length
         sprintf
-            "Causal graph: %d evidence items linked to %d hypotheses by %d assessments (%d supporting, %d contradicting, %d other); %d conclusions.%s The relationship index below lists every assessment as text."
+            "Causal graph: %d evidence items linked to %d hypotheses by %d assessments (%d supporting, %d contradicting, %d other); %d conclusions.%s%s The relationship index below lists every assessment as text."
             (count GraphColumn.EvidenceColumn)
             (count GraphColumn.HypothesisColumn)
             g.Edges.Length
@@ -269,6 +290,7 @@ module CausalGraph =
             (kind EdgeKind.OtherEdge)
             (count GraphColumn.ConclusionColumn)
             unlinked
+            bare
 
     let private columnName c =
         match c with
@@ -285,7 +307,7 @@ module CausalGraph =
     let bindings (view: WorkspaceView) : Bindings =
         let g = SectionData.analysis view.Section |> Option.map layout
         let present = g |> Option.exists (fun g -> not g.Edges.IsEmpty || g.Nodes.Length > 0)
-        let g = g |> Option.defaultValue { Width = 0.0; Height = 0.0; Nodes = []; Edges = []; Labels = []; UnlinkedEvidence = 0 }
+        let g = g |> Option.defaultValue { Width = 0.0; Height = 0.0; Nodes = []; Edges = []; Labels = []; Notes = []; UnlinkedEvidence = 0 }
         let heads =
             [ GraphColumn.EvidenceColumn, "Evidence"; GraphColumn.HypothesisColumn, "Hypotheses"; GraphColumn.ConclusionColumn, "Conclusions" ]
             |> List.filter (fun (c, _) -> g.Nodes |> List.exists (fun n -> n.Column = c))
@@ -299,7 +321,7 @@ module CausalGraph =
                   [ for c, label in heads ->
                         [ Bind.cellText "key" (columnName c)
                           Bind.cellText "label" label
-                          Bind.cellText "x" (f (columnX c))
+                          Bind.cellText "x" (f (g.Nodes |> List.find (fun n -> n.Column = c)).X)
                           Bind.cellText "y" (f (margin + 18.0)) ] ]
               Bind.items
                   "graph.nodes"
@@ -322,6 +344,13 @@ module CausalGraph =
                           Bind.cellText "d" e.Path
                           Bind.cellText "word" e.Word
                           Bind.cellText "title" e.Title ] ]
+              Bind.items
+                  "graph.notes"
+                  [ for n in g.Notes ->
+                        [ Bind.cellText "key" n.Key
+                          Bind.cellText "text" n.Text
+                          Bind.cellText "x" (f n.X)
+                          Bind.cellText "y" (f n.Y) ] ]
               Bind.items
                   "graph.labels"
                   [ for l in g.Labels ->

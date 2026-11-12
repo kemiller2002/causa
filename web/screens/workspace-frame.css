@@ -199,6 +199,7 @@
 .causa-focus__title { font-weight: var(--ef-type-weight-strong, 600); color: var(--ef-color-text-primary); }
 .causa-focus__counts { color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
 .causa-focus__cards { padding: 0 var(--ef-primitive-space-2) var(--ef-primitive-space-2); }
+.causa-focus__details > .causa-item__note { margin: 0; padding: 0 var(--ef-primitive-space-2) var(--ef-primitive-space-2); }
 .causa-focus__card {
   padding: var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-layout-stack-space);
   border-inline-start: 4px solid var(--ef-color-text-secondary);

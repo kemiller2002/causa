@@ -609,19 +609,19 @@
                 <div class="causa-graph__canvas">
                   <svg class="causa-graph__sizer" role="img" data-bind-aria-label="graph.summary" data-bind-width="graph.width" data-bind-height="graph.height"></svg>
                   <template data-each="graph.columns" data-key="key">
-                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><text class="causa-graph__heading" data-bind-x="x" data-bind-y="y" data-text="label"></text></svg></div>
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane" aria-hidden="true"><text class="causa-graph__heading" data-bind-x="x" data-bind-y="y" data-text="label"></text></svg></div>
                   </template>
                   <template data-each="graph.edges" data-key="key">
-                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><path data-bind-class="cls" data-bind-d="d"><title data-text="title"></title></path></svg></div>
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane" aria-hidden="true"><path data-bind-class="cls" data-bind-d="d"><title data-text="title"></title></path></svg></div>
                   </template>
                   <template data-each="graph.nodes" data-key="key">
-                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><g><title data-text="full"></title><rect data-bind-class="cls" data-bind-x="x" data-bind-y="y" data-bind-width="w" data-bind-height="h" rx="6"></rect><text class="causa-graph__label" data-bind-x="tx" data-bind-y="ty" data-text="label"></text></g></svg></div>
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane" aria-hidden="true"><g><title data-text="full"></title><rect data-bind-class="cls" data-bind-x="x" data-bind-y="y" data-bind-width="w" data-bind-height="h" rx="6"></rect><text class="causa-graph__label" data-bind-x="tx" data-bind-y="ty" data-text="label"></text></g></svg></div>
                   </template>
                   <template data-each="graph.notes" data-key="key">
-                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><text class="causa-graph__note" data-bind-x="x" data-bind-y="y" data-text="text"></text></svg></div>
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane" aria-hidden="true"><text class="causa-graph__note" data-bind-x="x" data-bind-y="y" data-text="text"></text></svg></div>
                   </template>
                   <template data-each="graph.labels" data-key="key">
-                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane"><text class="causa-graph__word" data-bind-x="x" data-bind-y="y" data-text="text"></text></svg></div>
+                    <div class="causa-graph__layer" aria-hidden="true"><svg class="causa-graph__plane" aria-hidden="true"><text class="causa-graph__word" data-bind-x="x" data-bind-y="y" data-text="text"></text></svg></div>
                   </template>
                 </div>
               </div>

@@ -18,12 +18,41 @@
   color: var(--causa-on-teal, var(--ef-color-text-inverse));
   min-block-size: var(--ef-layout-target-min);
 }
-.causa-cards { list-style: none; padding: 0; margin: 0; }
-.causa-card { overflow-wrap: anywhere; }
+/* The list as separate cards: Forma's card grid, but with a gap between cards instead of shared hairline rules, each
+   card with its own border, rounded corners and raised elevation, sized to its content (not stretched to the row's
+   height). One column on a phone; as many as fit at Forma's minimum card width on wider screens. */
+.causa-cards.ef-card-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  gap: var(--ef-space-4);
+  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--ef-layout-card-min)), 1fr));
+}
+.causa-cards.ef-card-grid > li > .causa-card {
+  block-size: auto;
+  border: var(--ef-shape-border-width) solid var(--ef-color-border-functional);
+  border-radius: var(--ef-shape-radius);
+  background: var(--ef-color-surface-secondary);
+  box-shadow: var(--ef-effect-shadow-raised);
+  overflow-wrap: anywhere;
+}
 /* Frozen demonstration versus writable copy: told apart in words (the tag and sentence) and by a border, never by
    colour alone (UI-014-O3, UI-016-O13). */
-.causa-card[data-copy="frozen"] { border-inline-start: var(--ef-primitive-space-1) solid var(--ef-color-status-info); }
-.causa-card[data-copy="working"] { border-inline-start: var(--ef-primitive-space-1) solid var(--causa-teal, var(--ef-color-accent-primary)); }
+.causa-cards.ef-card-grid > li > .causa-card[data-copy="frozen"] { border-inline-start: var(--ef-primitive-space-1) solid var(--ef-color-status-info); }
+.causa-cards.ef-card-grid > li > .causa-card[data-copy="working"] { border-inline-start: var(--ef-primitive-space-1) solid var(--causa-teal, var(--ef-color-accent-primary)); }
+/* The facts read as compact rows, label then value, so a card is no taller than its content needs. */
+.causa-card .ef-facts { margin-block-start: var(--ef-space-3); }
+.causa-card .ef-facts__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ef-space-1) var(--ef-space-3);
+  padding: var(--ef-space-2) var(--ef-space-3);
+}
+.causa-card .ef-facts__item > dd { margin: 0; }
 .causa-copy-kind { margin: 0; }
 .causa-tone[data-tone="critical"] { color: var(--causa-coral-strong, var(--ef-color-status-danger)); }
 .causa-tone[data-tone="attention"] { color: var(--ef-color-status-warning); }

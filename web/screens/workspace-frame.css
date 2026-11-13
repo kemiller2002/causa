@@ -176,7 +176,7 @@
 @media (forced-colors: active) {
   .causa-graph__edge { stroke: CanvasText; }
   .causa-graph__node { stroke: CanvasText; fill: Canvas; }
-  .causa-graph__label, .causa-graph__word, .causa-graph__heading { fill: CanvasText; }
+  .causa-graph__label, .causa-graph__word, .causa-graph__heading, .causa-graph__note { fill: CanvasText; }
 }
 .causa-editor__status { margin: 0; color: var(--ef-color-text-primary); font-weight: var(--ef-type-weight-strong, 600); }
 .causa-editor__status:empty { display: none; }
@@ -199,6 +199,7 @@
 .causa-focus__title { font-weight: var(--ef-type-weight-strong, 600); color: var(--ef-color-text-primary); }
 .causa-focus__counts { color: var(--ef-color-text-primary); font-size: var(--ef-type-size-small); }
 .causa-focus__cards { padding: 0 var(--ef-primitive-space-2) var(--ef-primitive-space-2); }
+.causa-focus__details > .causa-item__note { margin: 0; padding: 0 var(--ef-primitive-space-2) var(--ef-primitive-space-2); }
 .causa-focus__card {
   padding: var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-primitive-space-2) var(--ef-layout-stack-space);
   border-inline-start: 4px solid var(--ef-color-text-secondary);
@@ -220,8 +221,21 @@
   overflow: hidden;
 }
 .causa-focus__full > summary { min-block-size: var(--ef-layout-target-min); display: flex; align-items: center; cursor: pointer; }
-.causa-graph__full-view { border: 1px solid var(--ef-color-border-subtle); min-inline-size: 0; }
-.causa-graph__full-view > .causa-graph { padding: var(--ef-primitive-space-2); }
+/* The full graph: open on desktop (48rem, 768 px, and wider), where the toggle is not shown; on a phone the
+   per-hypothesis panels are the view and the graph shows only once "Show full graph" is opened. Without :has()
+   support the graph simply stays open. */
+.causa-graph-view { min-inline-size: 0; }
+.causa-graph__toggle { border: 1px solid var(--ef-color-border-subtle); background: var(--ef-color-surface-primary); }
+@media (max-width: 47.99rem) {
+  @supports selector(:has(*)) {
+    .causa-graph-view:has(> .causa-graph__toggle:not([open])) > .causa-graph { display: none; }
+  }
+}
+@media (min-width: 48rem) {
+  .causa-graph__toggle { display: none; }
+}
+/* A hypothesis with no evidence linked says so beside its node, in words. */
+.causa-graph__note { fill: var(--ef-color-text-primary); font-size: 0.75rem; font-style: italic; }
 /* A flex summary loses the native disclosure marker: draw one (decorative; the summary's state is announced). */
 .causa-focus__summary::before { content: "▸"; color: var(--ef-color-text-primary); }
 details[open] > .causa-focus__summary::before { content: "▾"; }

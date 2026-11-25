@@ -805,8 +805,8 @@
         "name": "ros-work-protocol",
         "mechanism": "resume-transition"
       },
-      "lastAssessedAt": "2026-11-25T13:05:14Z",
-      "recordedAt": "2026-11-25T13:05:14Z",
+      "lastAssessedAt": "2026-11-25T18:11:33.000Z",
+      "recordedAt": "2026-11-25T18:11:33.000Z",
       "history": [
         {
           "status": "unknown",
@@ -1711,6 +1711,26 @@
       },
       "collectedAt": "2026-11-25T13:05:33Z",
       "schemaVersion": "1.0.0"
+    },
+    {
+      "measurementId": "MEAS-2b968097c6cec360898421ec",
+      "id": "agent.resumes",
+      "value": 1,
+      "unit": "count",
+      "currency": null,
+      "quality": "derived",
+      "confidence": null,
+      "scope": "execution",
+      "aggregation": "sum",
+      "dimensions": {},
+      "pricing": null,
+      "source": {
+        "type": "calculated",
+        "name": "ros-work-protocol",
+        "mechanism": "resume-transition"
+      },
+      "collectedAt": "2026-11-25T18:11:33.000Z",
+      "schemaVersion": "1.0.0"
     }
   ],
   "rawTelemetry": [],
@@ -1756,6 +1776,17 @@
         "mechanism": "work-lifecycle"
       },
       "eventId": "TEVT-2d69ae71493fb5016eabf06c"
+    },
+    {
+      "type": "work.resumed",
+      "occurredAt": "2026-11-25T18:11:33.000Z",
+      "reason": null,
+      "source": {
+        "type": "ros-clock",
+        "name": "ros",
+        "mechanism": "work-lifecycle"
+      },
+      "eventId": "TEVT-ed88545169c571c4edd403a7"
     }
   ],
   "repository": {

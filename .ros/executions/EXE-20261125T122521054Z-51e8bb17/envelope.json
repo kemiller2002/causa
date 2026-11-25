@@ -50,8 +50,8 @@
   "humanOnlyTransitions": [],
   "parentExecution": null,
   "startedAt": "2026-11-25T12:25:21.356Z",
-  "state": "blocked",
-  "stateReason": "Owner decision: causa's governed competition lock (Indy-init dependency-lock.json, echelon-current 1.37.0) selects Aegis 1.0.0",
+  "state": "active",
+  "stateReason": null,
   "origin": {
     "kind": "work-transition",
     "reference": "work.begin"

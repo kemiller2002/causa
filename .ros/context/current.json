@@ -4,7 +4,7 @@
   "repository": "causa-t0",
   "actor": "claude",
   "startedAt": "2026-11-07T15:53:41.921Z",
-  "updatedAt": "2026-11-25T12:25:20.000Z",
+  "updatedAt": "2026-11-25T12:37:25.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -209,13 +209,34 @@
     {
       "id": "WI-0033",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
+      "state": "blocked",
+      "semanticState": "blocked",
       "evidence": [],
-      "updatedAt": "2026-11-25T12:25:20.000Z",
+      "updatedAt": "2026-11-25T12:37:25.000Z",
       "telemetryExecutionIds": [
         "EXE-20261125T122521054Z-51e8bb17"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "cf22fd3b878264cd9b12d0e2",
+        "recordedAt": "2026-11-25T12:37:24.000Z",
+        "executionId": "EXE-20261125T122521054Z-51e8bb17",
+        "repository": "causa-t0",
+        "branch": "claude/vigila-implementation-jdeps1",
+        "commit": "0590dbc0cf17c10cb09ec9df9effae1bfef95966",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/causa"
+        },
+        "remoteBranch": "claude/vigila-implementation-jdeps1",
+        "remoteCommit": "0590dbc0cf17c10cb09ec9df9effae1bfef95966",
+        "summary": "Aegis pinned to 2.0.0 via conditor upgrade. App.slnx fails NU1605 (Aegis 2.0.0 FSharp.Core >= 11.0.101 floor). Causa.slnx 351/353; VER-001-O1 and VER-003-O3 fail because .echelon/release-selection.json and the governed dependency lock still select aegis 1.0.0.",
+        "nextAction": "Retarget to Aegis 2.0.1 with conditor upgrade; obtain an owner decision to re-select aegis in the governed lock (Indy-init) and .echelon/release-selection.json",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "blockReason": "Aegis 2.0.0 packaging defect (FSharp.Core >= 11.0.101) breaks App.slnx restore with NU1605 on SDK 10.0.402; release-selection gate (VER-001-O1, VER-003-O3) requires an owner re-selection of aegis in the governed dependency lock. Waiting for Aegis 2.0.1."
     }
   ]
 }

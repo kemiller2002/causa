@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "causa-t0",
-  "nextSeq": 33,
+  "nextSeq": 34,
   "items": [
     {
       "id": "COND-MISSION-001",
@@ -688,6 +688,27 @@
       "attachments": [],
       "createdAt": "2026-11-08T12:42:31.896Z",
       "updatedAt": "2026-11-08T12:42:45Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0033",
+      "title": "Upgrade Aegis 1.0.0 -> 2.0.0 with Conditor 0.10.27 (echelon-current 1.40.0)",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-11-25T12:25:16.190Z",
+      "updatedAt": "2026-11-25T12:25:19.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

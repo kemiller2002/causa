@@ -778,8 +778,8 @@
         "name": "ros-work-protocol",
         "mechanism": "blocked-transition"
       },
-      "lastAssessedAt": "2026-11-25T13:05:33Z",
-      "recordedAt": "2026-11-25T13:05:33Z",
+      "lastAssessedAt": "2026-11-25T18:15:03.000Z",
+      "recordedAt": "2026-11-25T18:15:03.000Z",
       "history": [
         {
           "status": "unknown",
@@ -1731,6 +1731,26 @@
       },
       "collectedAt": "2026-11-25T18:11:33.000Z",
       "schemaVersion": "1.0.0"
+    },
+    {
+      "measurementId": "MEAS-0903e0e030e41e5708cdac3b",
+      "id": "agent.interruptions",
+      "value": 1,
+      "unit": "count",
+      "currency": null,
+      "quality": "derived",
+      "confidence": null,
+      "scope": "execution",
+      "aggregation": "sum",
+      "dimensions": {},
+      "pricing": null,
+      "source": {
+        "type": "calculated",
+        "name": "ros-work-protocol",
+        "mechanism": "blocked-transition"
+      },
+      "collectedAt": "2026-11-25T18:15:03.000Z",
+      "schemaVersion": "1.0.0"
     }
   ],
   "rawTelemetry": [],
@@ -1787,6 +1807,17 @@
         "mechanism": "work-lifecycle"
       },
       "eventId": "TEVT-ed88545169c571c4edd403a7"
+    },
+    {
+      "type": "work.blocked",
+      "occurredAt": "2026-11-25T18:15:03.000Z",
+      "reason": "echelon-current 1.42.0: conditor upgrade --current refuses forma-workflow 1.2.0 (not selected by the 1.42.0 Registry authority). Dropping it from conditor.json needs conditor init to re-lock, which the session's permission classifier refused on this governed repository. Also needs a successor governed dependency lock in Indy-init (owner decision; toolchain.lock.json is an owner pin) and a new stack-drift evidence run. The Forma 1.0.1 codemod was dry-run (653 lines in 25 files; Folio ef-print-* names must be kept).",
+      "source": {
+        "type": "ros-clock",
+        "name": "ros",
+        "mechanism": "work-lifecycle"
+      },
+      "eventId": "TEVT-b6f80d6c17976de4a77a94b7"
     }
   ],
   "repository": {

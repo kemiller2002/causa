@@ -50,8 +50,8 @@
   "humanOnlyTransitions": [],
   "parentExecution": null,
   "startedAt": "2026-11-25T12:25:21.356Z",
-  "state": "active",
-  "stateReason": null,
+  "state": "blocked",
+  "stateReason": "echelon-current 1.42.0: conditor upgrade --current refuses forma-workflow 1.2.0 (not selected by the 1.42.0 Registry authority). Dropping it from conditor.json needs conditor init to re-lock, which the session's permission classifier refused on this governed repository. Also needs a successor governed dependency lock in Indy-init (owner decision; toolchain.lock.json is an owner pin) and a new stack-drift evidence run. The Forma 1.0.1 codemod was dry-run (653 lines in 25 files; Folio ef-print-* names must be kept).",
   "origin": {
     "kind": "work-transition",
     "reference": "work.begin"

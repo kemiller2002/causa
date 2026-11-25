@@ -778,8 +778,8 @@
         "name": "ros-work-protocol",
         "mechanism": "blocked-transition"
       },
-      "lastAssessedAt": "2026-11-25T12:37:25.000Z",
-      "recordedAt": "2026-11-25T12:37:25.000Z",
+      "lastAssessedAt": "2026-11-25T13:05:33Z",
+      "recordedAt": "2026-11-25T13:05:33Z",
       "history": [
         {
           "status": "unknown",
@@ -1691,6 +1691,26 @@
       },
       "collectedAt": "2026-11-25T13:05:14Z",
       "schemaVersion": "1.0.0"
+    },
+    {
+      "measurementId": "MEAS-dc16f8cdaa450960dbc8c5f0",
+      "id": "agent.interruptions",
+      "value": 1,
+      "unit": "count",
+      "currency": null,
+      "quality": "derived",
+      "confidence": null,
+      "scope": "execution",
+      "aggregation": "sum",
+      "dimensions": {},
+      "pricing": null,
+      "source": {
+        "type": "calculated",
+        "name": "ros-work-protocol",
+        "mechanism": "blocked-transition"
+      },
+      "collectedAt": "2026-11-25T13:05:33Z",
+      "schemaVersion": "1.0.0"
     }
   ],
   "rawTelemetry": [],
@@ -1725,6 +1745,17 @@
         "mechanism": "work-lifecycle"
       },
       "eventId": "TEVT-f12f82c49e1250da019fe810"
+    },
+    {
+      "type": "work.blocked",
+      "occurredAt": "2026-11-25T13:05:33Z",
+      "reason": "Owner decision: causa's governed competition lock (Indy-init dependency-lock.json, echelon-current 1.37.0) selects Aegis 1.0.0",
+      "source": {
+        "type": "ros-clock",
+        "name": "ros",
+        "mechanism": "work-lifecycle"
+      },
+      "eventId": "TEVT-2d69ae71493fb5016eabf06c"
     }
   ],
   "repository": {

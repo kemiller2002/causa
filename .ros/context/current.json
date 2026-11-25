@@ -4,7 +4,7 @@
   "repository": "causa-t0",
   "actor": "claude",
   "startedAt": "2026-11-07T15:53:41.921Z",
-  "updatedAt": "2026-11-08T12:42:46Z",
+  "updatedAt": "2026-11-25T12:25:20.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -205,6 +205,17 @@
           "mechanism": "git-remote-observation"
         }
       }
+    },
+    {
+      "id": "WI-0033",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-11-25T12:25:20.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261125T122521054Z-51e8bb17"
+      ]
     }
   ]
 }

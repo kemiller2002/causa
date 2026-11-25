@@ -35,4 +35,5 @@
 | WI-0029 | [WI-INV-LIST] Implement the CAT-CAUSA-INVESTIGATION requirements of screen LIST | ready |  | medium |
 | WI-0030 | [WI-INV-START] Implement the CAT-CAUSA-INVESTIGATION requirements of screen START | active |  | medium |
 | WI-0031 | [WI-INV-WORKSPACE] Implement the CAT-CAUSA-INVESTIGATION requirements of screen WORKSPACE | active |  | medium |
-| WI-0032 | Record a code-quality metrics baseline for main c8831ba (size, test ratio, complexity, duplication, functional style) against industry benchmarks | ready |  | medium |
+| WI-0032 | Record a code-quality metrics baseline for main c8831ba (size, test ratio, complexity, duplication, functional style) against industry benchmarks | active |  | medium |
+| WI-0033 | Upgrade Aegis 1.0.0 -> 2.0.0 with Conditor 0.10.27 (echelon-current 1.40.0) | ready |  | medium |
